@@ -46,10 +46,10 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
 else()
   message(FATAL_ERROR "Unsupported architecture: ${CMAKE_HOST_SYSTEM_PROCESSOR}!")
 endif()
-# 检查大恒库文件是否存在
-if(NOT EXISTS "./daheng/lib/amd64/libgxiapi.so")
-    message(WARNING "libgxiapi.so not found at: ./daheng/lib/amd64/")
-endif()
+# # 检查大恒库文件是否存在
+# if(NOT EXISTS "daheng/lib/amd64/libgxiapi.so")
+#     message(WARNING "libgxiapi.so not found at: daheng/lib/amd64/")
+# endif()
 
 target_link_libraries(io MvCameraControl MVSDK gxiapi usb-1.0 yaml-cpp serial)
 

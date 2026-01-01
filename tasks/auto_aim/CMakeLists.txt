@@ -23,7 +23,7 @@ add_library(auto_aim OBJECT
     voter.cpp
     shooter.cpp
     yolo.cpp
-    yolos/yolov5.cpp
+    yolos/yolov5_ov.cpp
     yolos/yolov5_trt.cpp
     yolos/yolov8.cpp
     yolos/yolo11.cpp

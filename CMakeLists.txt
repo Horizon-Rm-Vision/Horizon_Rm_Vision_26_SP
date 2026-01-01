@@ -6,6 +6,19 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Release)
 message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}--------------------")
 
+# 编译选项,默认不编译多余组件，可以改OFF为ON或者在cmake ..中添加-DBUILD_XXX=ON临时启用
+option(BUILD_TEST "Build test tools" OFF)
+option(BUILD_CALIBRATION "Build calibration tools" OFF)
+option(BUILD_SENTRY "Build sentry tools" OFF)
+option(BUILD_TRT "Build only TensorRT" OFF)
+option(BUILD_OV "Build only OpenVINO" OFF)
+option(BUILD_DBINFER "Build double Infer" OFF)
+option(BUILD_ALL "Build all components" OFF)
+message(STATUS "--------------------BUILD_CALIBRATION: ${BUILD_CALIBRATION}--------------------")
+message(STATUS "--------------------BUILD_TEST: ${BUILD_TEST}--------------------")
+message(STATUS "--------------------BUILD_SENTRY: ${BUILD_SENTRY}--------------------")
+message(STATUS "--------------------BUILD_ALL: ${BUILD_ALL}--------------------")
+
 # Add module in charge of finding TensorRT
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
@@ -54,20 +67,32 @@ target_link_libraries(uav ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff to
 target_link_libraries(uav_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
 
 ##################calibration################
-add_executable(capture calibration/capture.cpp)
-add_executable(calibrate_camera calibration/calibrate_camera.cpp)
-add_executable(calibrate_handeye calibration/calibrate_handeye.cpp)
-add_executable(calibrate_robotworld_handeye calibration/calibrate_robotworld_handeye.cpp)
-add_executable(split_video calibration/split_video.cpp)
+# 只在 BUILD_CALIBRATION 或 BUILD_ALL 为 ON 时编译 calibration 工具
+if(BUILD_CALIBRATION OR BUILD_ALL)
+    add_executable(capture calibration/capture.cpp)
+    add_executable(calibrate_camera calibration/calibrate_camera.cpp)
+    add_executable(calibrate_handeye calibration/calibrate_handeye.cpp)
+    add_executable(calibrate_robotworld_handeye calibration/calibrate_robotworld_handeye.cpp)
+    add_executable(split_video calibration/split_video.cpp)
 
-target_link_libraries(capture ${OpenCV_LIBS} fmt::fmt tools io)
-target_link_libraries(calibrate_camera ${OpenCV_LIBS} fmt::fmt yaml-cpp tools)
-target_link_libraries(calibrate_handeye ${OpenCV_LIBS} fmt::fmt yaml-cpp tools)
-target_link_libraries(calibrate_robotworld_handeye ${OpenCV_LIBS} fmt::fmt yaml-cpp tools)
-target_link_libraries(split_video ${OpenCV_LIBS} fmt::fmt tools)
+    target_link_libraries(capture ${OpenCV_LIBS} fmt::fmt tools io)
+    target_link_libraries(calibrate_camera ${OpenCV_LIBS} fmt::fmt yaml-cpp tools)
+    target_link_libraries(calibrate_handeye ${OpenCV_LIBS} fmt::fmt yaml-cpp tools)
+    target_link_libraries(calibrate_robotworld_handeye ${OpenCV_LIBS} fmt::fmt yaml-cpp tools)
+    target_link_libraries(split_video ${OpenCV_LIBS} fmt::fmt tools)
+    message(STATUS "Calibration tools are enabled.")
+else()
+    message(STATUS "Calibration tools are disabled. Use -DBUILD_CALIBRATION=ON or -DBUILD_ALL=ON to enable.")
+endif()
+
+##################demo##################
+add_executable(auto_aim_test tests/auto_aim_test.cpp)
+target_link_libraries(auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 
 ##################tests##################
-add_executable(auto_aim_test tests/auto_aim_test.cpp)
+# 只在 BUILD_TEST 或 BUILD_ALL 为 ON 时编译 TEST 工具
+if(BUILD_TEST OR BUILD_ALL)
+
 add_executable(auto_buff_test tests/auto_buff_test.cpp)
 add_executable(camera_detect_test tests/camera_detect_test.cpp)
 add_executable(camera_test tests/camera_test.cpp)
@@ -83,7 +108,7 @@ add_executable(handeye_test tests/handeye_test.cpp)
 add_executable(dm_test tests/dm_test.cpp)
 add_executable(minimum_vision_system tests/minimum_vision_system.cpp)
 
-target_link_libraries(auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
+
 target_link_libraries(auto_buff_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff tools io)
 target_link_libraries(camera_detect_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools auto_aim io)
 target_link_libraries(camera_test ${OpenCV_LIBS} fmt::fmt tools io)
@@ -107,6 +132,9 @@ target_link_libraries(planner_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim too
 
 add_executable(planner_test_offline tests/planner_test_offline.cpp)
 target_link_libraries(planner_test_offline ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
+else()
+    message(STATUS "Test tools are disabled. Use -DBUILD_TEST=ON or -DBUILD_ALL=ON to enable.")
+endif()
 
 # 检查 ROS 环境
 find_package(ament_cmake QUIET)
@@ -114,8 +142,8 @@ find_package(rclcpp QUIET)
 find_package(std_msgs QUIET)
 find_package(rosidl_typesupport_cpp QUIET)
 find_package(sp_msgs QUIET)
-# 只有在找到 ROS 环境时才会添加 sentry 和 publish_test
-if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_cpp_FOUND AND sp_msgs_FOUND)
+# 只有在找到 ROS 环境且BUILD_SENTRY 或 BUILD_ALL 为 ON 时才会添加 sentry 和 publish_test
+if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_cpp_FOUND AND sp_msgs_FOUND AND BUILD_SENTRY OR BUILD_ALL)
     # 编译 sentry 和 publish_test
     add_executable(sentry src/sentry.cpp)
     add_executable(sentry_bp src/sentry_bp.cpp)

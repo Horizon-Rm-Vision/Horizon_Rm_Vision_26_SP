@@ -3,7 +3,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include "yolos/yolo11.hpp"
-#include "yolos/yolov5.hpp"
+#include "yolos/yolov5_ov.hpp"
 #include "yolos/yolov5_trt.hpp"
 #include "yolos/yolov8.hpp"
 
@@ -22,7 +22,7 @@ YOLO::YOLO(const std::string & config_path, bool debug)
     yolo_ = std::make_unique<YOLO11>(config_path, debug);
   }
 
-  else if (yolo_name == "yolov5") {
+  else if (yolo_name == "yolov5_ov") {
     yolo_ = std::make_unique<YOLOV5>(config_path, debug);
   }
 

@@ -1,4 +1,4 @@
-# 同济大学SuperPower战队25赛季自瞄算法开源
+# Horizon战队26赛季自瞄算法
 
 ## 本项目亮点
 - 无ROS依赖*，新同学无需学习ROS相关知识就能上手自瞄。
@@ -123,7 +123,7 @@ IMU型号：使用C板内置BMI088作为IMU\
     ```
     mkdir neo  
     cd neo  
-
+    
     wget https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.13463.18/intel-igc-core_1.0.13463.18_amd64.deb  
     wget https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.13463.18/intel-igc-opencl_1.0.13463.18_amd64.deb  
     wget https://github.com/intel/compute-runtime/releases/download/23.09.25812.14/intel-level-zero-gpu-dbgsym_1.3.25812.14_amd64.ddeb  
@@ -132,7 +132,7 @@ IMU型号：使用C板内置BMI088作为IMU\
     wget https://github.com/intel/compute-runtime/releases/download/23.09.25812.14/intel-opencl-icd_23.09.25812.14_amd64.deb  
     wget https://github.com/intel/compute-runtime/releases/download/23.09.25812.14/libigdgmm12_22.3.0_amd64.deb  
     wget https://github.com/intel/compute-runtime/releases/download/23.09.25812.14/ww09.sum  
-
+    
     sha256sum -c ww09.sum  
     sudo dpkg -i *.deb  
     ```
@@ -240,7 +240,7 @@ sp_vision_25
     ├── trajectory.hpp             // 弹道解算
     ├── yaml.hpp                   // YAML配置文件解析器
     └── ...
-```    
+```
 
 
 ## 4 轨迹视角下的自瞄理论
@@ -350,4 +350,5 @@ DPS = 单位时间射击窗口占比 \times 射频 \times 单发子弹伤害
 ##by ZYL
 ###M1:基于REV4,修复了大恒相机的曝光问题，为yolov5模式新增了TensorRT10推理框架的支持，使其支持在Jetapck6使用TensorRT10加速推理以及带NVIDIA独显的设备使用TensorRT10加速推理，是正式准备测试的第一个版本
 ###M2:根据io/ros2部分代码逆转写出的sp_msgs通信包，恢复了其和ros2程序通信的能力
+###M3:修改了主CMakeLists使其按条件编译，默认不编译全部组件，以加快编译速度，具体组件编译条件详细见上面的代码编译部分，修改通信协议，收发单位由弧度改为角度，修正大恒相机对arm64的兼容问题
 
