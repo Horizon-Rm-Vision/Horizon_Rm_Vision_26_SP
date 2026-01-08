@@ -226,22 +226,22 @@ cv::Point2f YOLOV5::get_center_norm(const cv::Mat & bgr_img, const cv::Point2f &
 void YOLOV5::draw_detections(
   const cv::Mat & img, const std::list<Armor> & armors, int frame_count) const
 {
-  auto detection = img.clone();
-  tools::draw_text(detection, fmt::format("[{}]", frame_count), {10, 30}, {255, 255, 255});
-  for (const auto & armor : armors) {
-    auto info = fmt::format(
-      "{:.2f} {} {} {}", armor.confidence, COLORS[armor.color], ARMOR_NAMES[armor.name],
-      ARMOR_TYPES[armor.type]);
-    tools::draw_points(detection, armor.points, {0, 255, 0});
-    tools::draw_text(detection, info, armor.center, {0, 255, 0});
-  }
+  // auto detection = img.clone();
+  // tools::draw_text(detection, fmt::format("[{}]", frame_count), {10, 30}, {255, 255, 255});
+  // for (const auto & armor : armors) {
+  //   auto info = fmt::format(
+  //     "{:.2f} {} {} {}", armor.confidence, COLORS[armor.color], ARMOR_NAMES[armor.name],
+  //     ARMOR_TYPES[armor.type]);
+  //   tools::draw_points(detection, armor.points, {0, 255, 0});
+  //   tools::draw_text(detection, info, armor.center, {0, 255, 0});
+  // }
 
-  if (use_roi_) {
-    cv::Scalar green(0, 255, 0);
-    cv::rectangle(detection, roi_, green, 2);
-  }
-  cv::resize(detection, detection, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
-  cv::imshow("detection", detection);
+  // if (use_roi_) {
+  //   cv::Scalar green(0, 255, 0);
+  //   cv::rectangle(detection, roi_, green, 2);
+  // }
+  // cv::resize(detection, detection, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
+  // cv::imshow("detection", detection);
 }
 
 void YOLOV5::save(const Armor & armor) const

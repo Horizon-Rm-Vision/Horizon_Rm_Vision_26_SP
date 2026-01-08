@@ -3,9 +3,13 @@
 
 #include <list>
 #include <opencv2/opencv.hpp>
+#include <opencv2/cudawarping.hpp>
+#include <opencv2/cudaarithm.hpp>
+#include <opencv2/cudaimgproc.hpp>
 #include <string>
 #include <vector>
 #include <memory>
+#include <cuda_runtime.h>
 
 #include "tasks/auto_aim/armor.hpp"
 #include "tasks/auto_aim/detector.hpp"
@@ -20,7 +24,7 @@ public:
   YOLOV5_TRT(const std::string & config_path, bool debug);
   ~YOLOV5_TRT();
 
-  std::list<Armor> detect(const cv::Mat & bgr_img, int frame_count) override;
+  std::list<Armor> detect(const cv::Mat & raw_img, int frame_count) override;
 
   std::list<Armor> postprocess(
     double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count) override;
@@ -48,9 +52,37 @@ private:
   int output_rows_;
   int output_cols_;
 
+  // GPU内存指针
+  float* d_input_tensor_ = nullptr;
+  float* d_output_tensor_ = nullptr;
+  size_t input_count_;
+  size_t output_count_;
+  
+  // 临时GPU内存用于后处理
+  int* d_temp_color_ids_ = nullptr;
+  int* d_temp_num_ids_ = nullptr;
+  float* d_temp_confidences_ = nullptr;
+  float* d_temp_boxes_ = nullptr;
+  float* d_temp_keypoints_ = nullptr;
+  int* d_valid_count_ = nullptr;
+  
+  // OpenCV CUDA对象
+  cv::cuda::GpuMat gpu_bgr_img_;
+  cv::cuda::GpuMat gpu_resized_;
+  cv::cuda::GpuMat gpu_padded_;
+  cv::cuda::GpuMat gpu_rgb_;
+  cv::cuda::GpuMat gpu_float_;
+  cv::cuda::GpuMat gpu_blob_;
+
   // 预处理和后处理相关
-  cv::Mat preprocessImage(const cv::Mat& bgr_img, double& scale, int& pad_x, int& pad_y);
-  std::list<Armor> parseDetections(const cv::Mat& output, double scale, int pad_x, int pad_y, const cv::Mat& bgr_img, int frame_count);
+  cv::cuda::GpuMat preprocessImageGPU(const cv::Mat& bgr_img, double& scale, int& pad_x, int& pad_y);
+  std::list<Armor> parseDetections(const cv::Mat& output, double scale, int pad_x, int pad_y, 
+                                   const cv::Mat& bgr_img, int frame_count);
+  void parseDetectionsGPU(const float* d_output, int output_rows, int output_cols,
+                         float score_threshold, double scale, int pad_x, int pad_y,
+                         std::vector<int>& color_ids, std::vector<int>& num_ids,
+                         std::vector<float>& confidences, std::vector<cv::Rect>& boxes,
+                         std::vector<std::vector<cv::Point2f>>& armor_key_points);
 
   bool check_name(const Armor & armor) const;
   bool check_type(const Armor & armor) const;
@@ -60,6 +92,10 @@ private:
   void save(const Armor & armor) const;
   void draw_detections(const cv::Mat & img, const std::list<Armor> & armors, int frame_count) const;
   double sigmoid(double x);
+  
+  // CUDA相关辅助函数
+  void allocateGPUMemory();
+  void freeGPUMemory();
 };
 
 }  // namespace auto_aim

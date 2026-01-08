@@ -110,17 +110,32 @@ GimbalState Gimbal::state() const
   return state_;
 }
 
+// std::string Gimbal::str(GimbalMode mode) const
+// {
+//   switch (mode) {
+//     case GimbalMode::IDLE:
+//       return "IDLE";
+//     case GimbalMode::AUTO_AIM:
+//       return "AUTO_AIM";
+//     case GimbalMode::SMALL_BUFF:
+//       return "SMALL_BUFF";
+//     case GimbalMode::BIG_BUFF:
+//       return "BIG_BUFF";
+//     default:
+//       return "INVALID";
+//   }
+// }
 std::string Gimbal::str(GimbalMode mode) const
 {
   switch (mode) {
-    case GimbalMode::IDLE:
-      return "IDLE";
     case GimbalMode::AUTO_AIM:
       return "AUTO_AIM";
     case GimbalMode::SMALL_BUFF:
       return "SMALL_BUFF";
     case GimbalMode::BIG_BUFF:
       return "BIG_BUFF";
+    case GimbalMode::IDLE:
+      return "IDLE";
     default:
       return "INVALID";
   }
@@ -212,22 +227,24 @@ void Gimbal::send(
   {
       if (fire) 
       {
-          mode = 57;  // 控制且开火，对应NT_M6的111001
+          mode = 57;  // 控制且开火，对应NT_M6的111001（十六进制原始数据39）
       } 
       else 
       {
-          mode = 49;  // 控制但不开火，对应NT_M6的110001
+          mode = 49;  // 控制但不开火，对应NT_M6的110001（十六进制原始数据31）
       }
   } 
   else 
   {
-      mode = 1;      // 不控制，对应NT_M6的自瞄模式默认标志位001
+      mode = 1;      // 不控制，对应NT_M6的自瞄模式默认标志位001（十六进制原始数据01）
   }
 
-  // 赋值给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
-  tx_data_.mode = mode * (180.0 / M_PI);  // 弧度转换为角度
-  tx_data_.yaw = yaw * (180.0 / M_PI);  // 弧度转换为角度
-  tx_data_.pitch = pitch * (180.0 / M_PI);  // 弧度转换为角度
+
+
+  tx_data_.mode = mode;  // 弧度转换为角度
+  // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
+  tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
+  tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.timestamp = 0;  // 时间戳暂时填0
   
   if (fd_ < 0) {
@@ -322,8 +339,8 @@ void Gimbal::read_thread()
           
           // 复制到局部变量以避免packed结构体引用问题
           uint8_t mode = rx_data_.mode;
-          float yaw = rx_data_.yaw * (M_PI / 180.0);  // 接收时从角度制转换为弧度制
-          float pitch = rx_data_.pitch * (M_PI / 180.0);  // 接收时从角度制转换为弧度制
+          float yaw = -rx_data_.yaw * (M_PI / 180.0);  // 接收时从角度制转换为弧度制并取负
+          float pitch = -rx_data_.pitch * (M_PI / 180.0);  // 接收时从角度制转换为弧度制并取负
           uint8_t bullet_speed = rx_data_.bullet_speed;
           
           // 使用yaw和pitch计算四元数（roll设为0）
