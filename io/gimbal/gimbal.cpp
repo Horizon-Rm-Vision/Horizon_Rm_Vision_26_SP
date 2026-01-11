@@ -346,8 +346,8 @@ void Gimbal::read_thread()
           // 使用yaw和pitch计算四元数（roll设为0）
           //单位转换
           double d2r = M_PI / 180.0;
-          Eigen::AngleAxisd yaw_angle(yaw * d2r, Eigen::Vector3d::UnitZ());
-          Eigen::AngleAxisd pitch_angle(pitch * d2r, Eigen::Vector3d::UnitY());
+          Eigen::AngleAxisd yaw_angle(yaw, Eigen::Vector3d::UnitZ());
+          Eigen::AngleAxisd pitch_angle(pitch, Eigen::Vector3d::UnitY());
           Eigen::AngleAxisd roll_angle(0 * d2r, Eigen::Vector3d::UnitX());
           
           Eigen::Quaterniond q = yaw_angle * pitch_angle * roll_angle;
@@ -368,10 +368,10 @@ void Gimbal::read_thread()
             
             GimbalMode old_mode = mode_;
             switch (mode) {
-              case 0:
+              case 1:
                 mode_ = GimbalMode::IDLE;
                 break;
-              case 1:
+              case 0:
                 mode_ = GimbalMode::AUTO_AIM;
                 break;
               case 2:

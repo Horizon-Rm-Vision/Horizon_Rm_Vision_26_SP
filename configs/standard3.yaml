@@ -2,12 +2,12 @@ enemy_color: "red"
 #enemy_color: "blue"
 
 #####-----神经网络参数-----#####
-yolo_name: yolov8
+yolo_name: yolov5_trt
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
 yolov5_model_path: ../assets/yolov5.xml
-yolov5_trt_model_path: ../assets/yolov5a-fp16.engine
+yolov5_trt_model_path: ../assets/yolov5a.engine
 device: CPU
 min_confidence: 0.8
 use_traditional: true
@@ -42,7 +42,7 @@ yaw_offset: 0 # degree -2.5
 pitch_offset: 0 # degree 2
 comming_angle: 55 # degree
 leaving_angle: 20 # degree
-decision_speed: 7 # rad/s
+decision_speed: 0.1 # rad/s
 high_speed_delay_time: 0.0 # s
 low_speed_delay_time: 0.0 # s planner use this value
 
@@ -52,25 +52,40 @@ second_tolerance: 2 # 远距离射击容差，degree
 judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
-camera_name: "hikrobot"
-exposure_ms: 3
-gain: 10.0
-vid_pid: "2bdf:0001"
+# camera_name: "hikrobot"
+# exposure_ms: 3
+# gain: 10.0
+# vid_pid: "2bdf:0001"
+
+camera_name: "mindvision"
+exposure_ms: 2
+gamma: 1
+vid_pid: "f622:d13a"
+
 
 #  1  0  0
 #  0  1  0
 #  0  0  1
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
-# 重投影误差: 0.1820px
-camera_matrix: [1785.4881526822305, 0, 672.4806478241826, 0, 1785.026019470562, 559.89603224794314, 0, 0, 1]
-distort_coeffs: [-0.076005079619881746, 0.11182817466388446, 0.0005362204787722057, -0.0027546300984895122, 0]
+# # 重投影误差: 0.1820px
+# camera_matrix: [1785.4881526822305, 0, 672.4806478241826, 0, 1785.026019470562, 559.89603224794314, 0, 0, 1]
+# distort_coeffs: [-0.076005079619881746, 0.11182817466388446, 0.0005362204787722057, -0.0027546300984895122, 0]
+
+#MD2
+camera_matrix: [1279.1579, 0, 660.93386, 0, 1285.86608, 539.38196, 0, 0, 1]
+distort_coeffs:  [-0.211299, 0.146132, 0.002248, 0.003142, 0.000000]
 
 # 相机同理想情况的偏角: yaw1.44 pitch-7.28 roll0.96 degree
 # 标定板到世界坐标系原点的水平距离: 1.13 m
 # 标定板同竖直摆放时的偏角: yaw7.61 pitch13.92 roll-0.46 degree
-R_camera2gimbal: [-0.027182119030230909, -0.12616154330853446, 0.99163723074269183, -0.99949106557517331, 0.019998323121329122, -0.024853106601381177, -0.016695575474690555, -0.99180811252093692, -0.12664093215554434]
-t_camera2gimbal: [0.13160669975045827, 0.10377721766577375, 0.024908271912914642]
+# R_camera2gimbal: [-0.027182119030230909, -0.12616154330853446, 0.99163723074269183, -0.99949106557517331, 0.019998323121329122, -0.024853106601381177, -0.016695575474690555, -0.99180811252093692, -0.12664093215554434]
+R_camera2gimbal: [0, 0, 1, -1, 0, 0, 0, -1, 0]  # 理想情况
+# t_camera2gimbal: [0.13160669975045827, 0.10377721766577375, 0.024908271912914642]
+# X = 0.13m：相机位于云台中心前方约 13 厘米处。
+# Y = 0.10m：相机位于云台中心左侧约 10 厘米处。
+# Z = 0.025m：相机位于云台中心上方约 2.5 厘米处。
+t_camera2gimbal: [0, 0, 0]  # 理想情况
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x100
@@ -79,7 +94,8 @@ send_canid: 0xff
 can_interface: "can0"
 
 #####-----gimbal参数-----#####
-com_port: "/dev/ttyUSB1"
+com_port: "/dev/ttyACM1"
+# com_port: "/dev/pts/4"
 yaw_kp: 0
 yaw_kd: 0
 pitch_kp: 0
@@ -88,11 +104,13 @@ pitch_kd: 0
 #####-----planner-----#####
 fire_thresh: 0.0035
 
-max_yaw_acc: 50
+# max_yaw_acc: 50
+max_yaw_acc: 30
 Q_yaw: [9e6, 0]
 R_yaw: [1]
 
-max_pitch_acc: 100
+# max_pitch_acc: 100
+max_pitch_acc: 80
 Q_pitch: [9e6, 0]
 R_pitch: [1]
 

@@ -28,6 +28,9 @@ struct Plan
   float pitch;
   float pitch_vel;
   float pitch_acc;
+
+  float last_yaw;
+  float last_pitch;
 };
 
 class Planner
@@ -44,6 +47,8 @@ private:
   double pitch_offset_;
   double fire_thresh_;
   double low_speed_delay_time_, high_speed_delay_time_, decision_speed_;
+  double last_yaw_ = 0.0;
+  double last_pitch_ = 0.0;
 
   TinySolver * yaw_solver_;
   TinySolver * pitch_solver_;
