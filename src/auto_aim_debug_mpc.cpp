@@ -187,7 +187,7 @@ int main(int argc, char * argv[])
 {
   tools::Exiter exiter;
   tools::Plotter plotter;
-
+  tools::draw_picture draw;
   cv::CommandLineParser cli(argc, argv, keys);
   auto config_path = cli.get<std::string>(0);
   if (cli.has("help") || config_path.empty()) {
@@ -285,29 +285,16 @@ int main(int argc, char * argv[])
     else
       target_queue.push(std::nullopt);
 
-    // 在图像上绘制检测结果（合并原 detection 窗口信息）
+     // 在图像上绘制检测结果（合并原 detection 窗口信息）
     for (const auto & armor : armors) {
       // 画装甲四点与标签
+      cv::Point2f center;
+      center.x=(armor.points[0].x+armor.points[1].x+armor.points[2].x+armor.points[3].x)/4;
+      center.y=(armor.points[0].y+armor.points[1].y+armor.points[2].y+armor.points[3].y)/4;
       tools::draw_points(img, armor.points, {0, 255, 0});
       auto info = fmt::format("{:.2f} {} {} {}", armor.confidence, auto_aim::COLORS[armor.color], auto_aim::ARMOR_NAMES[armor.name],auto_aim::ARMOR_TYPES[armor.type]);
-      tools::draw_text(img, info, armor.center, {0, 255, 0});
-    }
-    
-    if (!targets.empty()) {
-      auto target = targets.front();
-
-      // 当前帧target更新后
-      std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
-      for (const Eigen::Vector4d & xyza : armor_xyza_list) {
-        auto image_points =
-          solver.reproject_armor(xyza.head(3), xyza[3], target.armor_type, target.name);
-        tools::draw_points(img, image_points, {0, 255, 0});
-      }
-
-      Eigen::Vector4d aim_xyza = planner.debug_xyza;
-      auto image_points =
-        solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
-      tools::draw_points(img, image_points, {0, 0, 255});
+      tools::draw_text(img, info, armor.center, {20, 0, 165});
+      draw.draw_Picture_center(img,center);
     }
     
     // 获取云台状态和规划信息用于UI显示
@@ -315,7 +302,29 @@ int main(int argc, char * argv[])
     std::optional<auto_aim::Target> target_opt = target_queue.front();
     bool has_target = target_opt.has_value();
     auto plan = planner.plan(target_opt, gs.bullet_speed);
+    if (!targets.empty()) {
+      auto target = targets.front();
+       
+      // 当前帧target更新后
+      std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
+      for (const Eigen::Vector4d & xyza : armor_xyza_list) {
+        auto image_points =
+        solver.reproject_armor(xyza.head(3), xyza[3], target.armor_type, target.name);
+        tools::draw_points(img, image_points, {0, 255, 0});
+      }
+
+      Eigen::Vector4d aim_xyza = planner.debug_xyza;
+      auto image_points =
+      solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
+      cv::Point2f center;
+        center.x=(image_points[0].x+image_points[1].x+image_points[2].x+image_points[3].x)/4;
+        center.y=(image_points[0].y+image_points[1].y+image_points[2].y+image_points[3].y)/4;
+        draw.draw_Picture_center(img,center,cv::Scalar(0, 165, 255));
+        plan.fire?draw.draw_Picture_center(img,center,cv::Scalar(0, 165, 255)):tools::draw_points(img, image_points, cv::Scalar(0,0,255));
+        tools::draw_points(img, image_points, cv::Scalar(0, 0, 255));
+    }
     
+
     // 计算FPS
     frame_count++;
     auto current_time = std::chrono::steady_clock::now();
@@ -325,113 +334,47 @@ int main(int argc, char * argv[])
       fps = static_cast<float>(frame_count) * 1000.0f / static_cast<float>(elapsed_time);
       frame_count = 0;
       last_fps_time = current_time;
-    }
-    
-    // 在图像上绘制UI信息
-    int y_offset = 30;
-    int line_height = 25;
-    cv::Scalar text_color(0, 255, 0); // 绿色文本
-    cv::Scalar highlight_color(0, 165, 255); // 橙色高亮文本
-    int font_face = cv::FONT_HERSHEY_SIMPLEX;
-    double font_scale = 0.6;
-    int thickness = 2;
-    
-    // FPS信息
-    std::string fps_text = fmt::format("FPS: {:.1f}", fps);
-    cv::putText(img, fps_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-    
-    // 运行模式
-    std::string mode_text = "Mode: AutoAim";
-    cv::putText(img, mode_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-    
-    // 目标检测状态
-    std::string detect_text = fmt::format("Detect: {}", has_target ? "YES" : "NO");
-    cv::putText(img, detect_text, cv::Point(10, y_offset), font_face, font_scale, 
-                has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), thickness);
-    y_offset += line_height;
-    
-    // 开火状态
-    std::string fire_text = fmt::format("Fire: {}", plan.fire ? "YES" : "NO");
-    cv::putText(img, fire_text, cv::Point(10, y_offset), font_face, font_scale, 
-                plan.fire ? cv::Scalar(0, 0, 255) : text_color, thickness);
-    y_offset += line_height;
-    
-    // 云台状态 - 接收到的数据
-    std::string gimbal_status = fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", gs.yaw, gs.pitch);
-    cv::putText(img, gimbal_status, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-    
-    std::string gimbal_vel = fmt::format("Gimbal Vel Y: {:.2f}  P: {:.2f}", gs.yaw_vel, gs.pitch_vel);
-    cv::putText(img, gimbal_vel, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-    
-    // 规划状态 - 发送的数据
-    std::string plan_status = fmt::format("Plan Yaw: {:.2f}  Pitch: {:.2f}", plan.yaw, plan.pitch);
-    cv::putText(img, plan_status, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
-    y_offset += line_height;
-    
-    std::string plan_vel = fmt::format("Plan Vel Y: {:.2f}  P: {:.2f}", plan.yaw_vel, plan.pitch_vel);
-    cv::putText(img, plan_vel, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
-    y_offset += line_height;
-    
-    std::string plan_acc = fmt::format("Plan Acc Y: {:.2f}  P: {:.2f}", plan.yaw_acc, plan.pitch_acc);
-    cv::putText(img, plan_acc, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
-    y_offset += line_height;
+    }    
+    draw.draw_set_img(img);//设置图像
+    draw.draw_TxT("Mode: AutoAim",true);// 运行模式
+    draw.draw_S("FPS",fps);// FPS信息
+    draw.draw_TxT("Detect",has_target ? "YES" : "NO",true);// 目标检测状态
+    draw.draw_TxT("Fire",plan.fire ? "YES" : "NO",true);// 开火状态
+    draw.draw_ChangeX(img_width - 180);
+    draw.draw_TxT("Gimbal",true);
+    draw.draw_S("Yaw",gs.yaw/(-M_PI/180),"pitch",gs.pitch/(-M_PI/180));// 云台状态 - 接收到的数据
+    draw.draw_S("Vel Y",gs.yaw_vel/(-M_PI/180),"P",gs.pitch_vel/(-M_PI/180));//
+
+    draw.draw_TxT("Plan",true);
+    draw.draw_S("Yaw",plan.yaw/(-M_PI/180),"Pitch",plan.pitch/(-M_PI/180));// 规划状态 - 发送的数据
+    draw.draw_S("Vel Y",plan.yaw_vel/(-M_PI/180)," P",plan.pitch_vel/(-M_PI/180));
+    draw.draw_S("Acc Y",plan.yaw_acc/(-M_PI/180)," P",plan.pitch_acc/(-M_PI/180));
     
     // 目标信息（如果存在）
     if (has_target) {
       auto& target = target_opt.value();
-      std::string target_info = fmt::format("Target Z: {:.2f}  Vz: {:.2f}", target.ekf_x()[4], target.ekf_x()[5]);
-      cv::putText(img, target_info, cv::Point(10, y_offset), font_face, font_scale, cv::Scalar(255, 255, 0), thickness);
-      y_offset += line_height;
-      
+      draw.draw_S("Target Z",target.ekf_x()[4]/(-M_PI/180),"Vz",target.ekf_x()[5]/(-M_PI/180));
       if (target.ekf_x().size() > 7) {
-        std::string target_w = fmt::format("Target W: {:.2f}", target.ekf_x()[7]);
-        cv::putText(img, target_w, cv::Point(10, y_offset), font_face, font_scale, cv::Scalar(255, 255, 0), thickness);
-        y_offset += line_height;
+        draw.draw_S("Target W",target.ekf_x()[7]/(-M_PI/180));
       }
     }
+
+    int img_width = img.cols;
     
     // 在图像右侧添加分隔线和状态指示
-    int img_width = img.cols;
-    cv::line(img, cv::Point(img_width - 200, 20), cv::Point(img_width - 200, y_offset + 20), cv::Scalar(0, 255, 255), 2);
-    
-    // 右侧状态指示
-    int right_x = img_width - 180;
-    y_offset = 30;
-    
-    std::string status_title = "STATUS";
-    cv::putText(img, status_title, cv::Point(right_x, y_offset), font_face, font_scale + 0.1, cv::Scalar(255, 255, 0), thickness);
-    y_offset += line_height + 10;
-    
-    // 系统时间
+    cv::line(img, cv::Point(img_width - 200, 20), cv::Point(img_width - 200, 50), cv::Scalar(0, 255, 255), 2);
+    draw.draw_TxT("status_title");
+
     auto now = std::chrono::system_clock::now();
     auto now_c = std::chrono::system_clock::to_time_t(now);
     std::string time_str = std::ctime(&now_c);
     time_str = time_str.substr(11, 8); // 只取HH:MM:SS部分
-    std::string time_text = fmt::format("Time: {}", time_str);
-    cv::putText(img, time_text, cv::Point(right_x, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-    
-    // 子弹速度
-    std::string bullet_speed_text = fmt::format("Bullet Speed: {:.1f}", gs.bullet_speed);
-    cv::putText(img, bullet_speed_text, cv::Point(right_x, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-    
-    // 目标数量
-    std::string target_count_text = fmt::format("Targets: {}", targets.size());
-    cv::putText(img, target_count_text, cv::Point(right_x, y_offset), font_face, font_scale, 
-                targets.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0), thickness);
-    y_offset += line_height;
-    
-    // 检测到的装甲板数量
-    std::string armor_count_text = fmt::format("Armors: {}", armors.size());
-    cv::putText(img, armor_count_text, cv::Point(right_x, y_offset), font_face, font_scale, 
-                armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0), thickness);
-    y_offset += line_height;
 
+    draw.draw_TxT("Time",time_str);// 系统时间
+    draw.draw_S("Bullet Speed",gs.bullet_speed);// 子弹速度
+    draw.draw_S("Targets", targets.size());// 目标数量
+    draw.draw_S("Armors", armors.size());// 检测到的装甲板数量
+    draw.draw_clean();
     cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
     cv::imshow("reprojection", img);
     auto key = cv::waitKey(1);
@@ -440,6 +383,7 @@ int main(int argc, char * argv[])
 
   quit = true;
   if (plan_thread.joinable()) plan_thread.join();
+  
   gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
 
   return 0;
