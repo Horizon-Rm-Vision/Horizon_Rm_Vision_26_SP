@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16.3)
 
 project(sp_vision)
 
+add_definitions(-DSPDLOG_FMT_EXTERNAL) # 强制 spdlog 用系统安装的 fmt
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Release)
 message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}--------------------")
