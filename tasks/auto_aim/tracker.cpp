@@ -24,6 +24,15 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   max_temp_lost_count_ = yaml["max_temp_lost_count"].as<int>();
   outpost_max_temp_lost_count_ = yaml["outpost_max_temp_lost_count"].as<int>();
   normal_temp_lost_count_ = max_temp_lost_count_;
+  // outpost specific parameters (可在 configs/sentry.yaml 中配置)
+  if (yaml["outpost_h"]) outpost_h_ = yaml["outpost_h"].as<double>();
+  else outpost_h_ = 0.10;                // 默认 10cm
+  if (yaml["outpost_h_variance"]) outpost_h_variance_ = yaml["outpost_h_variance"].as<double>();
+  else outpost_h_variance_ = 1e-2;       // 默认方差
+  if (yaml["outpost_height_match_weight"])
+    outpost_height_match_weight_ = yaml["outpost_height_match_weight"].as<double>();
+  else
+    outpost_height_match_weight_ = 10.0;  // 默认匹配高度权重
 }
 
 std::string Tracker::state() const { return state_; }
@@ -246,8 +255,9 @@ bool Tracker::set_target(std::list<Armor> & armors, std::chrono::steady_clock::t
   }
 
   else if (armor.name == ArmorName::outpost) {
-    Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 81, 0.4, 100, 1e-4, 0, 0}};
-    target_ = Target(armor, t, 0.2765, 3, P0_dig);
+    // 初始化时给板间高度 h 的先验值和方差，允许滤波器估计高度差
+    Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 81, 0.4, 100, 1e-4, 0, outpost_h_variance_}};
+    target_ = Target(armor, t, 0.2765, 3, P0_dig, outpost_h_, outpost_height_match_weight_);
   }
 
   else if (armor.name == ArmorName::base) {

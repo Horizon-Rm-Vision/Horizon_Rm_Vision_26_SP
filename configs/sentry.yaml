@@ -62,6 +62,13 @@ min_detect_count: 5
 max_temp_lost_count: 25
 outpost_max_temp_lost_count: 75
 
+# 前哨站三板高度与匹配配置（单位 m）
+outpost_h: 0.10
+# 前哨站板间高度先验方差（m^2），用于 P0 的最后一项
+outpost_h_variance: 0.01
+# 高度匹配权重（匹配代价中高度差的权重），值越大匹配时越重视高度差
+outpost_height_match_weight: 10.0
+
 #####-----aimer参数-----#####
 yaw_offset: -0.8 # degree -2.5
 pitch_offset: -1  # degree 2

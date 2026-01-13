@@ -26,7 +26,7 @@ public:
   Target() = default;
   Target(
     const Armor & armor, std::chrono::steady_clock::time_point t, double radius, int armor_num,
-    Eigen::VectorXd P0_dig);
+    Eigen::VectorXd P0_dig, double init_h = 0.0, double height_match_weight = 0.0);
   Target(double x, double vyaw, double radius, double h);
 
   void predict(std::chrono::steady_clock::time_point t);
@@ -54,6 +54,8 @@ private:
 
   tools::ExtendedKalmanFilter ekf_;
   std::chrono::steady_clock::time_point t_;
+
+  double height_match_weight_ = 0.0;
 
   void update_ypda(const Armor & armor, int id);  // yaw pitch distance angle
 

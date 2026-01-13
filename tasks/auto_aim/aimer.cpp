@@ -160,7 +160,9 @@ AimPoint Aimer::choose_aim_point(const Target & target)
   }
 
   // 不考虑小陀螺
-  if (std::abs(target.ekf_x()[8]) <= 2 && target.name != ArmorName::outpost) {
+  //if (std::abs(target.ekf_x()[8]) <= 2 && target.name != ArmorName::outpost) {
+  //此处原版代码存在问题，这里使用 ekf_x()[8] 来判断是否小陀螺（高速旋转），但 ekf_x()[8] 实际上是半径r，不是角速度w
+  if (std::abs(target.ekf_x()[7]) <= 2 && target.name != ArmorName::outpost) {
     // 选择在可射击范围内的装甲板
     std::vector<int> id_list;
     for (int i = 0; i < armor_num; i++) {

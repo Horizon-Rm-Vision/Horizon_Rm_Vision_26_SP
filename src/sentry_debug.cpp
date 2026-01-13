@@ -171,6 +171,15 @@ int main(int argc, char * argv[])
       data["nis_fail"] = target.ekf().data.at("nis_fail");
       data["nees_fail"] = target.ekf().data.at("nees_fail");
       data["recent_nis_failures"] = target.ekf().data.at("recent_nis_failures");
+      // 在图像上显示估计的板间高度和中心高度以及高度相关残差（便于调试）
+      try {
+        double est_h = x[10];
+        double center_z = x[4];
+        double residual_distance = target.ekf().data.at("residual_distance");
+        tools::draw_text(img, fmt::format("h={:.3f}m cz={:.3f}m rd={:.3f}", est_h, center_z, residual_distance),
+                         {10, 50}, {255, 255, 0});
+      } catch (...) {
+      }
     }
 
     // 云台响应情况

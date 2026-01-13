@@ -124,6 +124,9 @@ target_link_libraries(handeye_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io aut
 target_link_libraries(dm_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io)
 target_link_libraries(minimum_vision_system ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 
+add_executable(outpost_sim tests/outpost_sim.cpp)
+target_link_libraries(outpost_sim fmt::fmt tools)
+
 add_executable(gimbal_test tests/gimbal_test.cpp)
 target_link_libraries(gimbal_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
 

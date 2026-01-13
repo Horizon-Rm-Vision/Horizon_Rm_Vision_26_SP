@@ -9,7 +9,7 @@ namespace auto_aim
 {
 Target::Target(
   const Armor & armor, std::chrono::steady_clock::time_point t, double radius, int armor_num,
-  Eigen::VectorXd P0_dig)
+  Eigen::VectorXd P0_dig, double init_h, double height_match_weight)
 : name(armor.name),
   armor_type(armor.type),
   jumped(false),
@@ -38,6 +38,14 @@ Target::Target(
   // h: z2 - z1
   Eigen::VectorXd x0{{center_x, 0, center_y, 0, center_z, 0, ypr[0], 0, r, 0, 0}};  //初始化预测量
   Eigen::MatrixXd P0 = P0_dig.asDiagonal();
+
+  // 如果是前哨站（3块板），并传入 init_h，则初始化板间高度差（上中下: +h,0,-h）
+  if (name == ArmorName::outpost && armor_num_ == 3 && init_h != 0.0) {
+    x0[10] = init_h;  // 单位 m
+  }
+
+  // 保存匹配高度权重
+  height_match_weight_ = height_match_weight;
 
   // 防止夹角求和出现异常值
   auto x_add = [](const Eigen::VectorXd & a, const Eigen::VectorXd & b) -> Eigen::VectorXd {
@@ -162,6 +170,12 @@ void Target::update(const Armor & armor)
     auto angle_error = std::abs(tools::limit_rad(armor.ypr_in_world[0] - xyza[3])) +
                        std::abs(tools::limit_rad(armor.ypd_in_world[0] - ypd[0]));
 
+    // 增加高度差匹配项（当配置了 height_match_weight_ 时）
+    if (height_match_weight_ != 0.0) {
+      double z_diff = armor.xyz_in_world[2] - xyza[2];
+      angle_error += height_match_weight_ * std::abs(z_diff);
+    }
+
     if (std::abs(angle_error) < std::abs(min_angle_error)) {
       id = xyza_i_list[i].second;
       min_angle_error = angle_error;
@@ -272,7 +286,14 @@ Eigen::Vector3d Target::h_armor_xyz(const Eigen::VectorXd & x, int id) const
   auto r = (use_l_h) ? x[8] + x[9] : x[8];
   auto armor_x = x[0] - r * std::cos(angle);
   auto armor_y = x[2] - r * std::sin(angle);
-  auto armor_z = (use_l_h) ? x[4] + x[10] : x[4];
+  double dz = 0.0;
+  if (armor_num_ == 4 && (id == 1 || id == 3)) {
+    dz = x[10];
+  } else if (armor_num_ == 3) {
+    double half = (armor_num_ - 1) / 2.0; // for 3 pieces: offsets +h,0,-h
+    dz = (half - id) * x[10];
+  }
+  auto armor_z = x[4] + dz;
 
   return {armor_x, armor_y, armor_z};
 }
@@ -291,7 +312,9 @@ Eigen::MatrixXd Target::h_jacobian(const Eigen::VectorXd & x, int id) const
   auto dx_dl = (use_l_h) ? -std::cos(angle) : 0.0;
   auto dy_dl = (use_l_h) ? -std::sin(angle) : 0.0;
 
-  auto dz_dh = (use_l_h) ? 1.0 : 0.0;
+  double dz_dh = 0.0;
+  if (armor_num_ == 4 && (id == 1 || id == 3)) dz_dh = 1.0;
+  else if (armor_num_ == 3) dz_dh = ((armor_num_ - 1) / 2.0 - id);
 
   // clang-format off
   Eigen::MatrixXd H_armor_xyza{
