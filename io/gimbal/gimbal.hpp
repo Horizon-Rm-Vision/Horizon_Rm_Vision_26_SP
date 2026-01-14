@@ -28,8 +28,8 @@ struct __attribute__((packed)) GimbalToVision
   uint32_t timestamp;         // 四字节时间戳
   uint8_t bullet_speed;       // 一字节弹速
   uint8_t tail = 0xDC;        // 包尾 0xDC
-    // float yaw_vel;
-    // float pitch_vel;
+  float yaw_vel;
+  float pitch_vel;
 };
 
 struct __attribute__((packed)) VisionToGimbal
@@ -40,9 +40,9 @@ struct __attribute__((packed)) VisionToGimbal
   uint8_t mode;               // 一字节 mode
   uint32_t timestamp;         // 四字节时间戳
   uint8_t tail = 0xDC;        // 包尾 0xDC
-    // float yaw_vel;
+    float yaw_vel;
+    float pitch_vel;
     // float yaw_acc;
-    // float pitch_vel;
     // float pitch_acc;
 };
 

@@ -177,36 +177,36 @@ std::string Gimbal::packet_to_hex(const void* data, size_t size) const
   return ss.str();
 }
 
-void Gimbal::send(io::VisionToGimbal VisionToGimbal)
-{
-  // 复制数据到局部变量以避免packed结构体引用问题
-  uint8_t mode = VisionToGimbal.mode;
-  float yaw = VisionToGimbal.yaw;
-  float pitch = VisionToGimbal.pitch;
+// void Gimbal::send(io::VisionToGimbal VisionToGimbal)
+// {
+//   // 复制数据到局部变量以避免packed结构体引用问题
+//   uint8_t mode = VisionToGimbal.mode;
+//   float yaw = VisionToGimbal.yaw;
+//   float pitch = VisionToGimbal.pitch;
   
-  // 赋值给tx_data_
-  tx_data_.mode = mode;
-  tx_data_.yaw = yaw;
-  tx_data_.pitch = pitch;
-  tx_data_.timestamp = 0;  // 时间戳暂时填0
+//   // 赋值给tx_data_
+//   tx_data_.mode = mode;
+//   tx_data_.yaw = yaw;
+//   tx_data_.pitch = pitch;
+//   tx_data_.timestamp = 0;  // 时间戳暂时填0
   
-  if (fd_ < 0) {
-    tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
-    return;
-  }
+//   if (fd_ < 0) {
+//     tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
+//     return;
+//   }
   
-  // 使用局部变量记录发送的数据内容
-  tools::logger()->debug("[Gimbal] Sending data - Mode: {}, Pitch: {:.3f}, Yaw: {:.3f}",
-                        mode, pitch, yaw);
+//   // 使用局部变量记录发送的数据内容
+//   tools::logger()->debug("[Gimbal] Sending data - Mode: {}, Pitch: {:.3f}, Yaw: {:.3f}",
+//                         mode, pitch, yaw);
   
-  ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
-  if (bytes_written != sizeof(tx_data_)) {
-    tools::logger()->warn("[Gimbal] Failed to write serial, expected {} bytes, got {} bytes, error: {}",
-                         sizeof(tx_data_), bytes_written, strerror(errno));
-  } else {
-    tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
-  }
-}
+//   ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
+//   if (bytes_written != sizeof(tx_data_)) {
+//     tools::logger()->warn("[Gimbal] Failed to write serial, expected {} bytes, got {} bytes, error: {}",
+//                          sizeof(tx_data_), bytes_written, strerror(errno));
+//   } else {
+//     tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
+//   }
+// }
 
 void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
@@ -253,6 +253,9 @@ void Gimbal::send(
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
+  tx_data_.pitch_vel = -pitch_vel*(180.0 / M_PI);
+  tx_data_.yaw_vel = -yaw_vel*(180.0 / M_PI);
+
   tx_data_.timestamp = 0;  // 时间戳暂时填0
   
   if (fd_ < 0) {
