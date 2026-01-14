@@ -46,12 +46,20 @@ Gimbal::~Gimbal()
 
 bool Gimbal::open_serial()
 {
-  tools::logger()->info("[Gimbal] Opening serial port: {}", com_port_);
-  fd_ = open(com_port_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
-  if (fd_ < 0) {
-    tools::logger()->error("[Gimbal] Failed to open serial port {}: {}", com_port_, strerror(errno));
-    return false;
-  }
+  int i=0;
+   char *oo[6] = {"/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyTHS0", "/dev/ttyTHS1"};
+   do
+   {
+      if (i >= 6)
+         break;
+         fd_ = open(oo[i], O_RDWR | O_NOCTTY | O_NONBLOCK);
+         i++;
+   } while (fd_ == -1);                                                    //串口自适应
+   tools::logger()->info("[Gimbal] Opening serial port: {}", oo[i]);
+   if (fd_ < 0) {
+     tools::logger()->error("[Gimbal] Failed to open serial port {}: {}", oo[i], strerror(errno));
+     return false;
+    }
   
   tools::logger()->info("[Gimbal] Successfully opened serial port, fd: {}", fd_);
   configure_serial();
@@ -346,9 +354,9 @@ void Gimbal::read_thread()
           // 使用yaw和pitch计算四元数（roll设为0）
           //单位转换
           double d2r = M_PI / 180.0;
-          Eigen::AngleAxisd yaw_angle(yaw * d2r, Eigen::Vector3d::UnitZ());
-          Eigen::AngleAxisd pitch_angle(pitch * d2r, Eigen::Vector3d::UnitY());
-          Eigen::AngleAxisd roll_angle(0 * d2r, Eigen::Vector3d::UnitX());
+          Eigen::AngleAxisd yaw_angle(yaw , Eigen::Vector3d::UnitZ());
+          Eigen::AngleAxisd pitch_angle(pitch , Eigen::Vector3d::UnitY());
+          Eigen::AngleAxisd roll_angle(0, Eigen::Vector3d::UnitX());
           
           Eigen::Quaterniond q = yaw_angle * pitch_angle * roll_angle;
           q.normalize();
