@@ -8,12 +8,12 @@
 #include <cuda_runtime.h>
 
 #include "utils.h"
-//#include "int8_calibrator.h"
+#include "int8_calibrator.h"
 
 enum class TrtPrecision {
     kFP32,
     kFP16,
-    //kINT8
+    kINT8
 };
 
 
@@ -45,5 +45,5 @@ private:
     std::unique_ptr<nvinfer1::ICudaEngine> engine_;
     std::unique_ptr<nvinfer1::IExecutionContext> context_;
 
-    //std::unique_ptr<Int8EntropyCalibrator2> calibrator_;
+    std::unique_ptr<Int8EntropyCalibrator2> calibrator_;
 };

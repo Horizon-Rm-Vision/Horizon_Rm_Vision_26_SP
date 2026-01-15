@@ -1,16 +1,13 @@
-#仅用于camera_test，作为调试相机参数使用
-#曝光数值会x1000倍传入
-#并不是通过vid和pid来打开相机，而是通过重置USB设备时使用
-
 camera_name: "mindvision"
 exposure_ms: 5
-# gamma: 3 #已经废弃
+gamma: 3
 vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
 # vid_pid: "2bdf:0001"
+#并不是通过vid和pid来打开相机，而是通过重置USB设备时使用
 
 # camera_name: "daheng"
 # exposure_ms: 2

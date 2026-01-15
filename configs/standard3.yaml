@@ -42,7 +42,7 @@ yaw_offset: 0 # degree -2.5
 pitch_offset: 0 # degree 2
 comming_angle: 55 # degree
 leaving_angle: 20 # degree
-decision_speed: 0.2 # rad/s 判定是否小陀螺的速度阈值
+decision_speed: 0.1 # rad/s
 high_speed_delay_time: 0.0 # s
 low_speed_delay_time: 0.0 # s planner use this value
 
@@ -68,30 +68,13 @@ vid_pid: "f622:d13a"
 #  0  0  1
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
-# # 重投影误差,数据来自相机内参: 0.1820px
+# # 重投影误差: 0.1820px
 # camera_matrix: [1785.4881526822305, 0, 672.4806478241826, 0, 1785.026019470562, 559.89603224794314, 0, 0, 1]
 # distort_coeffs: [-0.076005079619881746, 0.11182817466388446, 0.0005362204787722057, -0.0027546300984895122, 0]
-
-# # HK
-# camera_matrix: [1783.59587, 0, 726.03868, 0, 1783.59342, 557.22206, 0, 0, 1]
-# distort_coeffs: [-0.093721, 0.207229, 0.002192, -0.000909, 0]
-
-# # MD1
-# camera_matrix: [2530.4449, 0, 631.46289, 0, 2536.11534, 513.61409, 0, 0, 1]
-# distort_coeffs: [-0.093721, 0.207229, 0.002192, -0.000909, 0]
 
 #MD2
 camera_matrix: [1279.1579, 0, 660.93386, 0, 1285.86608, 539.38196, 0, 0, 1]
 distort_coeffs:  [-0.211299, 0.146132, 0.002248, 0.003142, 0.000000]
-
-# # DH1
-# camera_matrix: [1272.39905, 0, 618.61436, 0, 1272.1674, 522.77117, 0, 0, 1]
-# distort_coeffs: [-0.200319, 0.123162, -0.000723, 0.000555, 0.000000]
-
-# # DH2
-# camera_matrix: 
-# distort_coeffs: 
-
 
 # 相机同理想情况的偏角: yaw1.44 pitch-7.28 roll0.96 degree
 # 标定板到世界坐标系原点的水平距离: 1.13 m

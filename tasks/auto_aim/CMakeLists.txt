@@ -31,7 +31,7 @@ add_library(auto_aim OBJECT
     multithread/mt_detector.cpp
     planner/planner.cpp
     trt_engine.cpp
-    # int8_calibrator.cpp
+    int8_calibrator.cpp
 )
 
 target_link_libraries(auto_aim PUBLIC ${CUDA_LIBRARIES} ${TensorRT_LIBRARIES} io openvino::runtime tinympcstatic )
