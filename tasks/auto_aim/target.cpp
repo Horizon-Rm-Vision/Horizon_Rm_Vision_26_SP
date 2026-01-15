@@ -21,9 +21,11 @@ Target::Target(
   is_converged_(false),
   switch_count_(0)
 {
+  //新版前哨站机制
   z1_in_world = 0;
   z2_in_world = 0;
   z3_in_world = 0;
+
   auto r = radius;
   priority = armor.priority;
   const Eigen::VectorXd & xyz = armor.xyz_in_world;
@@ -138,66 +140,6 @@ void Target::predict(double dt)
   ekf_.predict(F, Q, f);
 }
 
-// void Target::update(const Armor & armor)
-// {
-//   // 装甲板匹配
-//   int id;
-//   auto min_angle_error = 1e10;
-//   const std::vector<Eigen::Vector4d> & xyza_list = armor_xyza_list(); // 由一个装甲板通过几何约束算出其余装甲板的位置编号为i
-
-//   std::vector<std::pair<Eigen::Vector4d, int>> xyza_i_list;
-//   for (int i = 0; i < armor_num_; i++) {
-//     xyza_i_list.push_back({xyza_list[i], i});
-//   }
-//     // 按distance排序,匹配id
-//   std::sort(
-//     xyza_i_list.begin(), xyza_i_list.end(),
-//     [](const std::pair<Eigen::Vector4d, int> & a, const std::pair<Eigen::Vector4d, int> & b) {
-//       Eigen::Vector3d ypd1 = tools::xyz2ypd(a.first.head(3));
-//       Eigen::Vector3d ypd2 = tools::xyz2ypd(b.first.head(3));
-//       return ypd1[2] < ypd2[2];
-//     });
-
-//   // 取前3个distance最小的装甲板
-//   for (int i = 0; i < 3; i++) {
-//     const auto & xyza = xyza_i_list[i].first;
-//     Eigen::Vector3d ypd = tools::xyz2ypd(xyza.head(3));
-//     auto angle_error = std::abs(tools::limit_rad(armor.ypr_in_world[0] - xyza[3])) +
-//                        std::abs(tools::limit_rad(armor.ypd_in_world[0] - ypd[0]));
-
-//     if (std::abs(angle_error) < std::abs(min_angle_error)) {
-//       id = xyza_i_list[i].second; // id对应装甲板编号i
-//       min_angle_error = angle_error;
-//     }
-//   }
-
-//   if (id != 0) jumped = true;
-
-//   if (id != last_id) {
-//     is_switch_ = true;
-//   } else {
-//     is_switch_ = false;
-//   }
-
-//   if (is_switch_) switch_count_++;
-
-//   last_id = id;
-//   update_count_++;
-
-//   if(armor.name == ArmorName::outpost) {
-//     if(id == 0) z1_in_world = armor.xyz_in_world[2];
-//     if(id == 1) z2_in_world = armor.xyz_in_world[2];
-//     if(id == 2) z3_in_world = armor.xyz_in_world[2];
-//     // 将三个值放入数组并排序中间值
-//     double z_values[3] = {z1_in_world, z2_in_world, z3_in_world};
-//     std::sort(z_values, z_values + 3);
-//     // 更新装甲板的z坐标为中间值
-//     Armor armor = armor;
-//     armor.xyz_in_world[2] = z_values[1];
-//   }
-
-//   update_ypda(armor, id);
-// }
  // tracker update函数，传入检测到的armor
 void Target::update(const Armor & armor)
 {
@@ -210,7 +152,8 @@ void Target::update(const Armor & armor)
   for (int i = 0; i < armor_num_; i++) {
     xyza_i_list.push_back({xyza_list[i], i});
   }
-  
+    
+  // 按distance排序,匹配id
   // 按distance排序,匹配id
   std::sort(
     xyza_i_list.begin(), xyza_i_list.end(),
@@ -220,7 +163,7 @@ void Target::update(const Armor & armor)
       return ypd1[2] < ypd2[2];
     });
 
-  // 前哨站: 重新按z高度分配id
+  // 新版前哨站机制: 重新按z高度分配id
   if(armor.name == ArmorName::outpost && armor_num_ == 3) {
     // 按z坐标排序,让id=0/1/2对应下/中/上
     std::sort(
@@ -245,7 +188,8 @@ void Target::update(const Armor & armor)
   }
 
   // 取前3个distance最小的装甲板
-  for (int i = 0; i < std::min(3, armor_num_); i++) {
+  //for (int i = 0; i < 3; i++) { //old
+  for (int i = 0; i < std::min(3, armor_num_); i++) { 
     const auto & xyza = xyza_i_list[i].first;
     Eigen::Vector3d ypd = tools::xyz2ypd(xyza.head(3));
     auto angle_error = std::abs(tools::limit_rad(armor.ypr_in_world[0] - xyza[3])) +
@@ -271,6 +215,23 @@ void Target::update(const Armor & armor)
   update_count_++;
 
   // 前哨站z坐标处理: 现在id已经按高度排序,直接取中间id
+  if(armor.name == ArmorName::outpost) {
+    if(id == 0) z1_in_world = armor.xyz_in_world[2];
+    if(id == 1) z2_in_world = armor.xyz_in_world[2];
+    if(id == 2) z3_in_world = armor.xyz_in_world[2];
+    
+    // 将三个值放入数组并排序取中间值
+    double z_values[3] = {z1_in_world, z2_in_world, z3_in_world};
+    std::sort(z_values, z_values + 3);
+    
+    // 更新装甲板的z坐标为中间值
+    Armor armor_modified = armor;
+    armor_modified.xyz_in_world[2] = z_values[1];
+    
+    update_ypda(armor_modified, id);
+    return;
+  }
+  // 新版前哨站机制：前哨站z坐标处理: 现在id已经按高度排序,直接取中间id
   if(armor.name == ArmorName::outpost) {
     if(id == 0) z1_in_world = armor.xyz_in_world[2];
     if(id == 1) z2_in_world = armor.xyz_in_world[2];
@@ -323,6 +284,7 @@ void Target::update_ypda(const Armor & armor, int id)
 
   const Eigen::VectorXd & ypd = armor.ypd_in_world;
   const Eigen::VectorXd & ypr = armor.ypr_in_world;
+  // 观测量只传入中间装甲板的高度数据
   // 观测量只传入中间装甲板的高度数据
   Eigen::VectorXd z{{ypd[0], ypd[1], ypd[2], ypr[0]}};  //获得观测量
 
@@ -380,6 +342,7 @@ Eigen::Vector3d Target::h_armor_xyz(const Eigen::VectorXd & x, int id) const
   auto armor_x = x[0] - r * std::cos(angle);
   auto armor_y = x[2] - r * std::sin(angle);
   auto armor_z = (use_l_h) ? x[4] + x[10] : x[4]; // 考虑高度差，新版前哨站应该改这部分
+  //新版前哨站机制
   if(armor_num_ == 3) { // 三装甲板高度特判
     if(id == 0) armor_z = x[4] - 0.1;
     if(id == 1) armor_z = x[4];

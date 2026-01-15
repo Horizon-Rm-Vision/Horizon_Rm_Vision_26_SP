@@ -1,13 +1,19 @@
 #ifndef TOOLS__PLOTTER_HPP
 #define TOOLS__PLOTTER_HPP
 
+#include <netinet/in.h>  // sockaddr_in
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <opencv2/opencv.hpp>
 #include <netinet/in.h>
 #include <deque>
 #include <vector>
 #include <string>
-#include <mutex>
+
+//新增本地plot所需头文件
+#include <opencv2/opencv.hpp>
+#include <deque>
+#include <vector>
 
 namespace tools
 {
@@ -26,7 +32,7 @@ public:
   ~Plotter();
 
   void plot(const nlohmann::json & json);
-  
+
   // 实时曲线绘制功能
   void addCurve(const std::string& name, cv::Scalar color);
   void addData(const std::vector<double>& values);
@@ -47,7 +53,12 @@ private:
   sockaddr_in destination_;
   std::mutex mutex_;
 
-  // 曲线绘制相关
+  // 曲线绘制相关函数和变量
+  void drawGrid(cv::Mat& img, int plot_width, int plot_height, double min_val, double max_val);
+  void drawCurve(cv::Mat& img, const CurveData& curve, int plot_width, int plot_height, 
+                 double min_val, double range);
+  void drawLegend(cv::Mat& img);
+  cv::Scalar generateColor(size_t index);
   std::vector<CurveData> curves_;
   int width_{1400};
   int height_{300};

@@ -114,7 +114,9 @@ Plan Planner::plan(std::optional<Target> target, double bullet_speed)
     std::abs(target->ekf_x()[7]) > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
 
     auto future = std::chrono::steady_clock::now() + std::chrono::microseconds(int(delay_time * 1e6));
+    auto future = std::chrono::steady_clock::now() + std::chrono::microseconds(int(delay_time * 1e6));
 
+    target->predict(future);
     target->predict(future);
 
     return plan(*target, bullet_speed);

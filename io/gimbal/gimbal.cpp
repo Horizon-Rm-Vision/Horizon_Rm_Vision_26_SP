@@ -125,6 +125,8 @@ GimbalState Gimbal::state() const
 //       return "INVALID";
 //   }
 // }
+
+//转换GimbalMode数值为对应的字符串
 std::string Gimbal::str(GimbalMode mode) const
 {
   switch (mode) {
@@ -169,6 +171,7 @@ std::string Gimbal::packet_to_hex(const void* data, size_t size) const
   return ss.str();
 }
 
+//仅用于fire_test.cpp
 void Gimbal::send(io::VisionToGimbal VisionToGimbal)
 {
   // 复制数据到局部变量以避免packed结构体引用问题
@@ -200,28 +203,11 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
   }
 }
 
+// 自瞄向电控发送数据
 void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
   float pitch_acc)
 {
-  //uint8_t mode = control ? (fire ? 2 : 1) : 0; //等价于下面的if else
-  // uint8_t mode;
-  // if (control) 
-  // {
-  //     if (fire) 
-  //     {
-  //         mode = 2;  // 控制且开火
-  //     } 
-  //     else 
-  //     {
-  //         mode = 1;  // 控制但不开火
-  //     }
-  // } 
-  // else 
-  // {
-  //     mode = 0;      // 不控制
-  // }
-
   uint8_t mode;
   if (control) 
   {
@@ -255,7 +241,7 @@ void Gimbal::send(
   // 使用局部变量记录发送的数据内容
   std::string mode_str = control ? (fire ? "CONTROL_FIRE" : "CONTROL_NO_FIRE") : "NO_CONTROL";
   tools::logger()->debug("[Gimbal] Sending data - Mode: {} ({}), Pitch: {:.3f}, Yaw: {:.3f}",
-                        mode_str, mode, pitch, yaw);
+                        mode_str, mode, -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI));
   
   ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
   if (bytes_written != sizeof(tx_data_)) {
@@ -264,12 +250,14 @@ void Gimbal::send(
   } else {
     tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
     
-    // 记录原始数据
-    tools::logger()->trace("[Gimbal] Raw TX data: {}", 
-                          packet_to_hex(&tx_data_, sizeof(tx_data_)));
+    // // 记录发送原始数据
+    // tools::logger()->trace("[Gimbal] Raw TX data: {}", 
+    //                       packet_to_hex(&tx_data_, sizeof(tx_data_)));
+
   }
 }
 
+// 自瞄从电控读取数据
 void Gimbal::read_thread()
 {
   tools::logger()->info("[Gimbal] read_thread started.");
@@ -308,9 +296,9 @@ void Gimbal::read_thread()
       continue;
     }
     
-    // 记录接收的原始数据
-    tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}", 
-                          bytes_read, packet_to_hex(buffer + data_index, bytes_read));
+    // // 记录接收原始数据
+    // tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}", 
+    //                       bytes_read, packet_to_hex(buffer + data_index, bytes_read));
     
     data_index += bytes_read;
     
@@ -345,10 +333,10 @@ void Gimbal::read_thread()
           
           // 使用yaw和pitch计算四元数（roll设为0）
           //单位转换
-          double d2r = M_PI / 180.0;
+          //double d2r = M_PI / 180.0;
           Eigen::AngleAxisd yaw_angle(yaw, Eigen::Vector3d::UnitZ());
           Eigen::AngleAxisd pitch_angle(pitch, Eigen::Vector3d::UnitY());
-          Eigen::AngleAxisd roll_angle(0 * d2r, Eigen::Vector3d::UnitX());
+          Eigen::AngleAxisd roll_angle(0, Eigen::Vector3d::UnitX());
           
           Eigen::Quaterniond q = yaw_angle * pitch_angle * roll_angle;
           q.normalize();
@@ -358,6 +346,7 @@ void Gimbal::read_thread()
             // Process the packet
             queue_.push({q, t});
             
+            //传入数值给state_
             std::lock_guard<std::mutex> lock(mutex_);
             state_.yaw = yaw;
             state_.yaw_vel = 0.0f;  // 速度暂时填0
@@ -366,19 +355,20 @@ void Gimbal::read_thread()
             state_.bullet_speed = static_cast<float>(bullet_speed);
             state_.bullet_count = 0;  // 子弹计数暂时填0
             
+            //本次接收前后模式变化记录日志
             GimbalMode old_mode = mode_;
             switch (mode) {
-              case 1:
-                mode_ = GimbalMode::IDLE;
-                break;
               case 0:
                 mode_ = GimbalMode::AUTO_AIM;
                 break;
-              case 2:
+              case 1:
                 mode_ = GimbalMode::SMALL_BUFF;
                 break;
-              case 3:
+              case 2:
                 mode_ = GimbalMode::BIG_BUFF;
+                break;
+              case 3:
+                mode_ = GimbalMode::IDLE;
                 break;
               default:
                 mode_ = GimbalMode::IDLE;
@@ -386,9 +376,9 @@ void Gimbal::read_thread()
             }
             
             // 使用局部变量记录解析后的数据内容
-            tools::logger()->info("[Gimbal] Parsed data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
+            tools::logger()->info("[Gimbal] Parsed read data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
                                  "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
-                                 str(old_mode), str(mode_), pitch, yaw, bullet_speed, 
+                                 str(old_mode), str(mode_), -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI), bullet_speed, 
                                  q.w(), q.x(), q.y(), q.z());
             
             // Move remaining data to beginning of buffer
@@ -432,6 +422,7 @@ void Gimbal::read_thread()
   tools::logger()->info("[Gimbal] read_thread stopped.");
 }
 
+//失败重连
 void Gimbal::reconnect()
 {
   tools::logger()->info("[Gimbal] Attempting to reconnect to serial port");
