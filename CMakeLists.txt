@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16.3)
 
 project(sp_vision)
 
-add_definitions(-DSPDLOG_FMT_EXTERNAL) # 强制 spdlog 用系统安装的 fmt
+#add_definitions(-DSPDLOG_FMT_EXTERNAL) # 强制 spdlog 用系统安装的 fmt
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Release)
 message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}--------------------")
@@ -15,6 +15,7 @@ option(BUILD_TRT "Build only TensorRT" OFF)
 option(BUILD_OV "Build only OpenVINO" OFF)
 option(BUILD_DBINFER "Build double Infer" OFF)
 option(BUILD_ALL "Build all components" OFF)
+option(BUILD_GIMAL_ADD_VEL OFF)
 message(STATUS "--------------------BUILD_CALIBRATION: ${BUILD_CALIBRATION}--------------------")
 message(STATUS "--------------------BUILD_TEST: ${BUILD_TEST}--------------------")
 message(STATUS "--------------------BUILD_SENTRY: ${BUILD_SENTRY}--------------------")
@@ -89,6 +90,9 @@ endif()
 ##################demo##################
 add_executable(auto_aim_test tests/auto_aim_test.cpp)
 target_link_libraries(auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
+
+##################GIMBAL ADD VEL##################
+add_definitions(-DSR_VEL)
 
 ##################tests##################
 # 只在 BUILD_TEST 或 BUILD_ALL 为 ON 时编译 TEST 工具

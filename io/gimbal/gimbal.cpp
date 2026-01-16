@@ -159,6 +159,23 @@ Eigen::Quaterniond Gimbal::q(std::chrono::steady_clock::time_point t)
   }
 }
 
+// 仅用于capture
+Eigen::Quaterniond Gimbal::imu_at(std::chrono::steady_clock::time_point t)
+{
+  while (true) {
+    auto [q_a, t_a] = queue_.pop();
+    auto [q_b, t_b] = queue_.front();
+    auto t_ab = tools::delta_time(t_a, t_b);
+    auto t_ac = tools::delta_time(t_a, t);
+    auto k = t_ac / t_ab;
+    Eigen::Quaterniond q_c = q_a.slerp(k, q_b).normalized();
+    if (t < t_a) return q_c;
+    if (!(t_a < t && t <= t_b)) continue;
+
+    return q_c;
+  }
+}
+
 std::string Gimbal::packet_to_hex(const void* data, size_t size) const
 {
   const uint8_t* bytes = static_cast<const uint8_t*>(data);
@@ -178,12 +195,24 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
   uint8_t mode = VisionToGimbal.mode;
   float yaw = VisionToGimbal.yaw;
   float pitch = VisionToGimbal.pitch;
+  #ifdef SR_VEL
+    float yaw_vel = VisionToGimbal.yaw_vel;
+    //float yaw_acc = VisionToGimbal.yaw_acc;
+    float pitch_vel = VisionToGimbal.pitch_vel;
+    //float pitch_acc = VisionToGimbal.pitch_acc;
+  #endif
   
   // 赋值给tx_data_
   tx_data_.mode = mode;
   tx_data_.yaw = yaw;
   tx_data_.pitch = pitch;
   tx_data_.timestamp = 0;  // 时间戳暂时填0
+  #ifdef SR_VEL
+    tx_data_.yaw_vel = yaw_vel;
+    //tx_data_.yaw_acc = yaw_acc;
+    tx_data_.pitch_vel = pitch_vel;
+    //tx_data_.pitch_acc = pitch_acc;
+  #endif
   
   if (fd_ < 0) {
     tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
@@ -225,13 +254,17 @@ void Gimbal::send(
       mode = 1;      // 不控制，对应NT_M6的自瞄模式默认标志位001（十六进制原始数据01）
   }
 
-
-
-  tx_data_.mode = mode;  // 弧度转换为角度
+  tx_data_.mode = mode;  
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.timestamp = 0;  // 时间戳暂时填0
+  #ifdef SR_VEL
+    tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
+    tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
+    //tx_data_.yaw_acc = -yaw_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
+    //tx_data_.pitch_acc = -pitch_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
+  #endif
   
   if (fd_ < 0) {
     tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
@@ -330,6 +363,12 @@ void Gimbal::read_thread()
           float yaw = -rx_data_.yaw * (M_PI / 180.0);  // 接收时从角度制转换为弧度制并取负
           float pitch = -rx_data_.pitch * (M_PI / 180.0);  // 接收时从角度制转换为弧度制并取负
           uint8_t bullet_speed = rx_data_.bullet_speed;
+          #ifdef SR_VEL
+            float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
+            float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
+            //float yaw_acc = -rx_data_.yaw_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
+            //float pitch_acc = -rx_data_.pitch_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
+          #endif
           
           // 使用yaw和pitch计算四元数（roll设为0）
           //单位转换
@@ -349,10 +388,18 @@ void Gimbal::read_thread()
             //传入数值给state_
             std::lock_guard<std::mutex> lock(mutex_);
             state_.yaw = yaw;
-            state_.yaw_vel = 0.0f;  // 速度暂时填0
             state_.pitch = pitch;
-            state_.pitch_vel = 0.0f;  // 速度暂时填0
             state_.bullet_speed = static_cast<float>(bullet_speed);
+            #ifdef SR_VEL
+              state_.yaw_vel = yaw_vel;
+              state_.pitch_vel = pitch_vel;
+              //state_.yaw_acc = yaw_acc;
+              //state_.pitch_acc = pitch_acc;
+            #endif
+            #ifndef SR_VEL
+            state_.yaw_vel = 0.0f;  // 速度暂时填0
+            state_.pitch_vel = 0.0f;  // 速度暂时填0
+            #endif
             state_.bullet_count = 0;  // 子弹计数暂时填0
             
             //本次接收前后模式变化记录日志

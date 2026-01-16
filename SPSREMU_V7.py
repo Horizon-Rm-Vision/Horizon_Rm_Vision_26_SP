@@ -3,6 +3,7 @@
 云台电控模拟程序
 模拟接收视觉程序数据并返回云台状态
 """
+#除了可以两个实体串口自收自发，也可以用虚拟串口 socat -d -d pty,b115200 pty,b115200
 
 import serial
 import struct

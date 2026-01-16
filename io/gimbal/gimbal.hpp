@@ -27,9 +27,11 @@ struct __attribute__((packed)) GimbalToVision
   uint8_t mode;               // 一字节 mode
   uint32_t timestamp;         // 四字节时间戳
   uint8_t bullet_speed;       // 一字节弹速
+  #ifdef SR_VEL // 添加云台前馈角速度数据收发
+    float yaw_vel;
+    float pitch_vel;
+  #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
-    // float yaw_vel;
-    // float pitch_vel;
 };
 
 struct __attribute__((packed)) VisionToGimbal
@@ -39,11 +41,13 @@ struct __attribute__((packed)) VisionToGimbal
   float yaw;                  // 四字节 yaw
   uint8_t mode;               // 一字节 mode
   uint32_t timestamp;         // 四字节时间戳
-  uint8_t tail = 0xDC;        // 包尾 0xDC
-    // float yaw_vel;
+  #ifdef SR_VEL // 添加云台前馈角速度数据收发
+    float yaw_vel;
+    float pitch_vel;
     // float yaw_acc;
-    // float pitch_vel;
     // float pitch_acc;
+  #endif
+  uint8_t tail = 0xDC;        // 包尾 0xDC
 };
 
 static_assert(sizeof(VisionToGimbal) <= 64);

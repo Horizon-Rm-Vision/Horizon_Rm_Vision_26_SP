@@ -53,20 +53,20 @@ judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
 #####-----相机参数-----#####
-camera_name: "mindvision"
-exposure_ms: 5
+# camera_name: "mindvision"
+# exposure_ms: 5
 # gamma: 3 #已经废弃
-vid_pid: "f622:d13a"
+# vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
 # vid_pid: "2bdf:0001"
 
-# camera_name: "daheng"
-# exposure_ms: 2
-# gamma: 2.85
-# vid_pid: "KE0200010097"
+camera_name: "daheng"
+exposure_ms: 2
+gamma: 2.85
+vid_pid: "KE0200010097"
 
 
 #  1  0  0
@@ -117,7 +117,7 @@ t_camera2gimbal: [0, 0, 0]  # 理想情况
 # can_interface: "can0"
 
 #####-----gimbal参数-----#####
-com_port: "/dev/ttyUSB1"
+com_port: "/dev/pts/5"
 yaw_kp: 0
 yaw_kd: 0
 pitch_kp: 0

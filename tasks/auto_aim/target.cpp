@@ -187,8 +187,8 @@ void Target::update(const Armor & armor)
   }
 
   // 取前3个distance最小的装甲板
-  //for (int i = 0; i < 3; i++) { //old
-  for (int i = 0; i < std::min(3, armor_num_); i++) { 
+  for (int i = 0; i < 3; i++) { //old
+  //for (int i = 0; i < std::min(3, armor_num_); i++) { 
     const auto & xyza = xyza_i_list[i].first;
     Eigen::Vector3d ypd = tools::xyz2ypd(xyza.head(3));
     auto angle_error = std::abs(tools::limit_rad(armor.ypr_in_world[0] - xyza[3])) +
