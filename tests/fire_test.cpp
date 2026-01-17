@@ -35,12 +35,12 @@ int main(int argc, char * argv[])
   auto last_t = std::chrono::steady_clock::now();
   plan.yaw = 0;
   plan.pitch = 0;
-  #ifdef SR_VEL
+  //#ifdef SR_VEL
     plan.yaw_vel = 0;
     plan.pitch_vel = 0;
     //plan.yaw_acc = 0;
     //plan.pitch_acc = 0;
-  #endif
+  //#endif
 
   while (!exiter.exit()) {
     auto now = std::chrono::steady_clock::now();

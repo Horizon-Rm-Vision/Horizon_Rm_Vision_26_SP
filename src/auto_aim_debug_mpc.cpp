@@ -24,6 +24,7 @@ using namespace std::chrono_literals;
 const std::string keys =
   "{help h usage ? |                        | 输出命令行参数说明}"
   "{@config-path   | ../configs/standard3.yaml | 位置参数，yaml配置文件路径 }";
+bool has_target = 0;
 
 int main(int argc, char * argv[])
 {
@@ -64,8 +65,9 @@ int main(int argc, char * argv[])
       auto gs = gimbal.state();
       auto plan = planner.plan(target, gs.bullet_speed);
 
+      std::cout<<plan.control<<std::endl;
       gimbal.send(
-        plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
+        has_target, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
         plan.pitch_acc);
 
       auto fired = gs.bullet_count > last_bullet_count;
@@ -160,7 +162,8 @@ int main(int argc, char * argv[])
     // 获取云台状态和规划信息用于UI显示
     auto gs = gimbal.state();
     std::optional<auto_aim::Target> target_opt = target_queue.front();
-    bool has_target = target_opt.has_value();
+    //bool has_target = target_opt.has_value();
+    has_target = target_opt.has_value();
     auto plan = planner.plan(target_opt, gs.bullet_speed);
     
     // 计算FPS
