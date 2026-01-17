@@ -58,6 +58,8 @@ Plan Planner::plan(Target target, double bullet_speed)
   // 3. Solve yaw
   Eigen::VectorXd x0(2);
   x0 << traj(0, 0), traj(1, 0);
+  //auto gs = gimbal.state();
+  //x0 << (gs.yaw - yaw0), gs.yaw_vel;
   tiny_set_x0(yaw_solver_, x0);
 
   yaw_solver_->work->Xref = traj.block(0, 0, 2, HORIZON);
