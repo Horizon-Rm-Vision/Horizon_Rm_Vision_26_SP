@@ -28,7 +28,7 @@ endif()
 
 # appends some common paths
 set(_TensorRT_SEARCH_NORMAL
-  PATHS "/home/ad/TensorRT-10.7.0.23"
+  PATHS "/home/luoxu/1work_round_ws/TensorRT-10.7.0.23"
 )
 list(APPEND _TensorRT_SEARCHES _TensorRT_SEARCH_NORMAL)
 

@@ -14,6 +14,7 @@ add_library(io STATIC
     cboard.cpp
     dm_imu/dm_imu.cpp
     gimbal/gimbal.cpp
+    Video/video.cpp
 )
 
 # hikrobot
@@ -50,6 +51,8 @@ endif()
 # if(NOT EXISTS "daheng/lib/amd64/libgxiapi.so")
 #     message(WARNING "libgxiapi.so not found at: daheng/lib/amd64/")
 # endif()
+#video
+target_include_directories(io PUBLIC Video)
 
 target_link_libraries(io MvCameraControl MVSDK gxiapi usb-1.0 yaml-cpp serial)
 
