@@ -7,7 +7,7 @@ classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
 yolov5_model_path: ../assets/yolov5.xml
-yolov5_trt_model_path: ../assets/yolov5a-fp16.engine
+yolov5_trt_model_path: ../assets/yolov5a.engine
 device: CPU
 min_confidence: 0.8
 use_traditional: true
@@ -34,17 +34,17 @@ max_rectangular_error: 25 # degree
 
 #####-----tracker参数-----#####
 min_detect_count: 5
-max_temp_lost_count: 15
+max_temp_lost_count: 30
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
 yaw_offset: 0 # degree -2.5
-pitch_offset: 0 # degree 2
+pitch_offset: 1.2 # degree 2
 comming_angle: 55 # degree
 leaving_angle: 20 # degree
-decision_speed: 0.2 # rad/s 判定是否小陀螺的速度阈值
+decision_speed: 0.1 # rad/s 判定是否小陀螺的速度阈值
 high_speed_delay_time: 0.0 # s
-low_speed_delay_time: 0.0 # s planner use this value
+low_speed_delay_time: 0.01 # s planner use this value
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree
@@ -58,15 +58,16 @@ auto_fire: true # 是否由自瞄控制射击
 # gamma: 3 #已经废弃
 # vid_pid: "f622:d13a"
 
-# camera_name: "hikrobot"
-# exposure_ms: 3
-# gain: 10.0
-# vid_pid: "2bdf:0001"
+camera_name: "hikrobot"
+exposure_ms: 10
+gain: 10.0
+vid_pid: "2bdf:0001"
 
-camera_name: "daheng"
-exposure_ms: 2
-gamma: 2.85
-vid_pid: "KE0200010097"
+# camera_name: "daheng"
+# exposure_ms: 2
+# gamma: 2.85
+# vid_pid: "KE0200010097"
+
 
 
 #  1  0  0
@@ -79,16 +80,16 @@ R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 # distort_coeffs: [-0.076005079619881746, 0.11182817466388446, 0.0005362204787722057, -0.0027546300984895122, 0]
 
 # # HK
-# camera_matrix: [1783.59587, 0, 726.03868, 0, 1783.59342, 557.22206, 0, 0, 1]
-# distort_coeffs: [-0.093721, 0.207229, 0.002192, -0.000909, 0]
+camera_matrix: [1783.59587, 0, 726.03868, 0, 1783.59342, 557.22206, 0, 0, 1]
+distort_coeffs: [-0.093721, 0.207229, 0.002192, -0.000909, 0]
 
 # # MD1
 # camera_matrix: [2530.4449, 0, 631.46289, 0, 2536.11534, 513.61409, 0, 0, 1]
 # distort_coeffs: [-0.093721, 0.207229, 0.002192, -0.000909, 0]
 
 #MD2
-camera_matrix: [1279.1579, 0, 660.93386, 0, 1285.86608, 539.38196, 0, 0, 1]
-distort_coeffs:  [-0.211299, 0.146132, 0.002248, 0.003142, 0.000000]
+# camera_matrix: [1279.1579, 0, 660.93386, 0, 1285.86608, 539.38196, 0, 0, 1]
+# distort_coeffs:  [-0.211299, 0.146132, 0.002248, 0.003142, 0.000000]
 
 # # DH1
 # camera_matrix: [1272.39905, 0, 618.61436, 0, 1272.1674, 522.77117, 0, 0, 1]
@@ -108,7 +109,7 @@ R_camera2gimbal: [0, 0, 1, -1, 0, 0, 0, -1, 0]  # 理想情况
 # 机械偏置：表示相机坐标系原点相对于云台坐标系原点的平移向量
 # 数据解读：t_camera2gimbal: [<X>, <Y>, <Z>]，单位：米，X取正值指相机位于云台中心前方，Y取正值指相机位于云台中心左侧，Z取正值指相机位于云台中心上方
 # t_camera2gimbal: [0.13160669975045827, 0.10377721766577375, 0.024908271912914642]
-t_camera2gimbal: [0, 0, 0]  # 理想情况
+t_camera2gimbal: [0.14095, 0, 0.13416]  # 理想情况
 
 # #####-----cboard参数-----#####
 # quaternion_canid: 0x100
@@ -117,7 +118,7 @@ t_camera2gimbal: [0, 0, 0]  # 理想情况
 # can_interface: "can0"
 
 #####-----gimbal参数-----#####
-com_port: "/dev/pts/5"
+com_port: "/dev/ttyACM0"
 yaw_kp: 0
 yaw_kd: 0
 pitch_kp: 0
@@ -128,7 +129,7 @@ fire_thresh: 0.0035
 
 # max_yaw_acc: 50
 max_yaw_acc: 30
-Q_yaw: [9e6, 0]
+Q_yaw: [6e6, 0]
 R_yaw: [1]
 
 # max_pitch_acc: 100
@@ -141,4 +142,4 @@ model: "../assets/yolo11_buff_int8.xml"
 
 #####-----buff_aimer参数-----#####
 fire_gap_time: 0.700   # s
-predict_time: 0.120     # s
+predict_time: 0.12     # s
