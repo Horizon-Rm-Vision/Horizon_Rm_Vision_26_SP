@@ -216,36 +216,8 @@ void Gimbal::send(
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.timestamp = 0;                    // 时间戳暂时填0
 
-  std::ofstream out_txt_file;
+
   static bool i_frist_send=true;
-  if (_mode_ == 0) {
-    if(i_frist_send)
-    {
-     
-        out_txt_file.open("../txt/i_send.txt", std::ios::out | std::ios::trunc);
-        out_txt_file.close();
-        i_frist_send = false;  //清零
-    }
-    out_txt_file.open("../txt/i_send.txt", std::ios::out | std::ios::app);
-    out_txt_file << std::fixed;
-    out_txt_file << "send(py)  " << tx_data_.pitch << "   " << tx_data_.yaw << std::endl
-                 << std::endl;
-    out_txt_file.close();
-     //cv::waitKey(1000/50);
-  }
-  if (_mode_ == 1) {
-     if(i_frist_send)
-    {
-        out_txt_file.open("../txt/i_send2.txt", std::ios::out | std::ios::trunc);
-        out_txt_file.close();
-        i_frist_send = false;  //清零
-    }
-    out_txt_file.open("../txt/i_send2.txt", std::ios::out | std::ios::app);
-    out_txt_file << std::fixed;
-    out_txt_file << "send(py)  " << tx_data_.pitch << "   " << tx_data_.yaw << std::endl
-                 << std::endl;
-    out_txt_file.close();
-  }
   //#ifdef SR_VEL
 
   //tx_data_.yaw_acc = -yaw_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
@@ -272,34 +244,6 @@ void Gimbal::send(
     tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
     // // 记录发送原始数据
     // tools::logger()->trace("[Gimbal] Raw TX data: {}", packet_to_hex(&tx_data_, sizeof(tx_data_)));
-    
-    if (_mode_ == 0) {
-      if(ori_frist_send)
-      {
-        out_txt_file.open("../txt/ori_send.txt", std::ios::out | std::ios::trunc);
-        out_txt_file.close();
-        ori_frist_send=false;
-      }
-      std::ofstream out_txt_file;
-      out_txt_file.open("../txt/ori_send.txt", std::ios::out | std::ios::app);
-      out_txt_file << std::fixed;
-      out_txt_file << "send  " << packet_to_hex(&tx_data_, sizeof(tx_data_)) << std::endl
-                   << std::endl;
-      out_txt_file.close();
-    } else if (_mode_ == 1) {
-      if(ori_frist_send)
-      {
-        out_txt_file.open("../txt/ori_send2.txt", std::ios::out | std::ios::trunc);
-        out_txt_file.close();
-         ori_frist_send=false;
-      }
-      std::ofstream out_txt_file;
-      out_txt_file.open("../txt/ori_send2.txt", std::ios::out | std::ios::app);
-      out_txt_file << std::fixed;
-      out_txt_file << "send  " << packet_to_hex(&tx_data_, sizeof(tx_data_)) << std::endl
-                   << std::endl;
-      out_txt_file.close();
-    }
   }
 }
 
@@ -343,38 +287,8 @@ void Gimbal::read_thread()
       continue;
     }
     static bool first = true;
-    std::ofstream out_txt_file;
-    if (_mode_ == 0) {
-      // // 记录接收原始数据
-      // tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}",
-      //                       bytes_read, packet_to_hex(buffer + data_index, bytes_read));
-      if (first) {
-       
-        out_txt_file.open("../txt/ori_received.txt", std::ios::out | std::ios::trunc);
-        out_txt_file.close();
-        first = false;  //清零
-      }
-    
-      out_txt_file.open("../txt/ori_received.txt", std::ios::out | std::ios::app);
-      out_txt_file << std::fixed;
-      out_txt_file << "received  " << packet_to_hex(buffer + data_index, bytes_read) << std::endl;
-      out_txt_file.close();
-       //cv::waitKey(1000/50);
-    }
-    else if (_mode_ == 1) {
-      // // 记录接收原始数据
-      // tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}",
-      //                       bytes_read, packet_to_hex(buffer + data_index, bytes_read));
-      if (first) {
-        out_txt_file.open("../txt/ori_received2.txt", std::ios::out | std::ios::trunc);
-        out_txt_file.close();
-        first = false;  //清零
-      }
-      out_txt_file.open("../txt/ori_received2.txt", std::ios::out | std::ios::app);
-      out_txt_file << std::fixed;
-      out_txt_file << "received  " << packet_to_hex(buffer + data_index, bytes_read) << std::endl;
-      out_txt_file.close();
-    }  
+
+   
     data_index += bytes_read;
 
     // Process complete packets
@@ -401,32 +315,7 @@ void Gimbal::read_thread()
           // tools::logger()->debug(
           //   "[Gimbal] Found complete packet at offset {}, raw: {}", i,
           //   packet_to_hex(buffer + i, packet_size));
-          if (_mode_ == 0) {
-            std::ofstream out_txt_file;
-            if (i_first) {
-              out_txt_file.open("../txt/i_received.txt", std::ios::out | std::ios::trunc);
-              out_txt_file.close();
-              i_first = false;
-            }
-            out_txt_file.open("../txt/i_received.txt", std::ios::out | std::ios::app);
-            out_txt_file << std::fixed;
-            out_txt_file << "received(py)  " << rx_data_.pitch << "   " << rx_data_.yaw
-                         << std::endl;
-            out_txt_file.close();
-          }
-          else if (_mode_ == 1) {
-            std::ofstream out_txt_file;
-            if (i_first) {
-              out_txt_file.open("../txt/i_received2.txt", std::ios::out | std::ios::trunc);
-              out_txt_file.close();
-              i_first = false;
-            }
-            out_txt_file.open("../txt/i_received2.txt", std::ios::out | std::ios::app);
-            out_txt_file << std::fixed;
-            out_txt_file << "received(py)  " << rx_data_.pitch << "   " << rx_data_.yaw
-                         << std::endl;
-            out_txt_file.close();
-          }
+    
           // 复制到局部变量以避免packed结构体引用问题
           uint8_t mode = rx_data_.mode;
           float yaw = -rx_data_.yaw * (M_PI / 180.0);      // 接收时从角度制转换为弧度制并取负

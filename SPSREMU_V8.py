@@ -1,6 +1,7 @@
 import serial
 import time
 import cv2
+import re
 
 def send_data_from_file(file_path, com_port, baud_rate=115200):
     """
@@ -62,7 +63,7 @@ def send_data_from_file(file_path, com_port, baud_rate=115200):
                         print(f"发送第 {i+1} 行: {len(data_bytes)} 字节")
                         
                         # 可选：添加延迟以避免发送过快
-                        time.sleep(1/30)
+                        time.sleep(0.00001)
                         
                     except ValueError as e:
                         print(f"第 {i+1} 行十六进制转换错误: {e}")
@@ -87,7 +88,6 @@ def send_data_from_file(file_path, com_port, baud_rate=115200):
             print("串口已关闭")
 
 # 更稳健的版本：使用正则表达式提取
-import re
 
 def send_data_from_file_regex(file_path, com_port, baud_rate=115200):
     """
@@ -120,7 +120,7 @@ def send_data_from_file_regex(file_path, com_port, baud_rate=115200):
                     print(f"发送第 {i+1} 条: {len(data_bytes)} 字节")
                     
                     # 可选延迟
-                    time.sleep(1000/24)
+                    time.sleep(1/50)
                     
                 except Exception as e:
                     print(f"第 {i+1} 条数据处理错误: {e}")
@@ -143,11 +143,11 @@ def send_data_from_file_regex(file_path, com_port, baud_rate=115200):
 if __name__ == "__main__":
     # 配置参数
     FILE_PATH = "/home/luoxu/zuomian/1_ws/RM_6/1/Horizon_Rm_Vision_26_SP/txt/ori_received.txt"  # 你的文件路径
-    COM_PORT = "/dev/pts/3"               # Windows串口号，Linux/macOS可能是 "/dev/ttyUSB0" 或 "/dev/ttyACM0"
+    COM_PORT = "/dev/pts/5"               # Windows串口号，Linux/macOS可能是 "/dev/ttyUSB0" 或 "/dev/ttyACM0"
     BAUD_RATE = 115200              # 波特率，根据你的设备设置
     
     # 方法1：使用基本方法
-    send_data_from_file(FILE_PATH, COM_PORT, BAUD_RATE)
+    #send_data_from_file(FILE_PATH, COM_PORT, BAUD_RATE)
     
     # 或者使用方法2：使用正则表达式（更稳健）
-    # send_data_from_file_regex(FILE_PATH, COM_PORT, BAUD_RATE)
+    send_data_from_file_regex(FILE_PATH, COM_PORT, BAUD_RATE)

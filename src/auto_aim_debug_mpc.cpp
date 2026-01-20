@@ -2,12 +2,11 @@
 
 #include <atomic>
 #include <chrono>
+#include <fstream>  // c++文件操作
+#include <iomanip>  // 设置输出格式
 #include <nlohmann/json.hpp>
 #include <opencv2/opencv.hpp>
 #include <thread>
-
-#include <fstream> // c++文件操作
-#include <iomanip> // 设置输出格式
 
 #include "io/camera.hpp"
 #include "io/gimbal/gimbal.hpp"
@@ -32,6 +31,7 @@ bool has_target = 0;
 int main(int argc, char * argv[])
 {
   tools::Exiter exiter;
+  long long int number=0;
   tools::Plotter plotter;
   tools::Recode_video video(30, "../video/Cvideo.avi");
   tools::Recode_video p(30, "../video/Cp.avi");
@@ -41,17 +41,22 @@ int main(int argc, char * argv[])
     cli.printMessage();
     return 0;
   }
-  
   std::ofstream out_txt_file;
   io::Gimbal gimbal(config_path);
-
-  if(gimbal._mode_==0)
-  {
-   out_txt_file.open("../txt/py_data.txt", std::ios::out | std::ios::trunc);
-   out_txt_file.close();
+  if (gimbal._mode_ == 0) {
+    out_txt_file.open("../txt/py_Gim.txt", std::ios::out | std::ios::trunc);
+    out_txt_file.close();
+    out_txt_file.open("../txt/py_Plan.txt", std::ios::out | std::ios::trunc);
+    out_txt_file.close();
+  }
+  if(gimbal._mode_==1){
+     out_txt_file.open("../txt/py_Gim2.txt", std::ios::out | std::ios::trunc);
+    out_txt_file.close();
+    out_txt_file.open("../txt/py_Plan2.txt", std::ios::out | std::ios::trunc);
+    out_txt_file.close();
   }
   io::Camera camera(config_path);
-  
+  std::ifstream text("../txt/py_Gim.txt");
   auto_aim::YOLO yolo(config_path, true);
   auto_aim::Solver solver(config_path);
   auto_aim::Tracker tracker(config_path, solver);
@@ -75,7 +80,6 @@ int main(int argc, char * argv[])
       auto target = target_queue.front();
       auto gs = gimbal.state();
       auto plan = planner.plan(target, gs.bullet_speed);
-
       std::cout << plan.control << std::endl;
       gimbal.send(
         has_target, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
@@ -86,7 +90,7 @@ int main(int argc, char * argv[])
 
       nlohmann::json data;
       data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);
-     
+
       data["gimbal_yaw"] = gs.yaw;
       data["gimbal_yaw_vel"] = gs.yaw_vel;
       data["gimbal_pitch"] = gs.pitch;
@@ -105,17 +109,6 @@ int main(int argc, char * argv[])
 
       data["fire"] = plan.fire ? 1 : 0;
       data["fired"] = fired ? 1 : 0;
-
-      if(gimbal._mode_==0)
-  {
-     out_txt_file.open("../txt/py_data.txt", std::ios::out | std::ios::app);
-     out_txt_file << std::fixed;
-     out_txt_file <<"Gim(py)   "<<gs.pitch<<"  "<<gs.yaw<<std::endl;
-     out_txt_file <<"plan(py)  "<<plan.pitch<<"  "<<plan.yaw<<std::endl<<std::endl;
-     out_txt_file.close();
-  }
-
-       
       if (target.has_value()) {
         data["target_z"] = target->ekf_x()[4];   //z
         data["target_vz"] = target->ekf_x()[5];  //vz
@@ -126,39 +119,57 @@ int main(int argc, char * argv[])
       } else {
         data["w"] = 0.0;
       }
-      
+
       //plotter.plot(data);
-      plotter.drawData(
-        {gs.yaw * 180 / M_PI, plan.target_yaw * 180 / M_PI, plan.yaw * 180 / M_PI},
-        {"gimbal_yaw", "target_yaw", "plann_yaw"});
-        p.Recode_Fin(plotter.drawCurves());
       std::this_thread::sleep_for(10ms);
     }
   });
 
   cv::Mat img;
-
+  std::string picture_path="../video/";
+  std::string name_end=".jpg";
   std::chrono::steady_clock::time_point t;
 
   while (!exiter.exit()) {
-    auto loop_start_time = std::chrono::steady_clock::now();
+     auto gs = gimbal.state();
 
+    if(gimbal._mode_==1)
+      {
+       text>>number>>gs.pitch>>gs.yaw;
+      }
+    auto loop_start_time = std::chrono::steady_clock::now();
+    std::stringstream s;
+
+    s<<picture_path<<number<<name_end;
     camera.read(img, t);
+     if(gimbal._mode_==1)
+    {
+      img=cv::imread(s.str());
+      s.clear();
+    }
     
     auto q = gimbal.q(t);
-    
+
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
     if (!targets.empty())
-    target_queue.push(targets.front());
+      target_queue.push(targets.front());
     else
-    target_queue.push(std::nullopt);
+      target_queue.push(std::nullopt);
     
-    if (gimbal._mode_==0)
+    if(gimbal._mode_==0)
     {
-     video.Recode_Fin(img);
+      cv::imwrite(s.str(),img);
+      s.clear();
     }
+   
+    if (!video.c) {
+      video.Recode_open(img);
+    } else {
+      video.Recode_in(img);
+    }
+
     // 在图像上绘制检测结果（合并原 detection 窗口信息）
     for (const auto & armor : armors) {
       // 画装甲四点与标签
@@ -192,9 +203,6 @@ int main(int argc, char * argv[])
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
       tools::draw_points(img, image_points, {0, 0, 255});
     }
-
-    // 获取云台状态和规划信息用于UI显示
-    auto gs = gimbal.state();
     std::optional<auto_aim::Target> target_opt = target_queue.front();
     //bool has_target = target_opt.has_value();
     has_target = target_opt.has_value();
@@ -346,11 +354,46 @@ int main(int argc, char * argv[])
       armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0), thickness);
     y_offset += line_height;
 
+    if (gimbal._mode_ == 0) {
+        out_txt_file.open("../txt/py_Gim.txt", std::ios::out | std::ios::app);
+        out_txt_file << std::fixed;
+        out_txt_file << number<<" "<<gs.pitch <<" "<< gs.yaw<< std::endl;
+        out_txt_file.close();
+
+        out_txt_file.open("../txt/py_Plan.txt", std::ios::out | std::ios::app);
+        out_txt_file << std::fixed;
+        out_txt_file <<number <<" "<<plan.pitch <<" "<< plan.yaw << std::endl;
+        out_txt_file.close();
+        number++;
+      }
+      if (gimbal._mode_ == 1) {
+        out_txt_file.open("../txt/py_Gim2.txt", std::ios::out | std::ios::app);
+        out_txt_file << std::fixed;
+        out_txt_file << number<<" "<<gs.pitch <<" "<< gs.yaw << std::endl;
+        out_txt_file.close();
+
+        out_txt_file.open("../txt/py_Plan2.txt", std::ios::out | std::ios::app);
+        out_txt_file << std::fixed;
+        out_txt_file << number<<" "<<plan.pitch <<" "<< plan.yaw << std::endl;
+        out_txt_file.close();
+      }
+      //  plotter.drawData(
+      //   {gs.yaw * 180 / M_PI, plan.target_yaw * 180 / M_PI, plan.yaw * 180 / M_PI},
+      //   {"gimbal_yaw", "target_yaw", "plann_yaw"});
+         plotter.drawData(
+        {gs.pitch * 180 / M_PI, plan.target_pitch * 180 / M_PI, plan.pitch * 180 / M_PI},
+        {"gimbal_pitch", "target_pitch", "plann_pitch"});
+      if (!p.c) {
+        p.Recode_open(plotter.drawCurves());
+      } else {
+        p.Recode_in(plotter.drawCurves());
+      }
     //cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
     cv::namedWindow("reprojection", 0);
     cv::imshow("reprojection", img);
     auto key = cv::waitKey(1);
     if (key == 'q') break;
+
   }
 
   quit = true;

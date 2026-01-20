@@ -1,8 +1,6 @@
 #include <fmt/core.h>
 
 #include <chrono>
-#include <fstream>  // c++文件操作
-#include <iomanip>  // 设置输出格式
 #include <nlohmann/json.hpp>
 #include <opencv2/opencv.hpp>
 
@@ -39,15 +37,10 @@ int main(int argc, char * argv[])
   tools::Exiter exiter;
   tools::Plotter plotter;
   tools::Recorder recorder;
-  tools::Recode_video video(30, "../video/No_mpc_video.avi");
-  tools::Recode_video p(30, "../video/No_mpc_p.avi");
-  std::ofstream out_txt_file;
+
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
-  if (gimbal._mode_ == 0) {
-    out_txt_file.open("../txt/no_mpc_py_data.txt", std::ios::out | std::ios::trunc);
-    out_txt_file.close();
-  }
+
   auto_aim::YOLO detector(config_path, false);
   auto_aim::Solver solver(config_path);
   auto_aim::Tracker tracker(config_path, solver);
@@ -66,16 +59,11 @@ int main(int argc, char * argv[])
     q = gimbal.imu_at(t - 1ms);
     auto gimbal_mode = gimbal.mode();
     // Map GimbalMode to Mode
-    if (gimbal_mode == io::GimbalMode::IDLE)
-      mode = io::Mode::idle;
-    else if (gimbal_mode == io::GimbalMode::AUTO_AIM)
-      mode = io::Mode::auto_aim;
-    else if (gimbal_mode == io::GimbalMode::SMALL_BUFF)
-      mode = io::Mode::small_buff;
-    else if (gimbal_mode == io::GimbalMode::BIG_BUFF)
-      mode = io::Mode::big_buff;
-    else
-      mode = io::Mode::idle;  // default
+    if (gimbal_mode == io::GimbalMode::IDLE) mode = io::Mode::idle;
+    else if (gimbal_mode == io::GimbalMode::AUTO_AIM) mode = io::Mode::auto_aim;
+    else if (gimbal_mode == io::GimbalMode::SMALL_BUFF) mode = io::Mode::small_buff;
+    else if (gimbal_mode == io::GimbalMode::BIG_BUFF) mode = io::Mode::big_buff;
+    else mode = io::Mode::idle;  // default
 
     if (last_mode != mode) {
       tools::logger()->info("Switch to {}", io::MODES[mode]);
@@ -96,21 +84,14 @@ int main(int argc, char * argv[])
 
     auto command = aimer.aim(targets, t, bullet_speed);
 
-    auto gs = gimbal.state();
-
-    if (gimbal._mode_ == 0) {
-      video.Recode_Fin(img);
-    }
     // 在图像上绘制检测结果（合并原 detection 窗口信息）
     for (const auto & armor : armors) {
       // 画装甲四点与标签
       tools::draw_points(img, armor.points, {0, 255, 0});
-      auto info = fmt::format(
-        "{:.2f} {} {} {}", armor.confidence, auto_aim::COLORS[armor.color],
-        auto_aim::ARMOR_NAMES[armor.name], auto_aim::ARMOR_TYPES[armor.type]);
+      auto info = fmt::format("{:.2f} {} {} {}", armor.confidence, auto_aim::COLORS[armor.color], auto_aim::ARMOR_NAMES[armor.name],auto_aim::ARMOR_TYPES[armor.type]);
       tools::draw_text(img, info, armor.center, {0, 255, 0});
     }
-
+    
     if (!targets.empty()) {
       auto target = targets.front();
       // 当前帧target更新后
@@ -139,21 +120,11 @@ int main(int argc, char * argv[])
     auto key = cv::waitKey(1);
     if (key == 'q') break;
 
+
     gimbal.send(command.control, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0);
 
-    plotter.drawData(
-      {gs.yaw * 180 / M_PI, command.yaw * 180 / M_PI},
-      {"gimbal_yaw","plann_yaw"});
-    p.Recode_Fin(plotter.drawCurves());
-    if (gimbal._mode_ == 0) {
-      out_txt_file.open("../txt/no_mpc_py_data.txt", std::ios::out | std::ios::app);
-      out_txt_file << std::fixed;
-      out_txt_file << "Gim(py)   " << gs.pitch << "  " << gs.yaw << std::endl;
-      out_txt_file << "plan(py)  " << command.pitch << "  " << command.yaw << std::endl
-                   << std::endl;
-      out_txt_file.close();
-    }
-
-    return 0;
+    //plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
   }
+
+  return 0;
 }

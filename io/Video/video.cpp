@@ -12,16 +12,6 @@ Video::Video(std::string path) : quit_(false), ok_(false), queue_(1)
   this->path = path;
   video.open(this->path);
   open();
-
-  // 守护线程
-  daemon_thread_ = std::thread{[this] {
-    while (!quit_) {
-      std::this_thread::sleep_for(100ms);
-      if (ok_) continue;
-      if (capture_thread_.joinable()) capture_thread_.join();
-      open();
-    }
-  }};
 }
 void Video::read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp)
 {
@@ -39,7 +29,8 @@ void Video::open()
       ok_ = true;
       while (!quit_) {
         int fps=video.get(cv::CAP_PROP_FPS);
-        std::chrono::milliseconds sleep_time(fps);
+        int c=1000/fps;
+        std::chrono::milliseconds sleep_time(c);
       std::this_thread::sleep_for(sleep_time);
 
       cv::Mat img;
