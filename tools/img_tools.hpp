@@ -21,6 +21,7 @@ void draw_points(
 void draw_text(
   cv::Mat & img, const std::string & text, const cv::Point & point,
   const cv::Scalar & color = {0, 255, 255}, double font_scale = 1.0, int thickness = 2);
+
 class Recode_video
 {
 private:
@@ -29,10 +30,10 @@ private:
   int frameWidth;
   int frameHeight;  
   int fourcc;
+  bool frist=true;
   cv::VideoWriter writer;
 
 public:
-  bool c = false;
   Recode_video(double fps,std::string path) { this->fps = fps;this->outputPath=path; }
   ~Recode_video() { writer.release(); }
   void Recode_open(cv::Mat firstimg)
@@ -47,9 +48,21 @@ public:
      
       std::cerr << "Could not open the output video file for write\n";
     }
-    c = true;
+    frist=false;
   }
-
+  void Recode_Fin(cv::Mat img)
+  {
+        if(frist)
+        {
+            Recode_open(img);
+           
+        }
+        else
+        {
+            Recode_in(img);
+        }
+        
+  }
   void Recode_in(cv::Mat img)
   {
    
@@ -61,6 +74,18 @@ public:
   }
   void Recode_close() { writer.release(); }
 };
+
+// class Recode_TxT
+// {
+//   private:
+//   std::string name;
+//   public:
+//   void Recode()
+//   {
+
+//   }
+
+// }
 }  // namespace tools
 
 #endif  // TOOLS__IMG_TOOLS_HPP

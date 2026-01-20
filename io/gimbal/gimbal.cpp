@@ -272,6 +272,7 @@ void Gimbal::send(
     tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
     // // 记录发送原始数据
     // tools::logger()->trace("[Gimbal] Raw TX data: {}", packet_to_hex(&tx_data_, sizeof(tx_data_)));
+    
     if (_mode_ == 0) {
       if(ori_frist_send)
       {

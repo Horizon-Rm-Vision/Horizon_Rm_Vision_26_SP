@@ -56,8 +56,8 @@ auto_fire: true # 是否由自瞄控制射击
 #####-----相机参数-----#####
 camera_name: "Video"
 exposure_ms: 3
-path: "../video.avi"
-_mode_: 1 #1为复现 0为记录
+path: "../video.mp4"
+_mode_: 0 #1为复现 0为记录
 
 
 #camera_name: "mindvision"
@@ -123,7 +123,7 @@ t_camera2gimbal: [0, 0, 0]  # 理想情况
 # can_interface: "can0"
 
 #####-----gimbal参数-----#####
-com_port: "/dev/pts/6"
+com_port: "/dev/pts/5"
 yaw_kp: 0
 yaw_kd: 0
 pitch_kp: 0

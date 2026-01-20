@@ -44,6 +44,7 @@ int main(int argc, char * argv[])
   
   std::ofstream out_txt_file;
   io::Gimbal gimbal(config_path);
+
   if(gimbal._mode_==0)
   {
    out_txt_file.open("../txt/py_data.txt", std::ios::out | std::ios::trunc);
@@ -130,11 +131,7 @@ int main(int argc, char * argv[])
       plotter.drawData(
         {gs.yaw * 180 / M_PI, plan.target_yaw * 180 / M_PI, plan.yaw * 180 / M_PI},
         {"gimbal_yaw", "target_yaw", "plann_yaw"});
-      if (!p.c) {
-        p.Recode_open(plotter.drawCurves());
-      } else {
-        p.Recode_in(plotter.drawCurves());
-      }
+        p.Recode_Fin(plotter.drawCurves());
       std::this_thread::sleep_for(10ms);
     }
   });
@@ -147,29 +144,21 @@ int main(int argc, char * argv[])
     auto loop_start_time = std::chrono::steady_clock::now();
 
     camera.read(img, t);
-    if (gimbal._mode_==0)
-    {
-      if (!video.c) {
-        video.Recode_open(img);
-      } else {
-        video.Recode_in(img);
-      }
-    }
-
+    
     auto q = gimbal.q(t);
-
+    
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
-      if (!targets.empty())
-      target_queue.push(targets.front());
+    if (!targets.empty())
+    target_queue.push(targets.front());
     else
-      target_queue.push(std::nullopt);
-      if (!video.c) {
-        video.Recode_open(img);
-      } else {
-        video.Recode_in(img);
-      }
+    target_queue.push(std::nullopt);
+    
+    if (gimbal._mode_==0)
+    {
+     video.Recode_Fin(img);
+    }
     // 在图像上绘制检测结果（合并原 detection 窗口信息）
     for (const auto & armor : armors) {
       // 画装甲四点与标签
