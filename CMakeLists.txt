@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.16.3)
 
-project(sp_vision)
+project(sp_vision CUDA CXX)
+
+# 设置CUDA架构
+set(CMAKE_CUDA_ARCHITECTURES 75)
 
 #add_definitions(-DSPDLOG_FMT_EXTERNAL) # 强制 spdlog 用系统安装的 fmt
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_BUILD_TYPE Release)
 message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}--------------------")
 
@@ -26,6 +30,9 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 find_package(CUDA REQUIRED)
 find_package(TensorRT REQUIRED)
+
+# 配置CUDA编译选项
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_75 --expt-relaxed-constexpr")
 
 find_package(OpenCV REQUIRED)
 find_package(fmt REQUIRED)

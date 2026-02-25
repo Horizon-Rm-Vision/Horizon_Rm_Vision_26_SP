@@ -31,21 +31,21 @@ min_armor_ratio: 1
 max_armor_ratio: 5
 max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
-min_confidence: 0.8
 
 #####-----tracker参数-----#####
 min_detect_count: 5
-max_temp_lost_count: 30
+max_temp_lost_count: 40
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
-yaw_offset: 0 # degree -2.5
-pitch_offset: 0 # degree 2
+yaw_offset: -1 # degree -2.5
+pitch_offset: 2 # degree 2
 comming_angle: 60 # degree
 leaving_angle: 20 # degree
-decision_speed: 8 # rad/s 判定是否小陀螺的速度阈值
+decision_speed: 0.1 #8 # rad/s 判定是否小陀螺的速度阈值
 high_speed_delay_time: 0.030 # s
-low_speed_delay_time: 0.015 # s planner use this value
+#low_speed_delay_time: 0.015 # s planner use this value
+low_speed_delay_time: 0.060 # s planner use this value
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree
@@ -55,7 +55,7 @@ auto_fire: true # 是否由自瞄控制射击
 
 #####-----相机参数-----#####
 camera_name: "mindvision"
-exposure_ms: 5
+exposure_ms: 8
 gamma: 3 #已经废弃
 vid_pid: "f622:d13a"
 
@@ -87,9 +87,13 @@ R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 # camera_matrix: [2530.4449, 0, 631.46289, 0, 2536.11534, 513.61409, 0, 0, 1]
 # distort_coeffs: [-0.093721, 0.207229, 0.002192, -0.000909, 0]
 
-#MD2
-camera_matrix: [1279.1579, 0, 660.93386, 0, 1285.86608, 539.38196, 0, 0, 1]
-distort_coeffs:  [-0.211299, 0.146132, 0.002248, 0.003142, 0.000000]
+# MD_HERO_UC
+camera_matrix: [2467.89248,0, 648.86375, 0, 2468.83665, 467.29131, 0, 0, 1]
+distort_coeffs: [-0.007537, 0.377799, 0.000311, 0.001523, 0.000000]
+
+# #MD2
+# camera_matrix: [1279.1579, 0, 660.93386, 0, 1285.86608, 539.38196, 0, 0, 1]
+# distort_coeffs:  [-0.211299, 0.146132, 0.002248, 0.003142, 0.000000]
 
 # # DH1
 # camera_matrix: [1272.39905, 0, 618.61436, 0, 1272.1674, 522.77117, 0, 0, 1]
@@ -109,7 +113,8 @@ R_camera2gimbal: [0, 0, 1, -1, 0, 0, 0, -1, 0]  # 理想情况
 # 机械偏置：表示相机坐标系原点相对于云台坐标系原点的平移向量
 # 数据解读：t_camera2gimbal: [<X>, <Y>, <Z>]，单位：米，X取正值指相机位于云台中心前方，Y取正值指相机位于云台中心左侧，Z取正值指相机位于云台中心上方
 # t_camera2gimbal: [0.13160669975045827, 0.10377721766577375, 0.024908271912914642]
-t_camera2gimbal: [0, 0, 0]  # 理想情况
+t_camera2gimbal: [0.2142, 0.033, 0.0562]  # 理想情况
+#qianhou 214.2mm zuoyou 33mm(板在相机右) shangxia 56.2mm
 
 # #####-----cboard参数-----#####
 # quaternion_canid: 0x100
@@ -118,7 +123,7 @@ t_camera2gimbal: [0, 0, 0]  # 理想情况
 # can_interface: "can0"
 
 #####-----gimbal参数-----#####
-com_port: "/dev/ttyACM0"
+com_port: "/dev/pts/2"
 yaw_kp: 0
 yaw_kd: 0
 pitch_kp: 0
@@ -130,10 +135,11 @@ fire_thresh: 0.0001
 # max_yaw_acc: 50
 max_yaw_acc: 50
 Q_yaw: [9e6, 0]
+#Q_yaw: [6e6, 0] #zys 1.18
 R_yaw: [1]
 
 # max_pitch_acc: 100
-max_pitch_acc: 80
+max_pitch_acc: 100
 Q_pitch: [9e6, 0]
 R_pitch: [1]
 

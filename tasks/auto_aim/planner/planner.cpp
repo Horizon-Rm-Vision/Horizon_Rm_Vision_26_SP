@@ -83,10 +83,10 @@ Plan Planner::plan(Target target, double bullet_speed)
   plan.yaw_acc = yaw_solver_->work->u(0, HALF_HORIZON);
 
   plan.pitch = pitch_solver_->work->x(0, HALF_HORIZON);
-  //#ifdef SR_VEL
-  plan.pitch_vel = pitch_solver_->work->x(1, HALF_HORIZON);
-  plan.pitch_acc = pitch_solver_->work->u(0, HALF_HORIZON);
-  //#endif
+  // //#ifdef SR_VEL
+  // plan.pitch_vel = pitch_solver_->work->x(1, HALF_HORIZON);
+  // plan.pitch_acc = pitch_solver_->work->u(0, HALF_HORIZON);
+  // //#endif
 
   // //保存上次状态供下次使用，暂时无用
   // plan.last_yaw = plan.yaw + plan.yaw_vel * DT;
