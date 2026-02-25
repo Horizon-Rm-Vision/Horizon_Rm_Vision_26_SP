@@ -108,7 +108,13 @@ void YOLOV5_TRT::allocateGPUMemory() {
   h_temp_keypoints_.reserve(h_max_detections_ * 8);
 
   // 创建一个非阻塞CUDA流，用于异步拷贝与推理
-  CUDA_CHECK(cudaStreamCreateWithFlags(&stream_, cudaStreamNonBlocking));
+  // 创建两个非阻塞CUDA流，用于双缓冲异步拷贝与推理
+  CUDA_CHECK(cudaStreamCreateWithFlags(&streams_[0], cudaStreamNonBlocking));
+  CUDA_CHECK(cudaStreamCreateWithFlags(&streams_[1], cudaStreamNonBlocking));
+
+  // 为双缓冲分配输出缓冲
+  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_output_tensor_[0]), sizeof(float) * output_count_));
+  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_output_tensor_[1]), sizeof(float) * output_count_));
 }
 
 void YOLOV5_TRT::freeGPUMemory() {
@@ -116,10 +122,7 @@ void YOLOV5_TRT::freeGPUMemory() {
     cudaFree(d_input_tensor_);
     d_input_tensor_ = nullptr;
   }
-  if (d_output_tensor_) {
-    cudaFree(d_output_tensor_);
-    d_output_tensor_ = nullptr;
-  }
+  // d_output_tensor_ handled as double buffer below
   if (d_temp_color_ids_) cudaFree(d_temp_color_ids_);
   if (d_temp_num_ids_) cudaFree(d_temp_num_ids_);
   if (d_temp_confidences_) cudaFree(d_temp_confidences_);
@@ -134,12 +137,18 @@ void YOLOV5_TRT::freeGPUMemory() {
   if (h_pinned_boxes_) cudaFreeHost(h_pinned_boxes_);
   if (h_pinned_keypoints_) cudaFreeHost(h_pinned_keypoints_);
   
-  // 销毁流
-  if (stream_) {
-    cudaStreamSynchronize(stream_);
-    cudaStreamDestroy(stream_);
-    stream_ = nullptr;
+  // 销毁双流
+  for (int i = 0; i < 2; ++i) {
+    if (streams_[i]) {
+      cudaStreamSynchronize(streams_[i]);
+      cudaStreamDestroy(streams_[i]);
+      streams_[i] = nullptr;
+    }
   }
+
+  // 释放双输出缓冲
+  if (d_output_tensor_[0]) { cudaFree(reinterpret_cast<void*>(d_output_tensor_[0])); d_output_tensor_[0] = nullptr; }
+  if (d_output_tensor_[1]) { cudaFree(reinterpret_cast<void*>(d_output_tensor_[1])); d_output_tensor_[1] = nullptr; }
 
 }
 
@@ -314,8 +323,10 @@ std::list<Armor> YOLOV5_TRT::detect(const cv::Mat & raw_img, int frame_count)
   cv::cuda::GpuMat gpu_blob = preprocessImageGPU(bgr_img, scale, pad_x, pad_y);
 
   // 将预处理后的数据拷贝到输入tensor
+  // 双缓冲槽选择
+  int slot = (slot_index_++) & 1;
   // 将预处理后的GPU blob直接作为TensorRT输入指针，避免额外的device->device拷贝
-  trt_engine_->AsyncInference(stream_, const_cast<float*>(gpu_blob.ptr<float>(0)), d_output_tensor_);
+  trt_engine_->AsyncInference(streams_[slot], const_cast<float*>(gpu_blob.ptr<float>(0)), reinterpret_cast<void*>(d_output_tensor_[slot]));
 
   // 解析检测结果
   tmp_img_ = bgr_img;
@@ -327,10 +338,10 @@ std::list<Armor> YOLOV5_TRT::detect(const cv::Mat & raw_img, int frame_count)
   if (use_gpu_nms_) {
     // 使用GPU端解析 + NMS，减少从device->host拷贝的数据量
     int num_detections = gpu_kernel::gpu_parse_detections_nms(
-        d_output_tensor_, output_rows_, output_cols_,
-        score_threshold_, nms_threshold_, (float)scale, pad_x, pad_y,
-        d_temp_color_ids_, d_temp_num_ids_, d_temp_confidences_,
-        d_temp_boxes_, d_temp_keypoints_, d_valid_count_, stream_);
+      reinterpret_cast<const float*>(d_output_tensor_[slot]), output_rows_, output_cols_,
+      score_threshold_, nms_threshold_, (float)scale, pad_x, pad_y,
+      d_temp_color_ids_, d_temp_num_ids_, d_temp_confidences_,
+      d_temp_boxes_, d_temp_keypoints_, d_valid_count_, streams_[slot]);
 
     if (num_detections > 0) {
       if (num_detections > h_max_detections_) num_detections = h_max_detections_;
@@ -342,14 +353,14 @@ std::list<Armor> YOLOV5_TRT::detect(const cv::Mat & raw_img, int frame_count)
       size_t s_boxes = sizeof(int) * num_detections * 4;
       size_t s_kps = sizeof(float) * num_detections * 8;
 
-      CUDA_CHECK(cudaMemcpyAsync(h_pinned_color_ids_, d_temp_color_ids_, s_color, cudaMemcpyDeviceToHost, stream_));
-      CUDA_CHECK(cudaMemcpyAsync(h_pinned_num_ids_, d_temp_num_ids_, s_num, cudaMemcpyDeviceToHost, stream_));
-      CUDA_CHECK(cudaMemcpyAsync(h_pinned_confidences_, d_temp_confidences_, s_conf, cudaMemcpyDeviceToHost, stream_));
-      CUDA_CHECK(cudaMemcpyAsync(h_pinned_boxes_, d_temp_boxes_, s_boxes, cudaMemcpyDeviceToHost, stream_));
-      CUDA_CHECK(cudaMemcpyAsync(h_pinned_keypoints_, d_temp_keypoints_, s_kps, cudaMemcpyDeviceToHost, stream_));
+        CUDA_CHECK(cudaMemcpyAsync(h_pinned_color_ids_, reinterpret_cast<const void*>(d_temp_color_ids_), s_color, cudaMemcpyDeviceToHost, streams_[slot]));
+        CUDA_CHECK(cudaMemcpyAsync(h_pinned_num_ids_, reinterpret_cast<const void*>(d_temp_num_ids_), s_num, cudaMemcpyDeviceToHost, streams_[slot]));
+        CUDA_CHECK(cudaMemcpyAsync(h_pinned_confidences_, reinterpret_cast<const void*>(d_temp_confidences_), s_conf, cudaMemcpyDeviceToHost, streams_[slot]));
+        CUDA_CHECK(cudaMemcpyAsync(h_pinned_boxes_, reinterpret_cast<const void*>(d_temp_boxes_), s_boxes, cudaMemcpyDeviceToHost, streams_[slot]));
+        CUDA_CHECK(cudaMemcpyAsync(h_pinned_keypoints_, reinterpret_cast<const void*>(d_temp_keypoints_), s_kps, cudaMemcpyDeviceToHost, streams_[slot]));
 
-      // 等待流上所有操作完成（包括AsyncInference、解析kernel和拷贝）
-      CUDA_CHECK(cudaStreamSynchronize(stream_));
+      // 等待该槽流上所有操作完成（包括AsyncInference、解析kernel和拷贝）
+      CUDA_CHECK(cudaStreamSynchronize(streams_[slot]));
 
       // 重构到 std::vector / 输出结构
       color_ids.resize(num_detections);
@@ -378,7 +389,7 @@ std::list<Armor> YOLOV5_TRT::detect(const cv::Mat & raw_img, int frame_count)
       }
     } else {
       // 没有检测到目标，确保流上的推理完成
-      CUDA_CHECK(cudaStreamSynchronize(stream_));
+      CUDA_CHECK(cudaStreamSynchronize(streams_[slot]));
     }
   } else {
     // 保留CPU端解析路径，但使用异步拷贝以减少阻塞
@@ -386,8 +397,8 @@ std::list<Armor> YOLOV5_TRT::detect(const cv::Mat & raw_img, int frame_count)
     static std::vector<float> output_data;
     if (output_data.size() < output_rows_ * output_cols_) output_data.resize(output_rows_ * output_cols_);
 
-    CUDA_CHECK(cudaMemcpyAsync(output_data.data(), d_output_tensor_, entire_out, cudaMemcpyDeviceToHost, stream_));
-    CUDA_CHECK(cudaStreamSynchronize(stream_));
+    CUDA_CHECK(cudaMemcpyAsync(output_data.data(), reinterpret_cast<const void*>(d_output_tensor_[slot]), entire_out, cudaMemcpyDeviceToHost, streams_[slot]));
+    CUDA_CHECK(cudaStreamSynchronize(streams_[slot]));
 
     // 在CPU上解析输出（原来的parseDetectionsGPU逻辑）
     for (int r = 0; r < output_rows_; r++) {
@@ -483,8 +494,8 @@ std::list<Armor> YOLOV5_TRT::parseDetectionsGPUFast(
     double scale, int pad_x, int pad_y, const cv::Mat& bgr_img, int frame_count)
 {
   // 调用GPU kernel进行解析和NMS
-  int num_detections = gpu_kernel::gpu_parse_detections_nms(
-      d_output_tensor_, 
+    int num_detections = gpu_kernel::gpu_parse_detections_nms(
+      reinterpret_cast<const float*>(d_output_tensor_[0]), 
       output_rows_, output_cols_,
       score_threshold_, 
       nms_threshold_,
@@ -495,7 +506,7 @@ std::list<Armor> YOLOV5_TRT::parseDetectionsGPUFast(
       d_temp_boxes_, 
       d_temp_keypoints_,
       d_valid_count_
-  );
+    );
   
   if (num_detections == 0) {
     return std::list<Armor>();

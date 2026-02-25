@@ -55,7 +55,6 @@ private:
 
   // GPU内存指针
   float* d_input_tensor_ = nullptr;
-  float* d_output_tensor_ = nullptr;
   size_t input_count_;
   size_t output_count_;
   
@@ -81,11 +80,16 @@ private:
   std::vector<int> h_temp_boxes_;
   std::vector<float> h_temp_keypoints_;
   int h_max_detections_ = 1000;
-  // CUDA stream用于异步拷贝和异步推理
-  cudaStream_t stream_ = nullptr;
+  // CUDA streams用于异步拷贝与并行推理（双缓冲）
+  cudaStream_t streams_[2] = {nullptr, nullptr};
+  // 交替槽索引
+  int slot_index_ = 0;
 
   // 是否使用GPU端NMS和解析（默认开启以减少IO开销）
   bool use_gpu_nms_ = true;
+
+  // 双输出缓冲以支持并发推理
+  float* d_output_tensor_[2] = {nullptr, nullptr};
   
   // OpenCV CUDA对象
   cv::cuda::GpuMat gpu_bgr_img_;
