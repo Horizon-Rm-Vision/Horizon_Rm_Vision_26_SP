@@ -20,6 +20,17 @@ Planner::Planner(const std::string & config_path)
   high_speed_delay_time_ = tools::read<double>(yaml, "high_speed_delay_time");
   low_speed_delay_time_ = tools::read<double>(yaml, "low_speed_delay_time");
 
+  // 读取弹道模型配置
+  if (yaml["ballistic_model"]) {
+    auto str = yaml["ballistic_model"].as<std::string>();
+    if (str == "hero")
+      ballistic_model_ = BallisticModel::kHero;
+    else
+      ballistic_model_ = BallisticModel::kNoDrag;
+  } else {
+    ballistic_model_ = BallisticModel::kNoDrag;
+  }
+
   setup_yaw_solver(config_path);
   setup_pitch_solver(config_path);
 }
@@ -41,7 +52,10 @@ Plan Planner::plan(Target target, double bullet_speed)
       xyz = xyza.head<3>();
     }
   }
-  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
+  auto bullet_traj = tools::Trajectory(
+    bullet_speed, min_dist, xyz.z(),
+    ballistic_model_ == BallisticModel::kHero ? tools::Trajectory::Model::kHero
+                                               : tools::Trajectory::Model::kNoDrag);
   target.predict(bullet_traj.fly_time);
 
   // 2. Get trajectory
@@ -190,7 +204,10 @@ Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_sp
   debug_xyza = Eigen::Vector4d(xyz.x(), xyz.y(), xyz.z(), yaw);
 
   auto azim = std::atan2(xyz.y(), xyz.x());
-  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
+  auto bullet_traj = tools::Trajectory(
+    bullet_speed, min_dist, xyz.z(),
+    ballistic_model_ == BallisticModel::kHero ? tools::Trajectory::Model::kHero
+                                               : tools::Trajectory::Model::kNoDrag);
   if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
 
   return {tools::limit_rad(azim + yaw_offset_), -bullet_traj.pitch - pitch_offset_};

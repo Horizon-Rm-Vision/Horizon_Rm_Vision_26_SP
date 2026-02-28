@@ -48,6 +48,9 @@ private:
   double pitch_offset_;
   double fire_thresh_;
   double low_speed_delay_time_, high_speed_delay_time_, decision_speed_;
+  // 弹道模型选择
+  enum class BallisticModel { kNoDrag, kHero };
+  BallisticModel ballistic_model_ = BallisticModel::kNoDrag;
 
   // //保存上一次识别结果，暂时没什么用
   // double last_yaw_ = 0.0;

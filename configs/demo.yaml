@@ -120,3 +120,6 @@ aim_time: 0.150         # s
 wait_time: 0.300        # s
 command_fire_gap: 0.080 # s
 predict_time: 0.150     # s
+
+# 弹道模型: "no_drag" 或 "hero"（可选）
+ballistic_model: "no_drag"

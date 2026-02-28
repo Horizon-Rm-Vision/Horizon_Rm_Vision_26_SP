@@ -8,6 +8,7 @@
 #include "io/cboard.hpp"
 #include "io/command.hpp"
 #include "target.hpp"
+#include "tools/trajectory.hpp"  // for trajectory model enum
 
 namespace auto_aim
 {
@@ -41,6 +42,7 @@ private:
   double high_speed_delay_time_;
   double low_speed_delay_time_;
   double decision_speed_;
+  tools::Trajectory::Model ballistic_model_ = tools::Trajectory::Model::kNoDrag;
 
   AimPoint choose_aim_point(const Target & target);
 };
