@@ -58,6 +58,8 @@ Plan Planner::plan(Target target, double bullet_speed)
   // 3. Solve yaw
   Eigen::VectorXd x0(2);
   x0 << traj(0, 0), traj(1, 0);
+  //auto gs = gimbal.state();
+  //x0 << (gs.yaw - yaw0), gs.yaw_vel;
   tiny_set_x0(yaw_solver_, x0);
 
   yaw_solver_->work->Xref = traj.block(0, 0, 2, HORIZON);
@@ -81,8 +83,16 @@ Plan Planner::plan(Target target, double bullet_speed)
   plan.yaw_acc = yaw_solver_->work->u(0, HALF_HORIZON);
 
   plan.pitch = pitch_solver_->work->x(0, HALF_HORIZON);
-  //plan.pitch_vel = pitch_solver_->work->x(1, HALF_HORIZON);
-  //plan.pitch_acc = pitch_solver_->work->u(0, HALF_HORIZON);
+  // //#ifdef SR_VEL
+  // plan.pitch_vel = pitch_solver_->work->x(1, HALF_HORIZON);
+  // plan.pitch_acc = pitch_solver_->work->u(0, HALF_HORIZON);
+  // //#endif
+
+  // //保存上次状态供下次使用，暂时无用
+  // plan.last_yaw = plan.yaw + plan.yaw_vel * DT;
+  // plan.last_pitch = plan.pitch + plan.yaw_vel * DT;
+  // last_yaw_ = plan.last_yaw;
+  // last_pitch_ = plan.last_pitch;
 
   auto shoot_offset_ = 2;
   plan.fire =
@@ -97,14 +107,24 @@ Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 {
   if (!target.has_value()) return {false};
 
-  double delay_time =
+  // // 暂时无用，无识别时状态位会变化
+  // if( !target.has_value()) {
+  //   Plan plan;
+  //   plan.yaw = last_yaw_;
+  //   plan.pitch = last_pitch_;
+  //   plan.control = true;
+  //   return plan;
+  // }else{
+    double delay_time =
     std::abs(target->ekf_x()[7]) > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
 
-  auto future = std::chrono::steady_clock::now() + std::chrono::microseconds(int(delay_time * 1e6));
+    auto future = std::chrono::steady_clock::now() + std::chrono::microseconds(int(delay_time * 1e6));
 
-  target->predict(future);
+    target->predict(future);
 
-  return plan(*target, bullet_speed);
+    return plan(*target, bullet_speed);
+  // }
+
 }
 
 void Planner::setup_yaw_solver(const std::string & config_path)

@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.16.3)
 
-project(sp_vision)
+project(sp_vision CUDA CXX)
 
+# 设置CUDA架构
+set(CMAKE_CUDA_ARCHITECTURES 75)
+
+#add_definitions(-DSPDLOG_FMT_EXTERNAL) # 强制 spdlog 用系统安装的 fmt
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_BUILD_TYPE Release)
 message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}--------------------")
 
@@ -14,6 +19,7 @@ option(BUILD_TRT "Build only TensorRT" OFF)
 option(BUILD_OV "Build only OpenVINO" OFF)
 option(BUILD_DBINFER "Build double Infer" OFF)
 option(BUILD_ALL "Build all components" OFF)
+option(BUILD_GIMAL_ADD_VEL ON)
 message(STATUS "--------------------BUILD_CALIBRATION: ${BUILD_CALIBRATION}--------------------")
 message(STATUS "--------------------BUILD_TEST: ${BUILD_TEST}--------------------")
 message(STATUS "--------------------BUILD_SENTRY: ${BUILD_SENTRY}--------------------")
@@ -24,6 +30,9 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 find_package(CUDA REQUIRED)
 find_package(TensorRT REQUIRED)
+
+# 配置CUDA编译选项
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_75 --expt-relaxed-constexpr")
 
 find_package(OpenCV REQUIRED)
 find_package(fmt REQUIRED)
@@ -53,6 +62,8 @@ add_executable(auto_aim_debug_mpc src/auto_aim_debug_mpc.cpp)
 add_executable(mt_auto_aim_debug src/mt_auto_aim_debug.cpp)
 add_executable(auto_buff_debug src/auto_buff_debug.cpp)
 add_executable(auto_buff_debug_mpc src/auto_buff_debug_mpc.cpp)
+add_executable(standard_serial src/standard_serial.cpp)
+add_executable(auto_buff_debug_serial src/auto_buff_debug_serial.cpp)
 add_executable(uav src/uav.cpp)
 add_executable(uav_debug src/uav_debug.cpp)
 
@@ -63,6 +74,8 @@ target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_a
 target_link_libraries(mt_auto_aim_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
 target_link_libraries(auto_buff_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff tools io ${CERES_LIBRARIES})
 target_link_libraries(auto_buff_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff tools io ${CERES_LIBRARIES})
+target_link_libraries(standard_serial ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
+target_link_libraries(auto_buff_debug_serial ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff tools io ${CERES_LIBRARIES})
 target_link_libraries(uav ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
 target_link_libraries(uav_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
 
@@ -88,6 +101,9 @@ endif()
 ##################demo##################
 add_executable(auto_aim_test tests/auto_aim_test.cpp)
 target_link_libraries(auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
+
+##################GIMBAL ADD VEL##################
+add_definitions(-DSR_VEL)
 
 ##################tests##################
 # 只在 BUILD_TEST 或 BUILD_ALL 为 ON 时编译 TEST 工具
