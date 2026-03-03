@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.16.3)
 
 project(sp_vision CUDA CXX)
 
-# 设置CUDA架构
-set(CMAKE_CUDA_ARCHITECTURES 75)
+# 设置CUDA架构:xavier为72,orin为87，16/20系显卡为75，30系显卡为80/86，40系显卡为89
+set(CMAKE_CUDA_ARCHITECTURES 86)
 
 #add_definitions(-DSPDLOG_FMT_EXTERNAL) # 强制 spdlog 用系统安装的 fmt
 set(CMAKE_CXX_STANDARD 17)
@@ -19,7 +19,7 @@ option(BUILD_TRT "Build only TensorRT" OFF)
 option(BUILD_OV "Build only OpenVINO" OFF)
 option(BUILD_DBINFER "Build double Infer" OFF)
 option(BUILD_ALL "Build all components" OFF)
-option(BUILD_GIMAL_ADD_VEL ON)
+#option(BUILD_GIMAL_ADD_VEL ON)
 message(STATUS "--------------------BUILD_CALIBRATION: ${BUILD_CALIBRATION}--------------------")
 message(STATUS "--------------------BUILD_TEST: ${BUILD_TEST}--------------------")
 message(STATUS "--------------------BUILD_SENTRY: ${BUILD_SENTRY}--------------------")
@@ -32,7 +32,7 @@ find_package(CUDA REQUIRED)
 find_package(TensorRT REQUIRED)
 
 # 配置CUDA编译选项
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_75 --expt-relaxed-constexpr")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_86 --expt-relaxed-constexpr")
 
 find_package(OpenCV REQUIRED)
 find_package(fmt REQUIRED)
@@ -103,7 +103,13 @@ add_executable(auto_aim_test tests/auto_aim_test.cpp)
 target_link_libraries(auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 
 ##################GIMBAL ADD VEL##################
-add_definitions(-DSR_VEL)
+if(BUILD_GIMAL_ADD_VEL)
+    # define macro for all targets
+    add_compile_definitions(SR_VEL)
+    message(STATUS "SR_VEL macro is enabled for build")
+else()
+    message(STATUS "SR_VEL macro is disabled for build")
+endif()
 
 ##################tests##################
 # 只在 BUILD_TEST 或 BUILD_ALL 为 ON 时编译 TEST 工具

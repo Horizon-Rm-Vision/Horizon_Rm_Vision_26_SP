@@ -24,6 +24,10 @@ const std::string keys =
 
 int main(int argc, char * argv[])
 {
+  #ifdef SR_VEL
+std::cout << "编译选项：SR_VEL 已启用，包含云台前馈角速度数据收发" << std::endl;
+  #endif
+
   // 读取命令行参数
   cv::CommandLineParser cli(argc, argv, keys);
   if (cli.has("help")) {
