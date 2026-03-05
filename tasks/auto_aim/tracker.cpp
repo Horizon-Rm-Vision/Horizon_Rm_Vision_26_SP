@@ -71,6 +71,10 @@ std::list<Target> Tracker::track(
   }
 
   state_machine(found);
+  
+  // 单装甲板调试注释，强制不丢失目标
+  std::list<Target> targets = {target_};
+  return targets;
 
   // 发散检测
   if (state_ != "lost" && target_.diverged()) {
@@ -91,8 +95,8 @@ std::list<Target> Tracker::track(
 
   if (state_ == "lost") return {};
 
-  std::list<Target> targets = {target_};
-  return targets;
+  // std::list<Target> targets = {target_};
+  // return targets;
 }
 
 std::tuple<omniperception::DetectionResult, std::list<Target>> Tracker::track(
