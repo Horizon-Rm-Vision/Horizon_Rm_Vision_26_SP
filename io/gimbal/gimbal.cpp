@@ -232,7 +232,8 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
   }
 }
 
-// 自瞄向电控发送数据
+#ifndef SENTRY_SR
+// 自瞄向电控发送数据(普通模式)
 void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
   float pitch_acc)
@@ -289,6 +290,71 @@ void Gimbal::send(
 
   }
 }
+#endif
+#ifdef SENTRY_SR
+// 自瞄向电控发送数据(哨兵模式，带导航通信内容)
+void Gimbal::send(
+  bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
+  float pitch_acc,float vx, float vy, float wz)
+{
+  uint8_t mode;
+  if (control) 
+  {
+      if (fire) 
+      {
+          mode = 57;  // 控制且开火，对应NT_M6的111001（十六进制原始数据39）
+      } 
+      else 
+      {
+          mode = 49;  // 控制但不开火，对应NT_M6的110001（十六进制原始数据31）
+      }
+  } 
+  else 
+  {
+      mode = 1;      // 不控制，对应NT_M6的自瞄模式默认标志位001（十六进制原始数据01）
+  }
+
+  tx_data_.mode = mode;  
+  // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
+  tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
+  tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
+  tx_data_.timestamp = 0;  // 时间戳暂时填0
+  tx_data_.vx = vx;
+  tx_data_.vy = vy;
+  tx_data_.wz = wz;
+  //哨兵导航
+  
+  #ifdef SR_VEL
+    tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
+    tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
+    //tx_data_.yaw_acc = -yaw_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
+    //tx_data_.pitch_acc = -pitch_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
+  #endif
+  
+  if (fd_ < 0) {
+    tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
+    return;
+  }
+  
+  // 使用局部变量记录发送的数据内容
+  std::string mode_str = control ? (fire ? "CONTROL_FIRE" : "CONTROL_NO_FIRE") : "NO_CONTROL";
+  tools::logger()->debug("[Gimbal] Sending data - Mode: {} ({}), Pitch: {:.3f}, Yaw: {:.3f}",
+                        mode_str, mode, -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI));
+  
+  ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
+  if (bytes_written != sizeof(tx_data_)) {
+    tools::logger()->warn("[Gimbal] Failed to write serial, expected {} bytes, got {} bytes, error: {}",
+                         sizeof(tx_data_), bytes_written, strerror(errno));
+  } else {
+    tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
+    
+    // // 记录发送原始数据
+    // tools::logger()->trace("[Gimbal] Raw TX data: {}", 
+    //                       packet_to_hex(&tx_data_, sizeof(tx_data_)));
+
+  }
+}
+#endif
 
 // 自瞄从电控读取数据
 void Gimbal::read_thread()
@@ -369,7 +435,13 @@ void Gimbal::read_thread()
             //float yaw_acc = -rx_data_.yaw_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
             //float pitch_acc = -rx_data_.pitch_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
           #endif
-          
+          #ifdef SENTRY_SR
+          //哨兵导航相关数据
+          uint8_t game_status = rx_data_.game_status;
+          uint8_t blood = rx_data_.blood;
+          uint8_t bullet = rx_data_.bullet;
+          #endif
+        
           // 使用yaw和pitch计算四元数（roll设为0）
           //单位转换
           //double d2r = M_PI / 180.0;
@@ -401,7 +473,12 @@ void Gimbal::read_thread()
             state_.pitch_vel = 0.0f;  // 速度暂时填0
             #endif
             state_.bullet_count = 0;  // 子弹计数暂时填0
-            
+            #ifdef SENTRY_SR
+            //哨兵导航相关数据
+            state_.game_status = game_status;
+            state_.blood = blood;
+            state_.bullet = bullet;
+            #endif
             //本次接收前后模式变化记录日志
             GimbalMode old_mode = mode_;
             switch (mode) {

@@ -49,9 +49,6 @@ high_speed_delay_time: 0.030 # s
 #low_speed_delay_time: 0.015 # s planner use this value
 low_speed_delay_time: 0.060 # s planner use this value
 
-# 弹道结算模式，可选 "no_drag" (默认抛物线) 或 "hero" (带空气阻力迭代)
-ballistic_model: "no_drag"
-
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree
 second_tolerance: 2 # 远距离射击容差，degree
@@ -155,8 +152,8 @@ model: "../assets/yolo11_buff_int8.xml"
 fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
 
-#####-----nav速度倍数-----#####
-velocity_n: 30
+# 弹道解算模式，可选 "no_drag" (默认抛物线) 或 "hero" (带空气阻力迭代)
+ballistic_model: "no_drag"
 
 #####-----EZ filter parameters-----####
 # 下面参数用于对发送给电控的yaw/pitch数据进行简单突变过滤。
@@ -168,3 +165,5 @@ filter:
   d_degree: 5.0        # 与平均值差异阈值（度）
   x: 5                 # 连续帧判定阈值，用于回溯或确认异常
 
+#####-----nav速度倍数（仅用于哨兵模式，导航相关）-----#####
+velocity_n: 30
