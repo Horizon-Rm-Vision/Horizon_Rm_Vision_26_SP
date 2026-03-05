@@ -39,5 +39,5 @@ M5-DEV6:引入cuda算子，大量重写trt部分，性能优化，3050测试机�
 M5-DEV7:cuda部分进一步改进尝试，收益不明显
 M5-DEV8:引入带空气阻力的弹道结算方法（移植自华科英雄24开源），使用yaml选择模式，运行demo未发现问题，待实车测试
 M5-DEV9:CMakelists引入全局宏控制写法，现可以使用主CMakelists控制编译时是否使用带角速度收发的通信模式（对应代码内的宏SR_VEL），接下来几个版本将开始测试由全局宏控制写法实现区分全量编译还是纯ov或trt部分编译
-M5-DEV10:手眼标定程序的标定板由圆点标定板改为棋盘标定板
-
+M5-DEV10:手眼标定程序的标定板由圆点标定板改为棋盘标定板（待实车测试）
+M5-DEV11:CMakelists可直接控制是否启用TRT,为解决当前的异常数值问题暂时采用一个简单过滤机制，机制详细实现见参数文件内的解释（待实车测试），内置v5模型的原版onnx（yolov5a-0708.onnx）、Jetson NANO Orin（yolov5a-fp16-orin.engine）和40系显卡的fp16 engine模型文件（yolov5a-fp16-ada.engine），原来的30系显卡的fp16 engine模型改名为yolov5a-fp16-ampere.engine

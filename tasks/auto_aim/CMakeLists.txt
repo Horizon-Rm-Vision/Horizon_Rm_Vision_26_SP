@@ -1,26 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 
-set(OpenVINO_DIR "/opt/intel/openvino_2024.6.0/runtime/cmake")
-
-find_package(OpenVINO REQUIRED COMPONENTS Runtime)
-
-# Add module in charge of finding TensorRT
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
-
-find_package(CUDA REQUIRED)
-find_package(TensorRT REQUIRED)
-
-# 启用CUDA支持
-enable_language(CUDA)
-set(CMAKE_CUDA_STANDARD 17)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_75 --expt-relaxed-constexpr")
-
+# 添加 tinympc 子目录（该目录应位于 auto_aim/planner/tinympc）
 add_subdirectory(planner/tinympc)
 
-add_library(auto_aim OBJECT 
+# 基础源文件（不依赖特定推理后端）
+set(AUTO_AIM_SRCS
     armor.cpp
-    classifier.cpp 
+    classifier.cpp
     detector.cpp
     solver.cpp
     aimer.cpp
@@ -29,17 +15,51 @@ add_library(auto_aim OBJECT
     voter.cpp
     shooter.cpp
     yolo.cpp
-    yolos/yolov5_ov.cpp
-    yolos/yolov5_trt.cpp
-    yolos/yolov5_trt_gpu_kernel.cu
-    yolos/yolov8.cpp
-    yolos/yolo11.cpp
     multithread/commandgener.cpp
     multithread/mt_detector.cpp
     planner/planner.cpp
-    trt_engine.cpp
     # int8_calibrator.cpp
 )
 
-target_link_libraries(auto_aim PUBLIC ${CUDA_LIBRARIES} ${TensorRT_LIBRARIES} io openvino::runtime tinympcstatic )
-target_include_directories(auto_aim PUBLIC include ${CUDA_INCLUDE_DIRS} ${TensorRT_INCLUDE_DIRS})
+# 如果启用 CUDA，添加 TensorRT 相关源文件
+if(USE_CUDA)
+    list(APPEND AUTO_AIM_SRCS
+        yolos/yolov5_trt.cpp
+        yolos/yolov5_trt_gpu_kernel.cu
+        trt_engine.cpp
+    )
+endif()
+
+# 如果启用 OpenVINO，添加 OpenVINO 相关源文件
+if(USE_OPENVINO)
+    list(APPEND AUTO_AIM_SRCS
+        yolos/yolov5_ov.cpp
+        yolos/yolov8.cpp
+        yolos/yolo11.cpp
+    )
+endif()
+
+# 创建对象库
+add_library(auto_aim OBJECT ${AUTO_AIM_SRCS})
+
+# 设置公共包含目录
+target_include_directories(auto_aim PUBLIC include)
+
+# 如果启用 CUDA，添加 CUDA 和 TensorRT 包含目录
+if(USE_CUDA)
+    target_include_directories(auto_aim PUBLIC ${CUDA_INCLUDE_DIRS} ${TensorRT_INCLUDE_DIRS})
+endif()
+
+# 链接依赖（对象库的依赖会传播给链接它的目标）
+# 公共依赖
+target_link_libraries(auto_aim PUBLIC io tinympcstatic)
+
+# CUDA/TensorRT 库
+if(USE_CUDA)
+    target_link_libraries(auto_aim PUBLIC ${CUDA_LIBRARIES} ${TensorRT_LIBRARIES})
+endif()
+
+# OpenVINO 库
+if(USE_OPENVINO)
+    target_link_libraries(auto_aim PUBLIC openvino::runtime)
+endif()

@@ -7,7 +7,9 @@ classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
 yolov5_model_path: ../assets/yolov5.xml
-yolov5_trt_model_path: ../assets/yolov5a-fp16.engine
+yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
+#yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
+#yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
 device: CPU
 min_confidence: 0.8
 use_traditional: true
@@ -152,3 +154,17 @@ model: "../assets/yolo11_buff_int8.xml"
 #####-----buff_aimer参数-----#####
 fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
+
+#####-----nav速度倍数-----#####
+velocity_n: 30
+
+#####-----EZ filter parameters-----####
+# 下面参数用于对发送给电控的yaw/pitch数据进行简单突变过滤。
+# 可以在运行时修改这些值来调节行为。
+filter:
+  enabled: true        # 是否启用滤波器
+  m: 30                # 记忆历史帧数量上限
+  n: 3                 # 与最近n帧平均值比较
+  d_degree: 5.0        # 与平均值差异阈值（度）
+  x: 5                 # 连续帧判定阈值，用于回溯或确认异常
+
