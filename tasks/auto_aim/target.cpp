@@ -71,8 +71,8 @@ Target::Target(double x, double vyaw, double radius, double h) : armor_num_(4)
 void Target::predict(std::chrono::steady_clock::time_point t)
 {
   auto dt = tools::delta_time(t, t_);
-  predict(dt);
-  // predict(0.015);
+  // predict(dt);
+  predict(0.015);
   t_ = t;
 }
 
@@ -211,8 +211,8 @@ void Target::update(const Armor & armor)
   }
 
   // 调试单装甲板
-  jumped = false;
-  is_switch_ = false;
+  // jumped = false;
+  // is_switch_ = false;
 
   if (is_switch_) switch_count_++;
 
