@@ -1,6 +1,6 @@
-pattern_cols: 10
-pattern_rows: 7
-center_distance_mm: 40
+pattern_cols: 11         # 内角点列数
+pattern_rows: 8          # 内角点行数
+center_distance_mm: 25   # 棋盘格方格边长（mm）
 
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0,  0, 0, 1]
 

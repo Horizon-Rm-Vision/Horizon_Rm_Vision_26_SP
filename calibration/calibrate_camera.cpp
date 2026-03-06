@@ -11,7 +11,6 @@ const std::string keys =
   "{config-path c  | configs/calibration.yaml | yaml配置文件路径 }"
   "{@input-folder  | assets/img_with_q        | 输入文件夹路径   }";
 
-// 生成标定板角点的三维坐标（棋盘格或圆点通用，z=0）
 std::vector<cv::Point3f> centers_3d(const cv::Size & pattern_size, const float center_distance)
 {
   std::vector<cv::Point3f> centers_3d;
@@ -32,7 +31,7 @@ void load(
   auto yaml = YAML::LoadFile(config_path);
   auto pattern_cols = yaml["pattern_cols"].as<int>();
   auto pattern_rows = yaml["pattern_rows"].as<int>();
-  auto center_distance_mm = yaml["center_distance_mm"].as<double>(); // 对于棋盘格，表示方格边长
+  auto center_distance_mm = yaml["center_distance_mm"].as<double>();
   cv::Size pattern_size(pattern_cols, pattern_rows);
 
   for (int i = 1; true; i++) {
@@ -44,22 +43,23 @@ void load(
     // 设置图片尺寸
     img_size = img.size();
 
-    // 识别棋盘格角点
-    std::vector<cv::Point2f> corners_2d;
-    bool success = cv::findChessboardCorners(img, pattern_size, corners_2d,
-        cv::CALIB_CB_ADAPTIVE_THRESH + cv::CALIB_CB_NORMALIZE_IMAGE);
+    // 转换为灰度图
+    cv::Mat gray;
+    cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
 
-    // 若成功，进一步细化角点到亚像素精度
+    // 识别棋盘格角点
+    std::vector<cv::Point2f> centers_2d;
+    bool success = cv::findChessboardCorners(gray, pattern_size, centers_2d);
+
     if (success) {
-        cv::Mat gray;
-        cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
-        cv::cornerSubPix(gray, corners_2d, cv::Size(5,5), cv::Size(-1,-1),
-            cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 30, 0.001));
+      // 亚像素精细化
+      cv::cornerSubPix(gray, centers_2d, cv::Size(11, 11), cv::Size(-1, -1),
+                       cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 30, 0.001));
     }
 
     // 显示识别结果
     auto drawing = img.clone();
-    cv::drawChessboardCorners(drawing, pattern_size, corners_2d, success);
+    cv::drawChessboardCorners(drawing, pattern_size, centers_2d, success);
     cv::resize(drawing, drawing, {}, 0.5, 0.5);  // 缩小图片尺寸便于显示完全
     cv::imshow("Press any to continue", drawing);
     cv::waitKey(0);
@@ -69,7 +69,7 @@ void load(
     if (!success) continue;
 
     // 记录所需的数据
-    img_points.emplace_back(corners_2d);
+    img_points.emplace_back(centers_2d);
     obj_points.emplace_back(centers_3d(pattern_size, center_distance_mm));
   }
 }

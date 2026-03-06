@@ -19,11 +19,33 @@ Gimbal::Gimbal(const std::string & config_path)
   auto yaml = tools::load(config_path);
   com_port_ = tools::read<std::string>(yaml, "com_port");
 
-  tools::logger()->info("[Gimbal] Initializing gimbal communication on port: {}", com_port_);
-
-  if (!open_serial()) {
-    tools::logger()->error("[Gimbal] Failed to open serial port: {}", com_port_);
-    exit(1);
+  if (com_port_ == "auto") {
+    // 候选串口列表（按题目要求顺序）
+    const char* candidates[] = {
+        "/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyACM2",
+        "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2",
+        "/dev/ttyTHS0", "/dev/ttyTHS1", "/dev/ttyTHS2",
+        nullptr
+    };
+    bool found = false;
+    for (const char** p = candidates; *p != nullptr; ++p) {
+      com_port_ = *p;  // 临时设置为当前候选端口
+      if (open_serial()) {
+        tools::logger()->info("[Gimbal] Auto selected port: {}", com_port_);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      tools::logger()->error("[Gimbal] No valid serial port found in auto mode.");
+      exit(1);
+    }
+  } else {
+    tools::logger()->info("[Gimbal] Initializing gimbal communication on port: {}", com_port_);
+    if (!open_serial()) {
+      tools::logger()->error("[Gimbal] Failed to open serial port: {}", com_port_);
+      exit(1);
+    }
   }
 
   thread_ = std::thread(&Gimbal::read_thread, this);
