@@ -9,7 +9,7 @@ message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}-------
 
 # 编译选项,默认不编译多余组件，可以改OFF为ON或者在cmake ..中添加-DBUILD_XXX=ON临时启用
 option(BUILD_TEST "Build test tools" ON)
-option(BUILD_CALIBRATION "Build calibration tools" OFF)
+option(BUILD_CALIBRATION "Build calibration tools" ON)
 option(BUILD_SENTRY "Build sentry tools" OFF)
 option(BUILD_TRT "Build only TensorRT" OFF)
 option(BUILD_OV "Build only OpenVINO" OFF)

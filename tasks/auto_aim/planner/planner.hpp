@@ -38,6 +38,8 @@ public:
 
   Plan plan(Target target, double bullet_speed);
   Plan plan(std::optional<Target> target, double bullet_speed);
+  // Plan aim_at_center(const Target & target, double bullet_speed);
+  Plan aim_at_center(Target target, double bullet_speed);
 
 private:
   double yaw_offset_;

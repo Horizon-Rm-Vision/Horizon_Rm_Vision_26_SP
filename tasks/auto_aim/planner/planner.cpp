@@ -202,4 +202,50 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
   return traj;
 }
 
+// Plan Planner::aim_at_center(const Target & target, double bullet_speed)
+Plan Planner::aim_at_center(Target target, double bullet_speed)
+{
+  target.v1 = 50;
+  target.v2 = 200;
+  Plan plan;
+  // 整车中心坐标
+  Eigen::Vector3d xyz;
+  xyz = {target.ekf_x()[0], target.ekf_x()[2], target.ekf_x()[4]};
+
+  // 计算弹道是否可解
+  double center_dist = xyz.head<2>().norm();
+  auto bullet_traj = tools::Trajectory(bullet_speed, center_dist, xyz.z());
+  if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
+  
+  // 计算yaw和pitch
+  auto azim = std::atan2(xyz.y(), xyz.x());
+  float yaw = tools::limit_rad(azim + yaw_offset_);
+  float pitch = -bullet_traj.pitch - pitch_offset_;
+
+  // 开火条件,距离最近的装甲板的yaw与云台夹角小于20度
+  Eigen::Vector3d armor_xyz;
+  double armor_yaw;
+  auto min_dist = 1e10;
+  for (auto & xyza : target.armor_xyza_list()) {
+    auto dist = xyza.head<2>().norm();
+    if (dist < min_dist) {
+      min_dist = dist;
+      armor_xyz = xyza.head<3>();
+      armor_yaw = xyza[3];
+    }
+  }
+  if(armor_yaw  > 20 || armor_yaw < -20) {
+    plan.control = false;
+    plan.fire = false;
+  }
+  if(armor_yaw  < 20 && armor_yaw  > -20) {
+    plan.control = true;
+    plan.fire = true;
+  }
+
+  // 返回规划结果
+  plan.target_yaw = yaw;
+  plan.target_pitch = pitch;
+  return plan;
+}
 }  // namespace auto_aim

@@ -1,16 +1,24 @@
-pattern_cols: 10
-pattern_rows: 7
-center_distance_mm: 40
+pattern_cols: 11         # 内角点列数
+pattern_rows: 8          # 内角点行数
+center_distance_mm: 25   # 棋盘格方格边长（mm）
 
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0,  0, 0, 1]
 
-camera_name: "hikrobot"
-exposure_ms: 3
-gain: 10.0
-vid_pid: "2bdf:0001"
+camera_name: "daheng"
+exposure_ms: 6
+gamma: 2.85
+vid_pid: "KE0200010097"
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x01
 bullet_speed_canid: 0x110
 send_canid: 0xff
 can_interface: "can0"
+
+#####-----gimbal参数-----#####
+# com_port: "/dev/ttyUSB1"
+com_port: "/dev/pts/10"
+yaw_kp: 0
+yaw_kd: 0
+pitch_kp: 0
+pitch_kd: 0
