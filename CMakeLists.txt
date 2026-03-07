@@ -20,8 +20,8 @@ endif()
 # 其他编译选项,默认不编译多余组件，可以改OFF为ON来启用或禁用，或者在cmake ..中添加-DBUILD_XXX=ON临时启用
 option(BUILD_SENTRY "Build sentry tools" OFF)
 option(BUILD_TEST "Build test tools" OFF)
-option(BUILD_CALIBRATION "Build calibration tools" OFF)
-option(BUILD_ALL "Build all components" ON)
+option(BUILD_CALIBRATION "Build calibration tools" ON)
+option(BUILD_ALL "Build all components" OFF)
 
 # 全局宏控制，注释上即禁用，不注释即启用，亦可直接在cmake命令中添加 -DBUILD_GIMAL_ADD_VEL=ON 即可
 add_compile_definitions(SR_VEL) # 带前馈角速度的串口收发模式
