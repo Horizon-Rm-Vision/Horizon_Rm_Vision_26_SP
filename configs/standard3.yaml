@@ -57,15 +57,15 @@ auto_fire: true # 是否由自瞄控制射击
 # gain: 10.0
 # vid_pid: "2bdf:0001"
 
-# camera_name: "mindvision"
-# exposure_ms: 2
-# gamma: 1
-# vid_pid: "f622:d13a"
+camera_name: "mindvision"
+exposure_ms: 2
+gamma: 1
+vid_pid: "f622:d13a"
 
-camera_name: "daheng"
-exposure_ms: 3
-gamma: 2.85
-vid_pid: "KE0200010097"
+# camera_name: "daheng"
+# exposure_ms: 3
+# gamma: 2.85
+# vid_pid: "KE0200010097"
 
 
 #  1  0  0
@@ -99,8 +99,8 @@ send_canid: 0xff
 can_interface: "can0"
 
 #####-----gimbal参数-----#####
-# com_port: "/dev/ttyACM1"
-com_port: "/dev/pts/5"
+com_port: "/dev/ttyACM0"
+# com_port: "/dev/pts/5"
 yaw_kp: 0
 yaw_kd: 0
 pitch_kp: 0

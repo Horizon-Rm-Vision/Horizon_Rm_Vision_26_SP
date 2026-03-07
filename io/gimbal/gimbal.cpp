@@ -294,6 +294,7 @@ void Gimbal::read_thread()
     }
     
     bytes_read = read(fd_, buffer + data_index, sizeof(buffer) - data_index);
+    auto t = std::chrono::steady_clock::now();
     if (bytes_read < 0) {
       if (errno != EAGAIN && errno != EWOULDBLOCK) {
         error_count++;
@@ -309,8 +310,8 @@ void Gimbal::read_thread()
     }
     
     // 记录接收的原始数据
-    tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}", 
-                          bytes_read, packet_to_hex(buffer + data_index, bytes_read));
+    // tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}", 
+    //                       bytes_read, packet_to_hex(buffer + data_index, bytes_read));
     
     data_index += bytes_read;
     
@@ -328,7 +329,7 @@ void Gimbal::read_thread()
             continue;
           }
           
-          auto t = std::chrono::steady_clock::now();
+          // auto t = std::chrono::steady_clock::now();
           
           // Copy valid packet
           std::memcpy(&rx_data_, buffer + i, packet_size);
@@ -386,7 +387,7 @@ void Gimbal::read_thread()
             }
             
             // 使用局部变量记录解析后的数据内容
-            tools::logger()->info("[Gimbal] Parsed data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
+            tools::logger()->debug("[Gimbal] Parsed data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
                                  "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
                                  str(old_mode), str(mode_), pitch, yaw, bullet_speed, 
                                  q.w(), q.x(), q.y(), q.z());
@@ -411,6 +412,10 @@ void Gimbal::read_thread()
           // Incomplete packet, wait for more data
           tools::logger()->trace("[Gimbal] Incomplete packet, have {} bytes, need {} bytes", 
                                 data_index - i, packet_size);
+          // break;
+          // 不完整包：把从i开始的数据移到头部，等待更多数据
+          std::memmove(buffer, buffer + i, data_index - i);
+          data_index = data_index - i;
           break;
         }
       }

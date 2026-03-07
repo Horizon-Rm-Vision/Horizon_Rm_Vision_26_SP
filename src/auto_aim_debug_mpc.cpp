@@ -65,6 +65,14 @@ int main(int argc, char * argv[])
       auto gs = gimbal.state(); // 角度转弧度
       auto plan = planner.plan(target, gs.bullet_speed);
 
+      // 云台限速
+      // if(std::abs(plan.yaw - gs.yaw) > 30 * CV_PI / 180.0) {
+      //   plan.yaw = gs.yaw + 30 * CV_PI / 180.0 * tools::sign(plan.yaw - gs.yaw);
+      // }
+      if(std::abs(plan.pitch - gs.pitch) > 30 * CV_PI / 180.0) {
+        plan.pitch = gs.pitch + 30 * CV_PI / 180.0;
+      }
+
       gimbal.send(
         plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
         plan.pitch_acc); // 弧度转角度
@@ -85,10 +93,12 @@ int main(int argc, char * argv[])
     auto loop_start_time = std::chrono::steady_clock::now();
     
     camera.read(img, t);
-    auto q = gimbal.q(t);
 
-    solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
+    
+    auto q = gimbal.q(t + 15ms);
+    solver.set_R_gimbal2world(q);
+    
     auto targets = tracker.track(armors, t);
     if (!targets.empty())
       target_queue.push(targets.front());
