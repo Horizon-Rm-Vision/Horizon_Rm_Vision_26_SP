@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 find_package(yaml-cpp REQUIRED)
 
-add_subdirectory(serial)
+#add_subdirectory(serial)
 
 # 创建目标 io
 add_library(io STATIC 

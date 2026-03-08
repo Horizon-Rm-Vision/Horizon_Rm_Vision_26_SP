@@ -31,10 +31,8 @@ make
 
 ### 2.1 运行采集程序
 ```bash
-./capture configs/calibration.yaml -o assets/img_with_q
+./capture
 ```
-- 第一个参数是配置文件路径（`configs/calibration.yaml`）。
-- `-o` 指定输出文件夹（默认为 `assets/img_with_q`），程序会自动创建。
 
 ### 2.2 采集操作
 - 程序启动后，实时显示相机画面，并叠加：
@@ -61,10 +59,8 @@ make
 
 ### 3.2 运行标定程序
 ```bash
-./calibrate_camera assets/calib_imgs -c configs/calibration.yaml
+./calibrate_camera 
 ```
-- 第一个参数是图片文件夹路径。
-- `-c` 指定配置文件（用于读取棋盘格尺寸）。
 
 ### 3.3 标定过程
 - 程序逐张读取图片，检测角点并显示（按任意键继续）。
@@ -85,11 +81,8 @@ make
 
 ### 4.2 运行手眼标定
 ```bash
-./calibrate_handeye assets/img_with_q -c configs/calibration.yaml
+./calibrate_handeye 
 ```
-- 第一个参数是包含 `N.jpg` 和 `N.txt` 的文件夹路径。
-- `-c` 指定配置文件。
-
 ### 4.3 标定过程
 - 程序逐组读取图片和四元数：
   1. 从四元数计算云台在世界坐标系下的旋转矩阵 `R_gimbal2world`（基于 `R_gimbal2imubody` 和IMU姿态）。
@@ -119,7 +112,7 @@ make
 
 运行命令与普通手眼类似：
 ```bash
-./calibrate_robotworld_handeye assets/img_with_q -c configs/calibration.yaml
+./calibrate_robotworld_handeye 
 ```
 
 输出额外包含标定板到世界原点的距离和偏角。
