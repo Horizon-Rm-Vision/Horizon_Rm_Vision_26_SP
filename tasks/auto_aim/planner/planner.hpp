@@ -28,18 +28,20 @@ struct Plan
   float pitch;
   float pitch_vel;
   float pitch_acc;
+
+  // //保存上一次识别结果，暂时没什么用
+  // float last_yaw;
+  // float last_pitch;
 };
 
 class Planner
 {
 public:
   Eigen::Vector4d debug_xyza;
-  Eigen::Vector3d center_points; // 仅重投影用，存储世界坐标系中的目标位置
   Planner(const std::string & config_path);
 
   Plan plan(Target target, double bullet_speed);
   Plan plan(std::optional<Target> target, double bullet_speed);
-  // Plan aim_at_center(const Target & target, double bullet_speed);
   Plan aim_at_center(Target target, double bullet_speed);
 
 private:
@@ -49,6 +51,13 @@ private:
   double low_speed_delay_time_, high_speed_delay_time_, decision_speed_;
   bool aim_center_;
   int armor_yaw_threshold_;
+  // 弹道模型选择
+  enum class BallisticModel { kNoDrag, kHero };
+  BallisticModel ballistic_model_ = BallisticModel::kNoDrag;
+
+  // //保存上一次识别结果，暂时没什么用
+  // double last_yaw_ = 0.0;
+  // double last_pitch_ = 0.0;
 
   TinySolver * yaw_solver_;
   TinySolver * pitch_solver_;

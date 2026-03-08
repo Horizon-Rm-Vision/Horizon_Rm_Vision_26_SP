@@ -13,8 +13,10 @@ find_package(std_msgs REQUIRED)
 
 # create messages
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/EnemyStatusMsg.msg"
   "msg/AutoaimTargetMsg.msg"
+  "msg/EnemyStatusMsg.msg"
+  "msg/NavStatusMsg.msg"
+  "msg/NavVelocityMsg.msg"
   DEPENDENCIES builtin_interfaces std_msgs
 )
 

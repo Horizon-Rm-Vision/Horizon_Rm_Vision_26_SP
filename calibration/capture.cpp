@@ -14,8 +14,8 @@
 
 const std::string keys =
   "{help h usage ?  |                          | 输出命令行参数说明}"
-  "{@config-path c  | configs/calibration.yaml | yaml配置文件路径 }"
-  "{output-folder o |      assets/img_with_q   | 输出文件夹路径   }";
+  "{@config-path c  | ../configs/calibration.yaml | yaml配置文件路径 }"
+  "{output-folder o |      ../assets/img_with_q   | 输出文件夹路径   }";
 
 void write_q(const std::string q_path, const Eigen::Quaterniond & q)
 {
@@ -44,7 +44,7 @@ void capture_loop(
   int count = 0;
   while (true) {
     camera.read(img, timestamp);
-    Eigen::Quaterniond q = gimbal.q(timestamp);
+    Eigen::Quaterniond q = gimbal.imu_at(timestamp);
 
     // 在图像上显示欧拉角，用来判断imuabs系的xyz正方向，同时判断imu是否存在零漂
     auto img_with_ypr = img.clone();

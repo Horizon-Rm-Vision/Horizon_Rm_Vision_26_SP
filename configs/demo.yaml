@@ -7,7 +7,9 @@ classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
 yolov5_model_path: ../assets/yolov5.xml
-yolov5_trt_model_path: ../assets/yolov5a.engine
+yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
+#yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
+#yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
 device: CPU
 min_confidence: 0.8
 use_traditional: true
@@ -120,3 +122,25 @@ aim_time: 0.150         # s
 wait_time: 0.300        # s
 command_fire_gap: 0.080 # s
 predict_time: 0.150     # s
+
+# 弹道模型: "no_drag" 或 "hero"（可选）
+ballistic_model: "no_drag"
+
+#####-----EZ filter parameters-----####
+# 下面参数用于对发送给电控的yaw/pitch数据进行简单突变过滤。
+# 可以在运行时修改这些值来调节行为。
+filter:
+  enabled: true        # 是否启用滤波器
+  m: 30                # 记忆历史帧数量上限
+  n: 3                 # 与最近n帧平均值比较
+  d_degree: 5.0        # 与平均值差异阈值（度）
+  x: 5                 # 连续帧判定阈值，用于回溯或确认异常
+
+#EZF详解：在pitch和yaw数据临发送前做一个简单过滤
+#记忆一段数帧（容量m）历史数据
+#数据临发出时如果发现相比上n帧的数据差异极大（差值d）
+#则拒绝发出本帧并记录在一个异常帧容器里
+#如果接下来的有连续超过x帧的数值与异常帧数据差异小于d
+#则更新认为之前的异常帧为正常帧，这几帧的数可以继续发出去
+#如果接下来这连续超过x帧的数值与最后的正常帧数据差异小于d
+#则之前的异常帧为真异常帧，继续发出正常帧的数据

@@ -15,9 +15,13 @@ public:
 
   void publish(const Eigen::Vector4d & target_pos);
 
+  void publish_status(uint8_t game_status, uint8_t blood, uint8_t bullet);
+
   std::vector<int8_t> subscribe_enemy_status();
 
   std::vector<int8_t> subscribe_autoaim_target();
+
+  std::optional<geometry_msgs::msg::Twist> get_nav_velocity();
 
   template <typename T>
   std::shared_ptr<rclcpp::Publisher<T>> create_publisher(

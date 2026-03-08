@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.16)
-
 add_library(tools OBJECT 
     exiter.cpp
     extended_kalman_filter.cpp
@@ -12,5 +11,4 @@ add_library(tools OBJECT
     logger.cpp
     pid.cpp
     crc.cpp
-    ui.cpp
 )

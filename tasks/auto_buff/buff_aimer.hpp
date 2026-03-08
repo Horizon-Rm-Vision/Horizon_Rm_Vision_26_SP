@@ -8,6 +8,8 @@
 #include <cmath>
 #include <vector>
 
+#include "tools/trajectory.hpp"
+
 #include "../auto_aim/planner/planner.hpp"
 #include "buff_target.hpp"
 #include "buff_type.hpp"
@@ -36,6 +38,9 @@ private:
   SmallTarget target_;
   double yaw_offset_;
   double pitch_offset_;
+
+  // 弹道模型选择
+  tools::Trajectory::Model ballistic_model_ = tools::Trajectory::Model::kNoDrag;
 
   double fire_gap_time_;
   double predict_time_;

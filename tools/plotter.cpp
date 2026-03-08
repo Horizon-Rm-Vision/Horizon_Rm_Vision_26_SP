@@ -6,15 +6,16 @@
 
 namespace tools
 {
-
 Plotter::Plotter(std::string host, uint16_t port)
 {
+  //原socket发送数据部分
   socket_ = ::socket(AF_INET, SOCK_DGRAM, 0);
 
   destination_.sin_family = AF_INET;
   destination_.sin_port = ::htons(port);
   destination_.sin_addr.s_addr = ::inet_addr(host.c_str());
-  
+
+
   // 配置Plotter的曲线绘制功能
   setPlotSize(1400, 300, 500);  // 宽度、高度、最大点数
 }
@@ -114,6 +115,7 @@ void Plotter::addData(const std::vector<double>& values, const std::vector<std::
   frame_count_++;
 }
 
+//新增：本地plot数据绘制（from infantryA by WCY）
 void Plotter::setPlotSize(int width, int height, int max_points)
 {
   std::lock_guard<std::mutex> lock(mutex_);

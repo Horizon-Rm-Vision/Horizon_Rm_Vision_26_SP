@@ -22,6 +22,17 @@ Planner::Planner(const std::string & config_path)
   aim_center_ = tools::read<bool>(yaml, "aim_center");
   armor_yaw_threshold_ = tools::read<double>(yaml, "armor_yaw_threshold");
 
+  // 读取弹道模型配置
+  if (yaml["ballistic_model"]) {
+    auto str = yaml["ballistic_model"].as<std::string>();
+    if (str == "hero")
+      ballistic_model_ = BallisticModel::kHero;
+    else
+      ballistic_model_ = BallisticModel::kNoDrag;
+  } else {
+    ballistic_model_ = BallisticModel::kNoDrag;
+  }
+
   setup_yaw_solver(config_path);
   setup_pitch_solver(config_path);
 }
@@ -43,7 +54,10 @@ Plan Planner::plan(Target target, double bullet_speed)
       xyz = xyza.head<3>();
     }
   }
-  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
+  auto bullet_traj = tools::Trajectory(
+    bullet_speed, min_dist, xyz.z(),
+    ballistic_model_ == BallisticModel::kHero ? tools::Trajectory::Model::kHero
+                                               : tools::Trajectory::Model::kNoDrag);
   target.predict(bullet_traj.fly_time);
 
   // 2. Get trajectory
@@ -60,6 +74,8 @@ Plan Planner::plan(Target target, double bullet_speed)
   // 3. Solve yaw
   Eigen::VectorXd x0(2);
   x0 << traj(0, 0), traj(1, 0);
+  //auto gs = gimbal.state();
+  //x0 << (gs.yaw - yaw0), gs.yaw_vel;
   tiny_set_x0(yaw_solver_, x0);
 
   yaw_solver_->work->Xref = traj.block(0, 0, 2, HORIZON);
@@ -83,8 +99,16 @@ Plan Planner::plan(Target target, double bullet_speed)
   plan.yaw_acc = yaw_solver_->work->u(0, HALF_HORIZON);
 
   plan.pitch = pitch_solver_->work->x(0, HALF_HORIZON);
+  #ifdef SR_VEL
   plan.pitch_vel = pitch_solver_->work->x(1, HALF_HORIZON);
   plan.pitch_acc = pitch_solver_->work->u(0, HALF_HORIZON);
+  #endif
+
+  // //保存上次状态供下次使用，暂时无用
+  // plan.last_yaw = plan.yaw + plan.yaw_vel * DT;
+  // plan.last_pitch = plan.pitch + plan.yaw_vel * DT;
+  // last_yaw_ = plan.last_yaw;
+  // last_pitch_ = plan.last_pitch;
 
   auto shoot_offset_ = 2;
   plan.fire =
@@ -176,7 +200,10 @@ Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_sp
   debug_xyza = Eigen::Vector4d(xyz.x(), xyz.y(), xyz.z(), yaw);
 
   auto azim = std::atan2(xyz.y(), xyz.x());
-  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
+  auto bullet_traj = tools::Trajectory(
+    bullet_speed, min_dist, xyz.z(),
+    ballistic_model_ == BallisticModel::kHero ? tools::Trajectory::Model::kHero
+                                               : tools::Trajectory::Model::kNoDrag);
   if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
 
   return {tools::limit_rad(azim + yaw_offset_), -bullet_traj.pitch - pitch_offset_};
@@ -208,7 +235,6 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
   return traj;
 }
 
-// Plan Planner::aim_at_center(const Target & target, double bullet_speed)
 Plan Planner::aim_at_center(Target target, double bullet_speed)
 {
   target.v1 = 50;
@@ -268,4 +294,5 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
 
   return plan;
 }
+
 }  // namespace auto_aim

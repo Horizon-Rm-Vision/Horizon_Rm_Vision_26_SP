@@ -10,6 +10,7 @@ Subscribe2Nav::Subscribe2Nav()
 : Node("nav_subscriber"),
   enemy_statue_queue_(1),
   autoaim_target_queue_(1),
+  nav_velocity_queue_(1),
   enemy_status_counter_(0),
   autoaim_target_counter_(0)
 {
@@ -20,6 +21,10 @@ Subscribe2Nav::Subscribe2Nav()
   autoaim_target_subscription_ = this->create_subscription<sp_msgs::msg::AutoaimTargetMsg>(
     "autoaim_target", 10,
     std::bind(&Subscribe2Nav::autoaim_target_callback, this, std::placeholders::_1));
+
+  nav_velocity_subscription_ = this->create_subscription<geometry_msgs::msg::Twist>(
+    "cmd_vel", 10,
+    std::bind(&Subscribe2Nav::nav_velocity_callback, this, std::placeholders::_1));
 
   RCLCPP_INFO(this->get_logger(), "nav_subscriber node initialized.");
 }
@@ -69,6 +74,13 @@ void Subscribe2Nav::autoaim_target_callback(const sp_msgs::msg::AutoaimTargetMsg
   }
 }
 
+void Subscribe2Nav::nav_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg)
+{
+    nav_velocity_queue_.clear();  // 只保留最新消息（类似原有逻辑）
+    nav_velocity_queue_.push(*msg);
+    // 如果需要超时清除，可参照 enemy_status 添加定时器，此处省略
+}
+
 void Subscribe2Nav::start()
 {
   RCLCPP_INFO(this->get_logger(), "nav_subscriber node Starting to spin...");
@@ -103,6 +115,16 @@ std::vector<int8_t> Subscribe2Nav::subscribe_autoaim_target()
     msg.timestamp.nanosec);
 
   return msg.target_ids;
+}
+
+std::optional<geometry_msgs::msg::Twist> Subscribe2Nav::get_nav_velocity()
+{
+    if (nav_velocity_queue_.empty()) {
+        return std::nullopt;
+    }
+    geometry_msgs::msg::Twist msg;
+    nav_velocity_queue_.back(msg);  // 获取最新消息
+    return msg;
 }
 
 }  // namespace io

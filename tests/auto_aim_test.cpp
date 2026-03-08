@@ -15,6 +15,10 @@
 #include "tools/math_tools.hpp"
 #include "tools/plotter.hpp"
 
+#ifdef EZ_FILTER
+#include "tools/yaml.hpp"
+#endif
+
 const std::string keys =
   "{help h usage ? |                   | 输出命令行参数说明 }"
   "{config-path c  | ../configs/demo.yaml | yaml配置文件的路径}"
@@ -37,6 +41,117 @@ int main(int argc, char * argv[])
 
   tools::Plotter plotter;
   tools::Exiter exiter;
+
+  #ifdef EZ_FILTER
+  // load filter configuration (same as in auto_aim_debug_mpc)
+  auto yaml_cfg = tools::load(config_path);
+  YAML::Node filter_node = yaml_cfg["filter"] ? yaml_cfg["filter"] : YAML::Node();
+
+  // replicate SendCmd and SpikeFilter here
+  struct SendCmd {
+    bool control;
+    bool fire;
+    float yaw;
+    float yaw_vel;
+    float yaw_acc;
+    float pitch;
+    float pitch_vel;
+    float pitch_acc;
+  };
+
+  class SpikeFilter {
+  public:
+    SpikeFilter(const YAML::Node &cfg) {
+      enabled_ = cfg["enabled"] ? cfg["enabled"].as<bool>() : true;
+      m_ = cfg["m"] ? cfg["m"].as<int>() : 30;
+      n_ = cfg["n"] ? cfg["n"].as<int>() : 3;
+      d_degree_ = cfg["d_degree"] ? cfg["d_degree"].as<double>() : 5.0;
+      x_ = cfg["x"] ? cfg["x"].as<int>() : 5;
+      if (m_ <= 0) m_ = 30;
+      if (n_ <= 0) n_ = 3;
+      if (x_ <= 0) x_ = 5;
+    }
+    std::vector<SendCmd> process(const SendCmd &cmd) {
+      std::vector<SendCmd> out;
+      if (!enabled_) {
+        out.push_back(cmd);
+        last_normal_ = cmd;
+        push_history(cmd);
+        return out;
+      }
+      double avg_yaw_deg = 0.0, avg_pitch_deg = 0.0;
+      int count = 0;
+      for (int i = (int)history_.size() - 1; i >= 0 && count < n_; --i, ++count) {
+        avg_yaw_deg += history_[i].yaw * 180.0 / M_PI;
+        avg_pitch_deg += history_[i].pitch * 180.0 / M_PI;
+      }
+      if (count == 0) {
+        avg_yaw_deg = last_normal_.yaw * 180.0 / M_PI;
+        avg_pitch_deg = last_normal_.pitch * 180.0 / M_PI;
+        count = 1;
+      } else {
+        avg_yaw_deg /= count;
+        avg_pitch_deg /= count;
+      }
+      double cmd_yaw_deg = cmd.yaw * 180.0 / M_PI;
+      double cmd_pitch_deg = cmd.pitch * 180.0 / M_PI;
+      double diff = std::max(std::abs(cmd_yaw_deg - avg_yaw_deg), std::abs(cmd_pitch_deg - avg_pitch_deg));
+      if (diff > d_degree_) {
+        abnormal_buffer_.push_back(cmd);
+        consecutive_like_abnormal_ = 0;
+        consecutive_like_normal_ = 0;
+        return out;
+      }
+      if (!abnormal_buffer_.empty()) {
+        const SendCmd &last_ab = abnormal_buffer_.back();
+        double last_ab_yaw_deg = last_ab.yaw * 180.0 / M_PI;
+        double last_ab_pitch_deg = last_ab.pitch * 180.0 / M_PI;
+        double diff_to_ab = std::max(std::abs(cmd_yaw_deg - last_ab_yaw_deg), std::abs(cmd_pitch_deg - last_ab_pitch_deg));
+        double last_norm_yaw_deg = last_normal_.yaw * 180.0 / M_PI;
+        double last_norm_pitch_deg = last_normal_.pitch * 180.0 / M_PI;
+        double diff_to_norm = std::max(std::abs(cmd_yaw_deg - last_norm_yaw_deg), std::abs(cmd_pitch_deg - last_norm_pitch_deg));
+        if (diff_to_ab < d_degree_) {
+          consecutive_like_abnormal_++;
+        } else {
+          consecutive_like_abnormal_ = 0;
+        }
+        if (diff_to_norm < d_degree_) {
+          consecutive_like_normal_++;
+        } else {
+          consecutive_like_normal_ = 0;
+        }
+        if (consecutive_like_abnormal_ >= x_) {
+          for (const auto &c : abnormal_buffer_) out.push_back(c);
+          abnormal_buffer_.clear();
+          consecutive_like_abnormal_ = 0;
+        } else if (consecutive_like_normal_ >= x_) {
+          abnormal_buffer_.clear();
+          consecutive_like_normal_ = 0;
+        }
+      }
+      out.push_back(cmd);
+      last_normal_ = cmd;
+      push_history(cmd);
+      return out;
+    }
+  private:
+    void push_history(const SendCmd &c) {
+      history_.push_back(c);
+      if ((int)history_.size() > m_) history_.pop_front();
+    }
+    bool enabled_ = true;
+    int m_ = 30;
+    int n_ = 3;
+    double d_degree_ = 5.0;
+    int x_ = 5;
+    std::deque<SendCmd> history_;
+    std::vector<SendCmd> abnormal_buffer_;
+    SendCmd last_normal_{};
+    int consecutive_like_abnormal_ = 0;
+    int consecutive_like_normal_ = 0;
+  };
+  SpikeFilter spike_filter(filter_node);
+  #endif
 
   auto video_path = fmt::format("{}.avi", input_path);
   auto text_path = fmt::format("{}.txt", input_path);
@@ -83,6 +198,32 @@ int main(int argc, char * argv[])
 
     auto aimer_start = std::chrono::steady_clock::now();
     auto command = aimer.aim(targets, timestamp, 27, false);
+
+    #ifdef EZ_FILTER
+    // apply spike filter to command (mimic sending step)
+    SendCmd scmd;
+    scmd.control = command.control;
+    scmd.fire = command.shoot; // treat shoot as fire
+    scmd.yaw = command.yaw;
+    scmd.yaw_vel = 0;
+    scmd.yaw_acc = 0;
+    scmd.pitch = command.pitch;
+    scmd.pitch_vel = 0;
+    scmd.pitch_acc = 0;
+    auto filtered = spike_filter.process(scmd);
+    if (!filtered.empty()) {
+      // use last filtered command for logic
+      const auto &f = filtered.back();
+      command.control = f.control;
+      command.yaw = f.yaw;
+      command.pitch = f.pitch;
+      command.shoot = f.fire;
+    } else {
+      // no command sent this frame
+      command.control = false;
+      command.shoot = false;
+    }
+    #endif
 
     if (
       !targets.empty() && aimer.debug_aim_point.valid &&
@@ -184,9 +325,14 @@ int main(int argc, char * argv[])
       data["nis_fail"] = target.ekf().data.at("nis_fail");
       data["nees_fail"] = target.ekf().data.at("nees_fail");
       data["recent_nis_failures"] = target.ekf().data.at("recent_nis_failures");
-    }
 
-    plotter.plot(data);
+          
+
+          //plotter.drawData({ command.pitch * 180/M_PI}, {"target_pitch"});
+    }
+plotter.drawData({ command.yaw * 180/M_PI,yaw * 180/M_PI}, {"target_yaw","gimbal_yaw"});
+    //plotter.plot(data);
+  
 
     cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
     cv::imshow("reprojection", img);

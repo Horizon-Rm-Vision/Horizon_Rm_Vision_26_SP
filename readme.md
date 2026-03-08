@@ -346,22 +346,3 @@ DPS = 单位时间射击窗口占比 \times 射频 \times 单发子弹伤害
 ## 项目成员
 王骁扬、杨佳轩、奚睿豪、俞选涛、吴圳楠、杨瑞灵、程翔宇
 
-#Horizon_Rm_Vision_26_SP
-##by ZYL
-###M1:基于REV4,修复了大恒相机的曝光问题，为yolov5模式新增了TensorRT10推理框架的支持，使其支持在Jetapck6使用TensorRT10加速推理以及带NVIDIA独显的设备使用TensorRT10加速推理，是正式准备测试的第一个版本
-###M2:根据io/ros2部分代码逆转写出的sp_msgs通信包，恢复了其和ros2程序通信的能力
-###M3:修改了主CMakeLists使其按条件编译，默认不编译全部组件，以加快编译速度，具体组件编译条件详细见上面的代码编译部分，修改通信协议，收发单位由弧度改为角度，修正大恒相机对arm64的兼容问题
-###M4:修改通信默认模式0为自瞄模式，修复拆数的bug,合并UI窗口，补充UI信息绘制，修改文件读取机制，从该版本开始不再需要从根目录启动程序，可以直接在build启动,TRT模式性能优化，将大量OpenCV任务放到GPU上，TensorRT模式下的性能提升近60%,引入新版大恒arm64的lib以修复部分arm设备的编译问题
-
-##infantryA:
-##by westsun
-###1.tools/plotter 增加曲线绘制功能，调用示例:plotter.drawData({gimbal.yaw, target.yaw, plann.yaw}, {"gimbal_yaw", "target_yaw", "planned_yaw"});
-###2.task/auto_aim/target 修改前哨战机制（待验证），如果可以正常使用，再修改观测数据更新卡尔曼滤波（目前是一直用中间装甲板的高度数据更新，应该是每块装甲板的高度数据都能更新）。
-
-待开发任务：
-1.通信模拟：火控，yaw,pitch的数值的问题
-2.终端优化：收发数据，原始数据
-3.UI改造：合并UI框，补充各种信息，绘制点
-4.CMakeLists：区分TRT和OV
-
-
