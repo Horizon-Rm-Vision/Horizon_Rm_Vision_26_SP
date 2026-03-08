@@ -11,6 +11,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "sp_msgs/sp_msgs/msg/nav_status_msg.hpp"
 
 namespace io
 {
@@ -25,9 +26,13 @@ public:
 
   void send_data(const Eigen::Vector4d & data);
 
+  void send_status(uint8_t game_status, uint8_t blood, uint8_t bullet);
+
 private:
   // ROS2 发布者
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
+
+  rclcpp::Publisher<sp_msgs::msg::NavStatusMsg>::SharedPtr status_publisher_;
 };
 
 }  // namespace io

@@ -235,7 +235,7 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
 // 自瞄向电控发送数据
 void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-  float pitch_acc)
+  float pitch_acc,float vx, float vy, float wz)
 {
   uint8_t mode;
   if (control) 
@@ -259,6 +259,8 @@ void Gimbal::send(
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.timestamp = 0;  // 时间戳暂时填0
+  //哨兵导航
+  
   #ifdef SR_VEL
     tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
@@ -363,6 +365,11 @@ void Gimbal::read_thread()
           float yaw = -rx_data_.yaw * (M_PI / 180.0);  // 接收时从角度制转换为弧度制并取负
           float pitch = -rx_data_.pitch * (M_PI / 180.0);  // 接收时从角度制转换为弧度制并取负
           uint8_t bullet_speed = rx_data_.bullet_speed;
+
+          //哨兵导航包
+          uint8_t game_status = rx_data_.game_status;
+          uint8_t blood = rx_data_.blood;
+          uint8_t bullet = rx_data_.bullet;
           #ifdef SR_VEL
             float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
             float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
@@ -401,6 +408,11 @@ void Gimbal::read_thread()
             state_.pitch_vel = 0.0f;  // 速度暂时填0
             #endif
             state_.bullet_count = 0;  // 子弹计数暂时填0
+
+            //哨兵导航包
+            state_.game_status = game_status;
+            state_.blood = blood;
+            state_.bullet = bullet;
             
             //本次接收前后模式变化记录日志
             GimbalMode old_mode = mode_;

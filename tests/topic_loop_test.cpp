@@ -12,13 +12,14 @@ int main(int argc, char ** argv)
   rclcpp::Clock clock;
   auto string_publisher =
     ros2.create_publisher<sp_msgs::msg::EnemyStatusMsg>("temp_node", "enemy_status", 10);
-
-  int i = 0;
-  while (!exiter.exit()) {
-    sp_msgs::msg::EnemyStatusMsg msg;
-    msg.invincible_enemy_ids = {1, 2, 3};
-    msg.timestamp = clock.now();
-    string_publisher->publish(msg);
+    
+    int i = 0;
+    while (!exiter.exit()) {
+      sp_msgs::msg::EnemyStatusMsg msg;
+      msg.invincible_enemy_ids = {1, 2, 3};
+      msg.timestamp = clock.now();
+      string_publisher->publish(msg);
+      ros2.publish_status(1, 100, 30);
     RCLCPP_INFO(
       rclcpp::get_logger("msg send timestamp is"), "msg.timestamp: %d.%09u", msg.timestamp.sec,
       msg.timestamp.nanosec);
@@ -29,6 +30,13 @@ int main(int argc, char ** argv)
     if (i % 3 == 0) {
       auto x = ros2.subscribe_enemy_status();
       // tools::logger()->info("invincible enemy ids size is{}", x.size());
+    }
+
+    auto velocity = ros2.get_nav_velocity();
+    if (velocity) {
+        std::cout << "vx=" << velocity->vx 
+                  << ", vy=" << velocity->vy 
+                  << ", wz=" << velocity->wz << std::endl;
     }
 
     std::this_thread::sleep_for(std::chrono::seconds(1));

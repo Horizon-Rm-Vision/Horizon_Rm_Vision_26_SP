@@ -8,6 +8,8 @@
 
 #include "io/camera.hpp"
 #include "io/gimbal/gimbal.hpp"
+#include "io/ros2/publish2nav.hpp"
+#include "io/ros2/ros2.hpp"
 #include "tasks/auto_aim/planner/planner.hpp"
 #include "tasks/auto_aim/solver.hpp"
 #include "tasks/auto_aim/tracker.hpp"
@@ -37,6 +39,7 @@ int main(int argc, char * argv[])
     return 0;
   }
 
+  io::ROS2 ros2;
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
 
@@ -62,11 +65,12 @@ int main(int argc, char * argv[])
     while (!quit) {
       auto target = target_queue.front();
       auto gs = gimbal.state();
+      auto velocity = ros2.get_nav_velocity();
       auto plan = planner.plan(target, gs.bullet_speed);
 
       gimbal.send(
         plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
-        plan.pitch_acc);
+        plan.pitch_acc,velocity->vx,velocity->vy,velocity->wz);
 
       auto fired = gs.bullet_count > last_bullet_count;
       last_bullet_count = gs.bullet_count;
@@ -163,6 +167,9 @@ int main(int argc, char * argv[])
     bool has_target = target_opt.has_value();
     auto plan = planner.plan(target_opt, gs.bullet_speed);
     
+    //发布导航的信息
+    ros2.publish_status(gs.game_status,gs.blood,gs.bullet);
+
     // 计算FPS
     frame_count++;
     auto current_time = std::chrono::steady_clock::now();
@@ -288,7 +295,7 @@ int main(int argc, char * argv[])
 
   quit = true;
   if (plan_thread.joinable()) plan_thread.join();
-  gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
+  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
   return 0;
 }

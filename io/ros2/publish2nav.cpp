@@ -14,6 +14,8 @@ Publish2Nav::Publish2Nav() : Node("auto_aim_target_pos_publisher")
 {
   publisher_ = this->create_publisher<std_msgs::msg::String>("auto_aim_target_pos", 10);
 
+  status_publisher_ = this->create_publisher<sp_msgs::msg::NavStatusMsg>("nav_status", 10);
+
   RCLCPP_INFO(this->get_logger(), "auto_aim_target_pos_publisher node initialized.");
 }
 
@@ -37,6 +39,15 @@ void Publish2Nav::send_data(const Eigen::Vector4d & target_pos)
   // RCLCPP_INFO(
   //   this->get_logger(), "auto_aim_target_pos_publisher node sent message: '%s'",
   //   message->data.c_str());
+}
+
+void Publish2Nav::send_status(uint8_t game_status, uint8_t blood, uint8_t bullet)
+{
+    auto message = sp_msgs::msg::NavStatusMsg();
+    message.game_status = game_status;
+    message.blood = blood;
+    message.bullet = bullet;
+    status_publisher_->publish(message);
 }
 
 void Publish2Nav::start()
