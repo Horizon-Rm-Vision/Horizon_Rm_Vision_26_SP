@@ -20,11 +20,13 @@ Gimbal::Gimbal(const std::string & config_path)
   com_port_ = tools::read<std::string>(yaml, "com_port");
 
   if (com_port_ == "auto") {
-    // 候选串口列表（按题目要求顺序）
+    // 候选串口列表
     const char* candidates[] = {
-        "/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyACM2",
-        "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2",
-        "/dev/ttyTHS0", "/dev/ttyTHS1", "/dev/ttyTHS2",
+        "/dev/ttyACM0", "/dev/ttyUSB0", "/dev/ttyTHS0","/dev/ttyCH341USB0",
+        "/dev/ttyACM1", "/dev/ttyUSB1", "/dev/ttyTHS1","/dev/ttyCH341USB1",
+        "/dev/ttyACM2", "/dev/ttyUSB2", "/dev/ttyTHS2","/dev/ttyCH341USB2",
+        "/dev/ttyACM3", "/dev/ttyUSB3", "/dev/ttyTHS3","/dev/ttyCH341USB3",
+        "/dev/ttyACM4", "/dev/ttyUSB4", "/dev/ttyTHS4","/dev/ttyCH341USB4",
         nullptr
     };
     bool found = false;
