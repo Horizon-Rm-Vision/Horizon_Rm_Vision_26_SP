@@ -71,32 +71,28 @@ std::list<Target> Tracker::track(
   }
 
   state_machine(found);
-  
-  // 单装甲板调试注释，强制不丢失目标
-  if (state_ != "lost") {
-    std::list<Target> targets = {target_};
-    return targets;
+
+  // 发散检测
+  if (state_ != "lost" && target_.diverged()) {
+    tools::logger()->debug("[Tracker] Target diverged!");
+    state_ = "lost";
+    return {};
   }
-  return {};
 
-  // // 发散检测
-  // if (state_ != "lost" && target_.diverged()) {
-  //   tools::logger()->debug("[Tracker] Target diverged!");
-  //   state_ = "lost";
-  //   return {};
-  // }
+  // 收敛效果检测：
+  if (
+    std::accumulate(
+      target_.ekf().recent_nis_failures.begin(), target_.ekf().recent_nis_failures.end(), 0) >=
+    (0.4 * target_.ekf().window_size)) {
+    tools::logger()->debug("[Target] Bad Converge Found!");
+    state_ = "lost";
+    return {};
+  }
 
-  // // 收敛效果检测：
-  // if (
-  //   std::accumulate(
-  //     target_.ekf().recent_nis_failures.begin(), target_.ekf().recent_nis_failures.end(), 0) >=
-  //   (0.4 * target_.ekf().window_size)) {
-  //   tools::logger()->debug("[Target] Bad Converge Found!");
-  //   state_ = "lost";
-  //   return {};
-  // }
+  if (state_ == "lost") return {};
 
-  // if (state_ == "lost") return {};
+  std::list<Target> targets = {target_};
+  return targets;
 }
 
 std::tuple<omniperception::DetectionResult, std::list<Target>> Tracker::track(
@@ -168,12 +164,12 @@ std::tuple<omniperception::DetectionResult, std::list<Target>> Tracker::track(
   // 更新状态机
   state_machine(found);
 
-  // // 发散检测
-  // if (state_ != "lost" && target_.diverged()) {
-  //   tools::logger()->debug("[Tracker] Target diverged!");
-  //   state_ = "lost";
-  //   return {switch_target, {}};  // 返回switch_target和空的targets
-  // }
+  // 发散检测
+  if (state_ != "lost" && target_.diverged()) {
+    tools::logger()->debug("[Tracker] Target diverged!");
+    state_ = "lost";
+    return {switch_target, {}};  // 返回switch_target和空的targets
+  }
 
   if (state_ == "lost") return {switch_target, {}};  // 返回switch_target和空的targets
 

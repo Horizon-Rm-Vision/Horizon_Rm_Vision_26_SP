@@ -22,6 +22,7 @@ public:
 
   std::vector<cv::Point2f> reproject_armor(
     const Eigen::Vector3d & xyz_in_world, double yaw, ArmorType type, ArmorName name) const;
+  std::vector<cv::Point2f> reproject_point(const Eigen::Vector3d &world_point) const;
 
   double oupost_reprojection_error(Armor armor, const double & picth);
 

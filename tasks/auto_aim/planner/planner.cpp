@@ -19,6 +19,8 @@ Planner::Planner(const std::string & config_path)
   decision_speed_ = tools::read<double>(yaml, "decision_speed");
   high_speed_delay_time_ = tools::read<double>(yaml, "high_speed_delay_time");
   low_speed_delay_time_ = tools::read<double>(yaml, "low_speed_delay_time");
+  aim_center_ = tools::read<bool>(yaml, "aim_center");
+  armor_yaw_threshold_ = tools::read<double>(yaml, "armor_yaw_threshold");
 
   setup_yaw_solver(config_path);
   setup_pitch_solver(config_path);
@@ -104,7 +106,11 @@ Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 
   target->predict(future);
 
-  return plan(*target, bullet_speed);
+  if (aim_center_) {
+    return aim_at_center(*target, bullet_speed);
+  } else {
+    return plan(*target, bullet_speed);
+  }
 }
 
 void Planner::setup_yaw_solver(const std::string & config_path)
@@ -212,6 +218,13 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
   Eigen::Vector3d xyz;
   xyz = {target.ekf_x()[0], target.ekf_x()[2], target.ekf_x()[4]};
 
+  // 存储世界坐标系中的目标位置，仅重投影用
+  if(target.ekf_x()[0]==0 && target.ekf_x()[2]==0 || target.armor_xyza_list().empty()) {
+    center_points = Eigen::Vector3d(0, 0, 0);
+  } else {
+    center_points = Eigen::Vector3d(target.ekf_x()[0], target.ekf_x()[2], target.ekf_x()[4]);
+  }
+
   // 计算弹道是否可解
   double center_dist = xyz.head<2>().norm();
   auto bullet_traj = tools::Trajectory(bullet_speed, center_dist, xyz.z());
@@ -234,18 +247,25 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
       armor_yaw = xyza[3];
     }
   }
-  if(armor_yaw  > 20 || armor_yaw < -20) {
+  if(armor_yaw  > armor_yaw_threshold_ || armor_yaw < -armor_yaw_threshold_) {
     plan.control = false;
     plan.fire = false;
   }
-  if(armor_yaw  < 20 && armor_yaw  > -20) {
+  if(armor_yaw  < armor_yaw_threshold_ && armor_yaw  > -armor_yaw_threshold_) {
     plan.control = true;
     plan.fire = true;
   }
 
   // 返回规划结果
   plan.target_yaw = yaw;
-  plan.target_pitch = pitch;
+  plan.target_pitch = pitch; // 规划值没调用MPC求解，直接返回了计算的yaw和pitch
+  plan.yaw = yaw;
+  plan.yaw_vel = 0;
+  plan.yaw_acc = 0;
+  plan.pitch = pitch;
+  plan.pitch_vel = 0;
+  plan.pitch_acc = 0;
+
   return plan;
 }
 }  // namespace auto_aim

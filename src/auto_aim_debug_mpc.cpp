@@ -60,6 +60,7 @@ int main(int argc, char * argv[])
     auto t0 = std::chrono::steady_clock::now();
     uint16_t last_bullet_count = 0;
 
+
     while (!quit) {
       auto target = target_queue.front();
       auto gs = gimbal.state(); // 角度转弧度
@@ -120,6 +121,11 @@ int main(int argc, char * argv[])
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
       tools::draw_points(img, image_points, {0, 0, 255});
+    }
+    // 绘制锁定中心
+    if (planner.aim_center_) {
+      auto center_image_points = solver.reproject_point(planner.center_points);
+      tools::draw_points(img, center_image_points, {255, 0, 0}, 5);
     }
     // 在图像上绘制检测结果（合并原 detection 窗口信息）
     for (const auto & armor : armors) {

@@ -52,6 +52,11 @@ second_tolerance: 2 # 远距离射击容差，degree
 judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
+#####-----锁车中心参数-----#####
+aim_center: false # 锁车中心
+armor_yaw_threshold: 10 # 锁车时装甲板yaw角度阈值，degree
+
+
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
@@ -91,7 +96,8 @@ R_camera2gimbal: [0, 0, 1, -1, 0, 0, 0, -1, 0]  # 理想情况
 # Y = 0.10m：相机位于云台中心左侧约 10 厘米处。
 # Z = 0.025m：相机位于云台中心上方约 2.5 厘米处。
 # t_camera2gimbal: [0, 0, 0]  # 理想情况
-t_camera2gimbal: [0.1925, 0.00204, 0.0106]
+t_camera2gimbal: [0.1225, 0.00204, 0.0106]
+# t_camera2gimbal: [0.1225, 0.00204, 0.0106]
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x100
