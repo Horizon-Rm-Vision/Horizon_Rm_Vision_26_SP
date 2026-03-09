@@ -17,6 +17,7 @@ namespace auto_aim
 class Tracker
 {
 public:
+  std::string aim_strategy_; // "center" or "follow"
   Tracker(const std::string & config_path, Solver & solver);
 
   std::string state() const;

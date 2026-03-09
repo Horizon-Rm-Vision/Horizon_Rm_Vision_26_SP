@@ -189,7 +189,11 @@ void Tracker::state_machine(bool found)
   else if (state_ == "detecting") {
     if (found) {
       detect_count_++;
-      if (detect_count_ >= min_detect_count_) state_ = "tracking";
+      if (detect_count_ >= min_detect_count_){
+        state_ = "tracking";
+        if(target_.ekf_x()[0] <= 3) aim_strategy_ = "follow";
+        else aim_strategy_ = "center";
+      }
     } else {
       detect_count_ = 0;
       state_ = "lost";

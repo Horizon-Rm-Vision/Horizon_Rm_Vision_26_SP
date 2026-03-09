@@ -291,6 +291,14 @@ int main(int argc, char * argv[])
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
+    
+    if(tracker.aim_strategy_ == "follow") {
+      planner.aim_center_ = false;
+    }
+    else {
+      planner.aim_center_ = true;
+    }
+    tools::draw_text(img, fmt::format("Aim Strategy: {}", tracker.aim_strategy_), {10, 90}, {0, 255, 0});
     if (!targets.empty())
       target_queue.push(targets.front());
     else
