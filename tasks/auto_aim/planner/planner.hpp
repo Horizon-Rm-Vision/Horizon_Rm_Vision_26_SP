@@ -38,7 +38,9 @@ class Planner
 {
 public:
   Eigen::Vector4d debug_xyza;
+  Eigen::Vector3d center_points; // 仅重投影用，存储世界坐标系中的目标位置
   Planner(const std::string & config_path);
+  bool aim_center_;
 
   Plan plan(Target target, double bullet_speed);
   Plan plan(std::optional<Target> target, double bullet_speed);
@@ -49,7 +51,6 @@ private:
   double pitch_offset_;
   double fire_thresh_;
   double low_speed_delay_time_, high_speed_delay_time_, decision_speed_;
-  bool aim_center_;
   int armor_yaw_threshold_;
   // 弹道模型选择
   enum class BallisticModel { kNoDrag, kHero };

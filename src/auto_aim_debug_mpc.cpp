@@ -310,7 +310,7 @@ int main(int argc, char * argv[])
     // 绘制锁定中心
     if (planner.aim_center_) {
       auto center_image_points = solver.reproject_point(planner.center_points);
-      tools::draw_points(img, center_image_points, {255, 0, 0}, 5);
+      tools::draw_points(img, center_image_points, {0, 0, 255}, 10);
     }
     
     if (!targets.empty()) {

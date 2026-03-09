@@ -240,9 +240,9 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
   target.v1 = 50;
   target.v2 = 200;
   Plan plan;
-  // 整车中心坐标
+  // 整车中心坐标减去半径为正对相机装甲板坐标
   Eigen::Vector3d xyz;
-  xyz = {target.ekf_x()[0], target.ekf_x()[2], target.ekf_x()[4]};
+  xyz = {target.ekf_x()[0] - target.ekf_x()[8], target.ekf_x()[2], target.ekf_x()[4]};
 
   // 存储世界坐标系中的目标位置，仅重投影用
   if(target.ekf_x()[0]==0 && target.ekf_x()[2]==0 || target.armor_xyza_list().empty()) {
@@ -253,15 +253,36 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
 
   // 计算弹道是否可解
   double center_dist = xyz.head<2>().norm();
-  auto bullet_traj = tools::Trajectory(bullet_speed, center_dist, xyz.z());
-  if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
-  
-  // 计算yaw和pitch
-  auto azim = std::atan2(xyz.y(), xyz.x());
-  float yaw = tools::limit_rad(azim + yaw_offset_);
-  float pitch = -bullet_traj.pitch - pitch_offset_;
+  float yaw, pitch;
+  //根据弹道飞行时间预测目标位置
+  auto bullet_traj = tools::Trajectory(
+  bullet_speed, center_dist, xyz.z(),
+  ballistic_model_ == BallisticModel::kHero ? tools::Trajectory::Model::kHero
+                                               : tools::Trajectory::Model::kNoDrag);
+  target.predict(bullet_traj.fly_time);
 
-  // 开火条件,距离最近的装甲板的yaw与云台夹角小于20度
+  if (ballistic_model_ == BallisticModel::kHero) {
+      auto azim = std::atan2(xyz.y(), xyz.x());
+      auto bullet_traj = tools::Trajectory(
+      bullet_speed, center_dist, xyz.z(),
+      ballistic_model_ == BallisticModel::kHero ? tools::Trajectory::Model::kHero
+                                                : tools::Trajectory::Model::kNoDrag);
+      if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
+      yaw = tools::limit_rad(azim + yaw_offset_);
+      pitch = -bullet_traj.pitch - pitch_offset_;
+  }
+  else{
+    auto bullet_traj = tools::Trajectory(bullet_speed, center_dist, xyz.z(), ballistic_model_);
+    if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
+    
+      // 计算yaw和pitch
+      auto azim = std::atan2(xyz.y(), xyz.x());
+      yaw = tools::limit_rad(azim + yaw_offset_);
+      pitch = -bullet_traj.pitch - pitch_offset_;
+  }
+
+
+  // 开火条件,距离最近的装甲板的yaw与云台夹角小于armor_yaw_threshold_阈值
   Eigen::Vector3d armor_xyz;
   double armor_yaw;
   auto min_dist = 1e10;
