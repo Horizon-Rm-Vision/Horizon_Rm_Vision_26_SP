@@ -298,7 +298,7 @@ int main(int argc, char * argv[])
     else {
       planner.aim_center_ = true;
     }
-    tools::draw_text(img, fmt::format("Aim Strategy: {}", tracker.aim_strategy_), {10, 90}, {0, 255, 0});
+    tools::draw_text(img, fmt::format("Aim Strategy: {}", tracker.aim_strategy_), {10, 690}, {0, 255, 0});
     if (!targets.empty())
       target_queue.push(targets.front());
     else
@@ -335,7 +335,9 @@ int main(int argc, char * argv[])
       Eigen::Vector4d aim_xyza = planner.debug_xyza;
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
-      tools::draw_points(img, image_points, {0, 0, 255});
+      if(planner.aim_center_ == false){
+        tools::draw_points(img, image_points, {0, 0, 255});
+      }
     }
     
     // 获取云台状态和规划信息用于UI显示

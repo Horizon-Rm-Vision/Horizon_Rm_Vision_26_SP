@@ -7,7 +7,7 @@ classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
 yolov5_model_path: ../assets/yolov5.xml
-yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
+yolov5_trt_model_path: ../assets/yolov5a.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
 device: CPU
@@ -56,24 +56,24 @@ judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
 #####-----锁车中心参数-----#####
-aim_center: false # 锁车中心
+aim_center: true # 锁车中心
 armor_yaw_threshold: 20 # 锁车时装甲板yaw角度阈值，degree
 
 #####-----相机参数-----#####
-camera_name: "mindvision"
-exposure_ms: 10
-gamma: 3 #已经废弃
-vid_pid: "f622:d13a"
+# camera_name: "mindvision"
+# exposure_ms: 10
+# gamma: 3 #已经废弃
+# vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
 # vid_pid: "2bdf:0001"
 
-# camera_name: "daheng"
-# exposure_ms: 2
-# gamma: 2.85
-# vid_pid: "KE0200010097"
+camera_name: "daheng"
+exposure_ms: 2
+gamma: 2.85
+vid_pid: "KE0200010097"
 
 
 #  1  0  0
@@ -141,7 +141,8 @@ t_camera2gimbal: [0.11612241824736501, -0.010136533135126701, 0.0983856717950905
 # can_interface: "can0"
 
 #####-----gimbal参数-----#####
-com_port: auto
+# com_port: auto
+com_port: "/dev/pts/5"
 yaw_kp: 0
 yaw_kd: 0
 pitch_kp: 0

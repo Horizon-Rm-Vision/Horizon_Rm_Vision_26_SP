@@ -272,7 +272,7 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
       pitch = -bullet_traj.pitch - pitch_offset_;
   }
   else{
-    auto bullet_traj = tools::Trajectory(bullet_speed, center_dist, xyz.z(), ballistic_model_);
+    auto bullet_traj = tools::Trajectory(bullet_speed, center_dist, xyz.z(), tools::Trajectory::Model::kNoDrag);
     if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
     
       // 计算yaw和pitch
