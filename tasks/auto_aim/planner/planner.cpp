@@ -237,8 +237,8 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
 
 Plan Planner::aim_at_center(Target target, double bullet_speed)
 {
-  target.v1 = 50;
-  target.v2 = 200;
+  target.v1 = 20;
+  // target.v2 = 150;
   Plan plan;
   // 整车中心坐标减去半径为正对相机装甲板坐标
   Eigen::Vector3d xyz;

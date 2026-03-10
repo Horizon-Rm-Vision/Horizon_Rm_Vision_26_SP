@@ -74,6 +74,7 @@ void Target::predict(std::chrono::steady_clock::time_point t)
 {
   auto dt = tools::delta_time(t, t_);
   predict(dt);
+  // predict(0.01);
   t_ = t;
 }
 
@@ -124,6 +125,7 @@ void Target::predict(double dt)
     {     0,      0,      0,      0,      0,      0,      0,      0, 0, 0, 0},
     {     0,      0,      0,      0,      0,      0,      0,      0, 0, 0, 0}
   };
+  // Q = Q*100;
   // clang-format on
 
   // 防止夹角求和出现异常值

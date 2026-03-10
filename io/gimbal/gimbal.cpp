@@ -430,6 +430,7 @@ void Gimbal::read_thread()
   }
   
   tools::logger()->info("[Gimbal] read_thread stopped.");
+  // std::this_thread::sleep_for(std::chrono::milliseconds(2));
 }
 
 void Gimbal::reconnect()

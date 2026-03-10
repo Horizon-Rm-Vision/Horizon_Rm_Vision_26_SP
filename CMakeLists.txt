@@ -25,7 +25,7 @@ option(BUILD_ALL "Build all components" OFF)
 
 # 全局宏控制，注释上即禁用，不注释即启用，亦可直接在cmake命令中添加 -DBUILD_GIMAL_ADD_VEL=ON 即可
 add_compile_definitions(SR_VEL) # 带前馈角速度的串口收发模式
-add_compile_definitions(EZ_FILTER) #简易极值滤波器，启用后会在串口收发模式下对云台速度进行简单过滤，预期可知的会增加响应延迟，待测试
+# add_compile_definitions(EZ_FILTER) #简易极值滤波器，启用后会在串口收发模式下对云台速度进行简单过滤，预期可知的会增加响应延迟，待测试
 add_compile_definitions(LIM_CODE) #简化代码模式，启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销
 
 if(BUILD_SENTRY)

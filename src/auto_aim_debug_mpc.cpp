@@ -211,8 +211,9 @@ int main(int argc, char * argv[])
     while (!quit) {
       auto target = target_queue.front();
       auto gs = gimbal.state();
-      // auto plan = planner.plan(target, gs.bullet_speed);
-      auto plan = planner.go(tracker.armor_);
+      auto plan = planner.plan(target, gs.bullet_speed);
+      // auto plango = planner.go(tracker.armor_);
+      plotter.drawData({gs.yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
 
       #ifdef EZ_FILTER
       //准备命令并通过过滤器处理
@@ -274,7 +275,7 @@ int main(int argc, char * argv[])
       }
 
       //plotter.plot(data);
-      plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
+      // plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
 
       std::this_thread::sleep_for(10ms);
     }
@@ -287,12 +288,13 @@ int main(int argc, char * argv[])
     auto loop_start_time = std::chrono::steady_clock::now();
     
     camera.read(img, t);
-
-    auto armors = yolo.detect(img);
-    auto q = gimbal.q(t);
+    auto q = gimbal.q(t + 15ms);
 
     solver.set_R_gimbal2world(q);
+
+    auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
+
     
     if(tracker.aim_strategy_ == "follow") {
       planner.aim_center_ = false;
