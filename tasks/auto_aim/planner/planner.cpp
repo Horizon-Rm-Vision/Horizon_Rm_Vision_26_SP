@@ -316,4 +316,30 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
   return plan;
 }
 
+Plan Planner::go(Armor armor)
+{
+    Eigen::Vector3d xyz = armor.xyz_in_world;
+
+    double horizontal = std::hypot(xyz.x(), xyz.y());
+
+    double azim = std::atan2(xyz.y(), xyz.x());
+    float yaw = tools::limit_rad(azim + yaw_offset_);
+
+    double pitch_angle = std::atan2(xyz.z(), horizontal);
+    float pitch = -pitch_angle - pitch_offset_;
+
+    Plan plan;
+    plan.control = true;
+    plan.fire = false;
+    plan.target_yaw = yaw;
+    plan.target_pitch = pitch;
+    plan.yaw = yaw;
+    plan.yaw_vel = 0;
+    plan.yaw_acc = 0;
+    plan.pitch = pitch;
+    plan.pitch_vel = 0;
+    plan.pitch_acc = 0;
+    return plan;
+}
+
 }  // namespace auto_aim

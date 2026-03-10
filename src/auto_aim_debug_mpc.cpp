@@ -211,7 +211,8 @@ int main(int argc, char * argv[])
     while (!quit) {
       auto target = target_queue.front();
       auto gs = gimbal.state();
-      auto plan = planner.plan(target, gs.bullet_speed);
+      // auto plan = planner.plan(target, gs.bullet_speed);
+      auto plan = planner.go(tracker.armor_);
 
       #ifdef EZ_FILTER
       //准备命令并通过过滤器处理
@@ -286,10 +287,11 @@ int main(int argc, char * argv[])
     auto loop_start_time = std::chrono::steady_clock::now();
     
     camera.read(img, t);
+
+    auto armors = yolo.detect(img);
     auto q = gimbal.q(t);
 
     solver.set_R_gimbal2world(q);
-    auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
     
     if(tracker.aim_strategy_ == "follow") {

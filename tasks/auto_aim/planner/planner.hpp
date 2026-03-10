@@ -45,6 +45,7 @@ public:
   Plan plan(Target target, double bullet_speed);
   Plan plan(std::optional<Target> target, double bullet_speed);
   Plan aim_at_center(Target target, double bullet_speed);
+  Plan go(Armor armor);
 
 private:
   double yaw_offset_;

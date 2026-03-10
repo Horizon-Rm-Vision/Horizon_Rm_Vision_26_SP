@@ -155,6 +155,13 @@ std::tuple<omniperception::DetectionResult, std::list<Target>> Tracker::track(
   else if (state_ == "detecting" && pre_state_ == "switching") {
     found = set_target(armors, t);
   }
+  //detect装甲板
+  else if(state_ == "tracking"){
+    // if (armors.empty()) return false;
+
+    armor_ = armors.front();
+    solver_.solve(armor_);
+  }
 
   else {
     found = update_target(armors, t);

@@ -11,7 +11,7 @@ yolov5_trt_model_path: ../assets/yolov5a.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
 device: CPU
-min_confidence: 0.8
+min_confidence: 0.7
 use_traditional: true
 
 #####-----ROI-----#####
@@ -35,8 +35,8 @@ max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
 
 #####-----tracker参数-----#####
-min_detect_count: 5
-max_temp_lost_count: 40
+min_detect_count: 8
+max_temp_lost_count: 19
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
@@ -60,20 +60,20 @@ aim_center: true # 锁车中心
 armor_yaw_threshold: 20 # 锁车时装甲板yaw角度阈值，degree
 
 #####-----相机参数-----#####
-camera_name: "mindvision"
-exposure_ms: 6
-gamma: 3 #已经废弃
-vid_pid: "f622:d13a"
+# camera_name: "mindvision"
+# exposure_ms: 0.7
+# gamma: 3 #已经废弃
+# vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
 # vid_pid: "2bdf:0001"
 
-# camera_name: "daheng"
-# exposure_ms: 2
-# gamma: 2.85
-# vid_pid: "KE0200010097"
+camera_name: "daheng"
+exposure_ms: 2
+gamma: 2.85
+vid_pid: "KE0200010097"
 
 
 #  1  0  0
@@ -136,8 +136,18 @@ R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
 # 相机同理想情况的偏角: yaw0.38 pitch-0.52 roll-1.26 degree
 # R_camera2gimbal: [-0.0064779369372593987, -0.0092959577573492862, 0.99993580869094323, -0.99973770966816744, -0.021906286121654128, -0.0066803065650612352, 0.021966979776106534, -0.99971680980052036, -0.009151611977478824]
-R_camera2gimbal: [0, 0, 1, -1, 0, 0, 0, -1, 0]  # 理想情况
-t_camera2gimbal: [0.10612241824736501, -0.020136533135126701, 0.088385671795090585]
+#
+# R_camera2gimbal: [0.12782692189672318, 0.10272561711927029, 0.9864622271662884, -0.99178506227818419, 0.0084648752197169497, 0.12763516807437056, 0.0047611217446347203, -0.99467371206591138, 0.10296377151577651]
+# t_camera2gimbal: [0.13286839341615525, 0.0008951502129394451, -0.019592761364113895]
+
+# 相机同理想情况的偏角: yaw-1.13 pitch-0.17 roll0.37 degree
+R_camera2gimbal: [0.019635231401362141, -0.0030784679202849655, 0.99980247085265728, -0.99978587182107559, 0.0064728614158731101, 0.01965483584420618, -0.006532089618701489, -0.99997431222024624, -0.0029507126018255558]
+t_camera2gimbal: [0.1301143376391436, 0.012665465599005195, 0.063522147596567019]
+
+
+
+# R_camera2gimbal: [0, 0, 1, -1, 0, 0, 0, -1, 0]  # 理想情况
+# t_camera2gimbal: [0.10612241824736501, -0.020136533135126701, 0.088385671795090585]
 
 # #####-----cboard参数-----#####
 # quaternion_canid: 0x100
@@ -146,8 +156,8 @@ t_camera2gimbal: [0.10612241824736501, -0.020136533135126701, 0.0883856717950905
 # can_interface: "can0"
 
 #####-----gimbal参数-----#####
-com_port: "/dev/ttyACM0"
-# com_port: "/dev/pts/5"
+# com_port: "/dev/ttyACM0"
+com_port: "/dev/pts/5"
 yaw_kp: 0
 yaw_kd: 0
 pitch_kp: 0
@@ -192,7 +202,9 @@ velocity_n: 30
 
 
 
-camera_matrix: [1279.1579, 0, 660.93386, 0, 1285.86608, 539.38196, 0, 0, 1]
-distort_coeffs:  [-0.211299, 0.146132, 0.002248, 0.003142, 0.000000]
+camera_matrix: [1273.75974,    0.     ,  644.08623,
+            0.     , 1274.08467,  503.23686,
+            0.     ,    0.     ,    1.     ]
+distort_coeffs:  [-0.213258, 0.179780, 0.000776, 0.000062, 0.000000]
 
 
