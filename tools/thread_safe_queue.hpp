@@ -5,7 +5,7 @@
 #include <functional>
 #include <iostream>
 #include <mutex>
-#include <queue>
+#include <deque>
 
 namespace tools
 {
@@ -25,14 +25,14 @@ public:
 
     if (queue_.size() >= max_size_) {
       if (PopWhenFull) {
-        queue_.pop();
+        queue_.pop_front();
       } else {
         full_handler_();
         return;
       }
     }
 
-    queue_.push(value);
+    queue_.push_back(value);
     not_empty_condition_.notify_all();
   }
 
@@ -48,7 +48,7 @@ public:
     }
 
     value = queue_.front();
-    queue_.pop();
+    queue_.pop_front();
   }
 
   T pop()
@@ -58,9 +58,23 @@ public:
     not_empty_condition_.wait(lock, [this] { return !queue_.empty(); });
 
     T value = std::move(queue_.front());
-    queue_.pop();
+    queue_.pop_front();
     return std::move(value);
   }
+
+  T peek(size_t index) const
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    not_empty_condition_.wait(lock, [this, index] { return queue_.size() > index; });
+    return queue_[index];
+  }
+
+  std::pair<T, T> peek2() const
+{
+  std::unique_lock<std::mutex> lock(mutex_);
+  not_empty_condition_.wait(lock, [this] { return queue_.size() >= 2; });
+  return {queue_[0], queue_[1]};
+}
 
   T front()
   {
@@ -83,26 +97,30 @@ public:
     value = queue_.back();
   }
 
-  bool empty()
+  bool empty() const
   {
     std::unique_lock<std::mutex> lock(mutex_);
     return queue_.empty();
   }
 
+  size_t size() const
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return queue_.size();
+  }
+
   void clear()
   {
     std::unique_lock<std::mutex> lock(mutex_);
-    while (!queue_.empty()) {
-      queue_.pop();
-    }
-    not_empty_condition_.notify_all();  // 如果其他线程正在等待队列不为空，这样可以唤醒它们
+    queue_.clear();
+    not_empty_condition_.notify_all();
   }
 
 private:
-  std::queue<T> queue_;
+  std::deque<T> queue_;
   size_t max_size_;
   mutable std::mutex mutex_;
-  std::condition_variable not_empty_condition_;
+  mutable std::condition_variable not_empty_condition_;
   std::function<void(void)> full_handler_;
 };
 

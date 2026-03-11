@@ -141,20 +141,47 @@ std::string Gimbal::str(GimbalMode mode) const
   }
 }
 
+// Eigen::Quaterniond Gimbal::q(std::chrono::steady_clock::time_point t)
+// {
+//   while (true) {
+//     auto [q_a, t_a] = queue_.pop();
+//     auto [q_b, t_b] = queue_.front();
+//     auto t_ab = tools::delta_time(t_a, t_b);
+//     auto t_ac = tools::delta_time(t_a, t);
+//     auto k = t_ac / t_ab;
+//     Eigen::Quaterniond q_c = q_a.slerp(k, q_b).normalized();
+//     if (t < t_a) return q_c;
+//     if (!(t_a < t && t <= t_b)) continue;
+
+//     return q_c;
+//   }
+// }
+
 Eigen::Quaterniond Gimbal::q(std::chrono::steady_clock::time_point t)
 {
   while (true) {
-    auto [q_a, t_a] = queue_.pop();
-    auto [q_b, t_b] = queue_.front();
-    auto t_ab = tools::delta_time(t_a, t_b);
-    auto t_ac = tools::delta_time(t_a, t);
-    auto k = t_ac / t_ab;
-    Eigen::Quaterniond q_c = q_a.slerp(k, q_b).normalized();
-    if (t < t_a) return q_c;
-    if (!(t_a < t && t <= t_b)) continue;
+    auto [front, back] = queue_.peek2();
+    auto [q_a, t_a] = front;
+    auto [q_b, t_b] = back;
 
-    return q_c;
+    if (t <= t_a) {
+      return q_a;
+    }
+
+    if (t_a < t && t <= t_b) {
+      double t_ab = tools::delta_time(t_a, t_b);
+      double t_ac = tools::delta_time(t_a, t);
+      double k = t_ac / t_ab;
+      return q_a.slerp(k, q_b).normalized();
+    }
+
+    queue_.pop();
   }
+}
+
+int Gimbal::q_size() const
+{
+  return queue_.empty() ? 0 : 1 + queue_.size();
 }
 
 std::string Gimbal::packet_to_hex(const void* data, size_t size) const
@@ -272,6 +299,9 @@ void Gimbal::send(
 
 void Gimbal::read_thread()
 {
+  // 在 read_thread 函数开头加
+  auto fps_start = std::chrono::steady_clock::now();
+  int fps_count = 0;
   tools::logger()->info("[Gimbal] read_thread started.");
   int error_count = 0;
   const size_t packet_size = sizeof(GimbalToVision);
@@ -357,6 +387,15 @@ void Gimbal::read_thread()
           if (mode <= 3) {
             // Process the packet
             queue_.push({q, t});
+            // 在 queue_.push({q, t}); 之后加
+            fps_count++;
+            auto fps_now = std::chrono::steady_clock::now();
+            std::chrono::duration<double> fps_elapsed = fps_now - fps_start;
+            if (fps_elapsed.count() >= 1.0) {
+              tools::logger()->warn("[Gimbal] push fps: {}", fps_count);
+              fps_count = 0;
+              fps_start = fps_now;
+            }
             
             std::lock_guard<std::mutex> lock(mutex_);
             state_.yaw = yaw;
@@ -386,7 +425,7 @@ void Gimbal::read_thread()
             }
             
             // 使用局部变量记录解析后的数据内容
-            tools::logger()->info("[Gimbal] Parsed data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
+            tools::logger()->debug("[Gimbal] Parsed data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
                                  "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
                                  str(old_mode), str(mode_), pitch, yaw, bullet_speed, 
                                  q.w(), q.x(), q.y(), q.z());
