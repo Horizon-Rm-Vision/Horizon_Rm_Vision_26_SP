@@ -45,7 +45,6 @@ public:
   Plan plan(Target target, double bullet_speed);
   Plan plan(std::optional<Target> target, double bullet_speed);
   Plan aim_at_center(Target target, double bullet_speed);
-  Plan go(Armor armor);
 
 private:
   double yaw_offset_;
@@ -53,6 +52,7 @@ private:
   double fire_thresh_;
   double low_speed_delay_time_, high_speed_delay_time_, decision_speed_;
   int armor_yaw_threshold_;
+  int armor_yaw_threshold;
   // 弹道模型选择
   enum class BallisticModel { kNoDrag, kHero };
   BallisticModel ballistic_model_ = BallisticModel::kNoDrag;

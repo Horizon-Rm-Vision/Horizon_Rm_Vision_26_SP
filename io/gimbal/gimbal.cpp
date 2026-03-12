@@ -299,27 +299,34 @@ void Gimbal::send(
 
 void Gimbal::read_thread()
 {
-  // 在 read_thread 函数开头加
   auto fps_start = std::chrono::steady_clock::now();
   int fps_count = 0;
   tools::logger()->info("[Gimbal] read_thread started.");
   int error_count = 0;
   const size_t packet_size = sizeof(GimbalToVision);
   
-  uint8_t buffer[1024];
+  uint8_t buffer[4096];  // 256 → 4096
   ssize_t bytes_read;
   size_t data_index = 0;
   
   while (!quit_) {
     if (error_count > 5000) {
-      error_count = 0;
-      tools::logger()->warn("[Gimbal] Too many errors ({}), attempting to reconnect...", error_count);
+      tools::logger()->warn("[Gimbal] Too many errors ({}), attempting to reconnect...", error_count);  // 先log
+      error_count = 0;  // 后清零
       reconnect();
       continue;
     }
     
     if (fd_ < 0) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      continue;
+    }
+
+    // 防止 data_index 接近 buffer 上限时无法 read
+    if (data_index >= sizeof(buffer) - packet_size) {
+      tools::logger()->warn("[Gimbal] Buffer nearly full ({}), discarding all data.", data_index);
+      data_index = 0;
+      error_count++;
       continue;
     }
     
@@ -338,138 +345,101 @@ void Gimbal::read_thread()
       continue;
     }
     
-    // 记录接收的原始数据
     tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}", 
                           bytes_read, packet_to_hex(buffer + data_index, bytes_read));
     
     data_index += bytes_read;
     
-    // Process complete packets
-    bool packet_found = false;
-    for (size_t i = 0; i <= data_index - 2; i++) {
-      // Look for packet header 0xCD
-      if (buffer[i] == 0xCD) {
-        // Check if we have a complete packet
-        if (i + packet_size <= data_index) {
-          // Check packet tail
-          if (buffer[i + packet_size - 1] != 0xDC) {
-            tools::logger()->warn("[Gimbal] Packet tail mismatch, expected 0xDC, got 0x{:02x}", 
-                                 buffer[i + packet_size - 1]);
-            continue;
-          }
-          
-          auto t = std::chrono::steady_clock::now(); // 接收完成给个时间戳
-          
-          // Copy valid packet
-          std::memcpy(&rx_data_, buffer + i, packet_size);
-          
-          // 记录原始数据包
-          tools::logger()->debug("[Gimbal] Found complete packet at offset {}, raw: {}", 
-                                i, packet_to_hex(buffer + i, packet_size));
-          
-          // 复制到局部变量以避免packed结构体引用问题
-          uint8_t mode = rx_data_.mode;
-          float yaw = -rx_data_.yaw * (M_PI / 180.0);  // 接收时从角度制转换为弧度制并取负
-          float pitch = -rx_data_.pitch * (M_PI / 180.0);  // 接收时从角度制转换为弧度制并取负
-          uint8_t bullet_speed = rx_data_.bullet_speed;
-          
-          // 使用yaw和pitch计算四元数（roll设为0）
-          //单位转换
-          double d2r = M_PI / 180.0;
-          Eigen::AngleAxisd yaw_angle(yaw, Eigen::Vector3d::UnitZ());
-          Eigen::AngleAxisd pitch_angle(pitch, Eigen::Vector3d::UnitY());
-          Eigen::AngleAxisd roll_angle(0 * d2r, Eigen::Vector3d::UnitX());
-          
-          Eigen::Quaterniond q = yaw_angle * pitch_angle * roll_angle;
-          q.normalize();
-          
-          // Validate mode field to avoid invalid mode warnings
-          if (mode <= 3) {
-            // Process the packet
-            queue_.push({q, t});
-            // 在 queue_.push({q, t}); 之后加
-            fps_count++;
-            auto fps_now = std::chrono::steady_clock::now();
-            std::chrono::duration<double> fps_elapsed = fps_now - fps_start;
-            if (fps_elapsed.count() >= 1.0) {
-              tools::logger()->warn("[Gimbal] push fps: {}", fps_count);
-              fps_count = 0;
-              fps_start = fps_now;
-            }
-            
-            std::lock_guard<std::mutex> lock(mutex_);
-            state_.yaw = yaw;
-            state_.yaw_vel = 0.0f;  // 速度暂时填0
-            state_.pitch = pitch;
-            state_.pitch_vel = 0.0f;  // 速度暂时填0
-            state_.bullet_speed = static_cast<float>(bullet_speed);
-            state_.bullet_count = 0;  // 子弹计数暂时填0
-            
-            GimbalMode old_mode = mode_;
-            switch (mode) {
-              case 1:
-                mode_ = GimbalMode::IDLE;
-                break;
-              case 0:
-                mode_ = GimbalMode::AUTO_AIM;
-                break;
-              case 2:
-                mode_ = GimbalMode::SMALL_BUFF;
-                break;
-              case 3:
-                mode_ = GimbalMode::BIG_BUFF;
-                break;
-              default:
-                mode_ = GimbalMode::IDLE;
-                break;
-            }
-            
-            // 使用局部变量记录解析后的数据内容
-            tools::logger()->debug("[Gimbal] Parsed data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
-                                 "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
-                                 str(old_mode), str(mode_), pitch, yaw, bullet_speed, 
-                                 q.w(), q.x(), q.y(), q.z());
-            
-            // Move remaining data to beginning of buffer
-            size_t remaining = data_index - (i + packet_size);
-            if (remaining > 0) {
-              std::memmove(buffer, buffer + i + packet_size, remaining);
-            }
-            data_index = remaining;
-            packet_found = true;
-            error_count = 0;
-            break;
-          } else {
-            // Invalid mode, skip this packet but continue processing
-            tools::logger()->warn("[Gimbal] Skipping packet with invalid mode: {}, raw data: {}", 
-                                 mode, packet_to_hex(buffer + i, packet_size));
-            // Move to next byte and continue searching
-            i += 1;
-          }
-        } else {
-          // Incomplete packet, wait for more data
-          tools::logger()->trace("[Gimbal] Incomplete packet, have {} bytes, need {} bytes", 
-                                data_index - i, packet_size);
-          break;
-        }
+    // 一次处理完 buffer 里所有完整包
+    size_t i = 0;
+    while (i + packet_size <= data_index) {
+      // 找包头
+      if (buffer[i] != 0xCD) {
+        i++;
+        continue;
       }
+      
+      // 校验包尾
+      if (buffer[i + packet_size - 1] != 0xDC) {
+        tools::logger()->warn("[Gimbal] Packet tail mismatch at offset {}, expected 0xDC, got 0x{:02x}",
+                             i, buffer[i + packet_size - 1]);
+        i++;
+        continue;
+      }
+      
+      auto t = std::chrono::steady_clock::now();
+      
+      std::memcpy(&rx_data_, buffer + i, packet_size);
+      
+      tools::logger()->debug("[Gimbal] Found complete packet at offset {}, raw: {}",
+                            i, packet_to_hex(buffer + i, packet_size));
+      
+      uint8_t mode = rx_data_.mode;
+      float yaw   = -rx_data_.yaw   * (M_PI / 180.0f);
+      float pitch = -rx_data_.pitch * (M_PI / 180.0f);
+      uint8_t bullet_speed = rx_data_.bullet_speed;
+      
+      Eigen::AngleAxisd yaw_angle  (yaw,   Eigen::Vector3d::UnitZ());
+      Eigen::AngleAxisd pitch_angle(pitch, Eigen::Vector3d::UnitY());
+      Eigen::AngleAxisd roll_angle (0.0,   Eigen::Vector3d::UnitX());
+      
+      Eigen::Quaterniond q = yaw_angle * pitch_angle * roll_angle;
+      q.normalize();
+      
+      if (mode <= 3) {
+        queue_.push({q, t});
+        
+        fps_count++;
+        auto fps_now = std::chrono::steady_clock::now();
+        std::chrono::duration<double> fps_elapsed = fps_now - fps_start;
+        if (fps_elapsed.count() >= 1.0) {
+          tools::logger()->warn("[Gimbal] push fps: {}", fps_count);
+          fps_count = 0;
+          fps_start = fps_now;
+        }
+        
+        {
+          std::lock_guard<std::mutex> lock(mutex_);
+          state_.yaw        = yaw;
+          state_.yaw_vel    = 0.0f;
+          state_.pitch      = pitch;
+          state_.pitch_vel  = 0.0f;
+          state_.bullet_speed = static_cast<float>(bullet_speed);
+          state_.bullet_count = 0;
+        }
+        
+        GimbalMode old_mode = mode_;
+        switch (mode) {
+          case 0: mode_ = GimbalMode::AUTO_AIM;   break;
+          case 1: mode_ = GimbalMode::IDLE;        break;
+          case 2: mode_ = GimbalMode::SMALL_BUFF;  break;
+          case 3: mode_ = GimbalMode::BIG_BUFF;    break;
+          default: mode_ = GimbalMode::IDLE;       break;
+        }
+        
+        tools::logger()->debug("[Gimbal] Parsed data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
+                             "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
+                             str(old_mode), str(mode_), pitch, yaw, bullet_speed,
+                             q.w(), q.x(), q.y(), q.z());
+        
+        error_count = 0;
+      } else {
+        tools::logger()->warn("[Gimbal] Skipping packet with invalid mode: {}, raw data: {}",
+                             mode, packet_to_hex(buffer + i, packet_size));
+      }
+      
+      i += packet_size;  // 无论 mode 是否有效，跳过这个包
     }
     
-    // If no packet found and buffer is full, clear some data to prevent overflow
-    if (!packet_found && data_index >= sizeof(buffer) - 10) {
-      tools::logger()->warn("[Gimbal] Buffer overflow protection, clearing buffer. data_index: {}", data_index);
-      // Keep last 100 bytes in case header is split
-      if (data_index > 100) {
-        std::memmove(buffer, buffer + data_index - 100, 100);
-        data_index = 100;
-        tools::logger()->debug("[Gimbal] Kept last 100 bytes, new data_index: {}", data_index);
-      }
-      error_count++;
+    // 把未处理的残留数据移到 buffer 头部
+    size_t remaining = data_index - i;
+    if (remaining > 0 && i > 0) {
+      std::memmove(buffer, buffer + i, remaining);
     }
+    data_index = remaining;
   }
   
   tools::logger()->info("[Gimbal] read_thread stopped.");
-  // std::this_thread::sleep_for(std::chrono::milliseconds(2));
 }
 
 void Gimbal::reconnect()
