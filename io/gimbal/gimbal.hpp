@@ -105,6 +105,9 @@ public:
   std::string str(GimbalMode mode) const;
   Eigen::Quaterniond q(std::chrono::steady_clock::time_point t);
   Eigen::Quaterniond imu_at(std::chrono::steady_clock::time_point t);
+  #ifdef NOVA_Q
+  int q_size() const;
+  #endif
 
   #ifndef SENTRY_SR
   void send(
