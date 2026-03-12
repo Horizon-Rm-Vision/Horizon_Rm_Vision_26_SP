@@ -56,7 +56,7 @@ int main(int argc, char * argv[])
 
   while (!exiter.exit()) {
     camera.read(img, t);
-    q = gimbal.imu_at(t - 1ms);
+    q = gimbal.q(t - 1ms);
     auto gimbal_mode = gimbal.mode();
     // Map GimbalMode to Mode
     if (gimbal_mode == io::GimbalMode::IDLE) mode = io::Mode::idle;

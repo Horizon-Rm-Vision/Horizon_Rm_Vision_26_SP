@@ -214,23 +214,6 @@ int Gimbal::q_size() const
 }
 #endif
 
-// 仅用于capture
-Eigen::Quaterniond Gimbal::imu_at(std::chrono::steady_clock::time_point t)
-{
-  while (true) {
-    auto [q_a, t_a] = queue_.pop();
-    auto [q_b, t_b] = queue_.front();
-    auto t_ab = tools::delta_time(t_a, t_b);
-    auto t_ac = tools::delta_time(t_a, t);
-    auto k = t_ac / t_ab;
-    Eigen::Quaterniond q_c = q_a.slerp(k, q_b).normalized();
-    if (t < t_a) return q_c;
-    if (!(t_a < t && t <= t_b)) continue;
-
-    return q_c;
-  }
-}
-
 std::string Gimbal::packet_to_hex(const void* data, size_t size) const
 {
   const uint8_t* bytes = static_cast<const uint8_t*>(data);
