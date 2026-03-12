@@ -10,7 +10,7 @@ set(CMAKE_BUILD_TYPE Release)
 message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}--------------------")
 
 # 编译模式选项：控制是否使用CUDA/TensorRT和OpenVINO
-option(USE_CUDA "Enable CUDA/TensorRT support" ON)
+option(USE_CUDA "Enable CUDA/TensorRT support" OFF)
 option(USE_OPENVINO "Enable OpenVINO support" ON)
 
 if(NOT USE_CUDA AND NOT USE_OPENVINO)
@@ -18,7 +18,7 @@ if(NOT USE_CUDA AND NOT USE_OPENVINO)
 endif()
 
 # 其他编译选项,默认不编译多余组件，可以改OFF为ON来启用或禁用，或者在cmake ..中添加-DBUILD_XXX=ON临时启用
-option(BUILD_SENTRY "Build sentry tools" OFF)
+option(BUILD_SENTRY "Build sentry tools" ON)
 option(BUILD_TEST "Build test tools" OFF)
 option(BUILD_CALIBRATION "Build calibration tools" ON)
 option(BUILD_ALL "Build all components" OFF)
@@ -27,7 +27,7 @@ option(BUILD_ALL "Build all components" OFF)
 #add_compile_definitions(SR_VEL) # 带前馈角速度的串口收发模式
 add_compile_definitions(LIM_CODE) #简化代码模式，启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销
 add_compile_definitions(AIM_CENTER) # 锁车中心模式，启用后会增加一个锁车中心点的计算和显示，并且在满足条件时优先锁定中心点而非装甲板
-add_compile_definitions(NOVA_Q) 
+add_compile_definitions(NOVA_Q) #基于peek2的四元数取数方式,待多几个版本测试以验证可靠性
 
 if(BUILD_SENTRY)
 add_compile_definitions(SENTRY_SR) # 串口通信编译为哨兵导航联合通信版本
