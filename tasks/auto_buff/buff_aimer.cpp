@@ -13,6 +13,14 @@ Aimer::Aimer(const std::string & config_path)
   pitch_offset_ = yaml["pitch_offset"].as<double>() / 57.3;  // degree to rad
   fire_gap_time_ = yaml["fire_gap_time"].as<double>();
   predict_time_ = yaml["predict_time"].as<double>();
+  // 弹道模型
+  if (yaml["ballistic_model"].IsDefined()) {
+    auto str = yaml["ballistic_model"].as<std::string>();
+    if (str == "hero")
+      ballistic_model_ = tools::Trajectory::Model::kHero;
+    else
+      ballistic_model_ = tools::Trajectory::Model::kNoDrag;
+  }
 
   last_fire_t_ = std::chrono::steady_clock::now();
 }
@@ -163,7 +171,7 @@ bool Aimer::get_send_angle(
   double h = aim_in_world[2];
 
   // 创建弹道对象
-  tools::Trajectory trajectory0(bullet_speed, d, h);
+  tools::Trajectory trajectory0(bullet_speed, d, h, ballistic_model_);
   if (trajectory0.unsolvable) {  // 如果弹道无法解算，返回未命中结果
     tools::logger()->debug(
       "[Aimer] Unsolvable trajectory0: {:.2f} {:.2f} {:.2f}", bullet_speed, d, h);
@@ -178,7 +186,7 @@ bool Aimer::get_send_angle(
   aim_in_world = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
   d = fsqrt(aim_in_world[0] * aim_in_world[0] + aim_in_world[1] * aim_in_world[1]);
   h = aim_in_world[2];
-  tools::Trajectory trajectory1(bullet_speed, d, h);
+  tools::Trajectory trajectory1(bullet_speed, d, h, ballistic_model_);
   if (trajectory1.unsolvable) {  // 如果弹道无法解算，返回未命中结果
     tools::logger()->debug(
       "[Aimer] Unsolvable trajectory1: {:.2f} {:.2f} {:.2f}", bullet_speed, d, h);

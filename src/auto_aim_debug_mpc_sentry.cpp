@@ -8,6 +8,8 @@
 
 #include "io/camera.hpp"
 #include "io/gimbal/gimbal.hpp"
+#include "io/ros2/publish2nav.hpp"
+#include "io/ros2/ros2.hpp"
 #include "tasks/auto_aim/planner/planner.hpp"
 #include "tasks/auto_aim/solver.hpp"
 #include "tasks/auto_aim/tracker.hpp"
@@ -18,15 +20,13 @@
 #include "tools/math_tools.hpp"
 #include "tools/plotter.hpp"
 #include "tools/thread_safe_queue.hpp"
-#include "tools/yaml.hpp"
-
+#include <yaml-cpp/yaml.h>
 
 using namespace std::chrono_literals;
 
 const std::string keys =
   "{help h usage ? |                        | 输出命令行参数说明}"
   "{@config-path   | ../configs/standard3.yaml | 位置参数，yaml配置文件路径 }";
-bool has_target = 0;
 
 int main(int argc, char * argv[])
 {
@@ -39,7 +39,10 @@ int main(int argc, char * argv[])
     cli.printMessage();
     return 0;
   }
+  auto yaml = YAML::LoadFile(config_path);
+  auto velocity_n = yaml["velocity_n"].as<int>();
 
+  io::ROS2 ros2;
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
 
@@ -65,13 +68,13 @@ int main(int argc, char * argv[])
     while (!quit) {
       auto target = target_queue.front();
       auto gs = gimbal.state();
+      auto velocity = ros2.get_nav_velocity();
       auto plan = planner.plan(target, gs.bullet_speed);
 
-      std::cout<<plan.control<<std::endl;
       gimbal.send(
-        has_target, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
-        plan.pitch_acc);
-        
+        plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
+        plan.pitch_acc,velocity->linear.x*velocity_n,velocity->linear.y*velocity_n,velocity->angular.z);
+
       auto fired = gs.bullet_count > last_bullet_count;
       last_bullet_count = gs.bullet_count;
 
@@ -109,7 +112,8 @@ int main(int argc, char * argv[])
       }
 
       //plotter.plot(data);
-      plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
+      // plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
+      plotter.drawData({velocity->linear.x,velocity->linear.y,velocity->angular.z}, {"x", "y", "wz"});
 
       std::this_thread::sleep_for(10ms);
     }
@@ -127,17 +131,6 @@ int main(int argc, char * argv[])
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
-
-    #ifdef AIM_CENTER
-    if(tracker.aim_strategy_ == "follow") {
-      planner.aim_center_ = false;
-    }
-    else {
-      planner.aim_center_ = true;
-    }
-    tools::draw_text(img, fmt::format("Aim Strategy: {}", tracker.aim_strategy_), {10, 690}, {0, 255, 0});
-    #endif
-
     if (!targets.empty())
       target_queue.push(targets.front());
     else
@@ -153,18 +146,8 @@ int main(int argc, char * argv[])
       tools::draw_text(img, fmt::format("armor_x: {:.2f}", armor.xyz_in_world[0]), {10, 600}, {0, 255, 0});
       tools::draw_text(img, fmt::format("armor_y: {:.2f}", armor.xyz_in_world[1]), {10, 630}, {0, 255, 0});
       tools::draw_text(img, fmt::format("armor_z: {:.2f}", armor.xyz_in_world[2]), {10, 660}, {0, 255, 0});
-      #ifdef NOVA_Q
-      tools::draw_text(img, fmt::format("queue_size: {}", gimbal.q_size()), {10, 720}, {0, 255, 0});
-      #endif
     }
-    #ifdef AIM_CENTER
-    // 绘制锁定中心
-    if (planner.aim_center_) {
-      auto center_image_points = solver.reproject_point(planner.center_points);
-      tools::draw_points(img, center_image_points, {0, 0, 255}, 10);
-    }
-    #endif
-
+    
     if (!targets.empty()) {
       auto target = targets.front();
 
@@ -179,23 +162,18 @@ int main(int argc, char * argv[])
       Eigen::Vector4d aim_xyza = planner.debug_xyza;
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
-      #ifndef AIM_CENTER
       tools::draw_points(img, image_points, {0, 0, 255});
-      #endif
-      #ifdef AIM_CENTER
-      if(planner.aim_center_ == false){
-        tools::draw_points(img, image_points, {0, 0, 255});
-      }
-      #endif
     }
     
     // 获取云台状态和规划信息用于UI显示
     auto gs = gimbal.state();
     std::optional<auto_aim::Target> target_opt = target_queue.front();
-    //bool has_target = target_opt.has_value();
-    has_target = target_opt.has_value();
+    bool has_target = target_opt.has_value();
     auto plan = planner.plan(target_opt, gs.bullet_speed);
     
+    //发布导航的信息
+    ros2.publish_status(gs.game_status,gs.blood,gs.bullet);
+
     // 计算FPS
     frame_count++;
     auto current_time = std::chrono::steady_clock::now();
@@ -321,7 +299,7 @@ int main(int argc, char * argv[])
 
   quit = true;
   if (plan_thread.joinable()) plan_thread.join();
-  gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
+  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
   return 0;
 }

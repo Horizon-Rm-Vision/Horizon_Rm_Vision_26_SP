@@ -7,7 +7,9 @@ classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
 yolov5_model_path: ../assets/yolov5.xml
-yolov5_trt_model_path: ../assets/yolov5a.engine
+yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
+#yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
+#yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
 device: CPU
 min_confidence: 0.8
 use_traditional: true
@@ -34,17 +36,18 @@ max_rectangular_error: 25 # degree
 
 #####-----tracker参数-----#####
 min_detect_count: 5
-max_temp_lost_count: 30
+max_temp_lost_count: 40
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
 yaw_offset: 0 # degree -2.5
-pitch_offset: 1.2 # degree 2
-comming_angle: 55 # degree
+pitch_offset: 0 # degree 2
+comming_angle: 60 # degree
 leaving_angle: 20 # degree
-decision_speed: 0.1 # rad/s 判定是否小陀螺的速度阈值
-high_speed_delay_time: 0.0 # s
-low_speed_delay_time: 0.01 # s planner use this value
+decision_speed: 0.1 #8 # rad/s 判定是否小陀螺的速度阈值
+high_speed_delay_time: 0.030 # s
+#low_speed_delay_time: 0.015 # s planner use this value
+low_speed_delay_time: 0.060 # s planner use this value
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree
@@ -53,15 +56,15 @@ judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
 #####-----相机参数-----#####
-# camera_name: "mindvision"
-# exposure_ms: 5
-# gamma: 3 #已经废弃
-# vid_pid: "f622:d13a"
+camera_name: "mindvision"
+exposure_ms: 3
+gamma: 3 #已经废弃
+vid_pid: "f622:d13a"
 
-camera_name: "hikrobot"
-exposure_ms: 10
-gain: 10.0
-vid_pid: "2bdf:0001"
+# camera_name: "hikrobot"
+# exposure_ms: 3
+# gain: 10.0
+# vid_pid: "2bdf:0001"
 
 # camera_name: "daheng"
 # exposure_ms: 2
@@ -69,47 +72,36 @@ vid_pid: "2bdf:0001"
 # vid_pid: "KE0200010097"
 
 
-
 #  1  0  0
 #  0  1  0
 #  0  0  1
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
-# # 重投影误差,数据来自相机内参: 0.1820px
-# camera_matrix: [1785.4881526822305, 0, 672.4806478241826, 0, 1785.026019470562, 559.89603224794314, 0, 0, 1]
-# distort_coeffs: [-0.076005079619881746, 0.11182817466388446, 0.0005362204787722057, -0.0027546300984895122, 0]
 
-# # HK
-camera_matrix: [1783.59587, 0, 726.03868, 0, 1783.59342, 557.22206, 0, 0, 1]
-distort_coeffs: [-0.093721, 0.207229, 0.002192, -0.000909, 0]
+# HERO-3-08
+# 重投影误差: 0.3751px
+camera_matrix: [2519.6346787506677, 0, 650.62921967933346, 0, 2520.0186051833116, 479.96940027405566, 0, 0, 1]
+distort_coeffs: [-0.0094591070249334542, 0.39935443155347256, 0.0011520327176720976, -0.0011554823923010092, 0]
 
-# # MD1
-# camera_matrix: [2530.4449, 0, 631.46289, 0, 2536.11534, 513.61409, 0, 0, 1]
-# distort_coeffs: [-0.093721, 0.207229, 0.002192, -0.000909, 0]
+# 相机同理想情况的偏角: yaw0.38 pitch-0.52 roll-1.26 degree
+R_camera2gimbal: [-0.0064779369372593987, -0.0092959577573492862, 0.99993580869094323, -0.99973770966816744, -0.021906286121654128, -0.0066803065650612352, 0.021966979776106534, -0.99971680980052036, -0.009151611977478824]
+t_camera2gimbal: [0.11612241824736501, -0.010136533135126701, 0.098385671795090585]
 
-#MD2
-# camera_matrix: [1279.1579, 0, 660.93386, 0, 1285.86608, 539.38196, 0, 0, 1]
-# distort_coeffs:  [-0.211299, 0.146132, 0.002248, 0.003142, 0.000000]
+# # INFANTRY-A-3-10
+# # 重投影误差: 0.2754px
+# camera_matrix: [1266.6039864439122, 0, 643.04121833566421, 0, 1266.4506056550972, 494.58721502051958, 0, 0, 1]
+# distort_coeffs: [-0.20874626403019023, 0.14038611567200077, -4.7953109312166869e-05, 9.4148356626248884e-05, 0]
+# # 相机同理想情况的偏角: yaw-1.09 pitch-0.67 roll-1.70 degree
+# R_camera2gimbal: [0.019389096825157548, -0.011088731212087291, 0.99975052036216061, -0.99937099647209426, -0.029911703809022194, 0.01904997075102156, 0.02969300144273259, -0.9994910354852351, -0.011661717282393402]
+# t_camera2gimbal: [0.12501580483081576, 0.007616350691297802, 0.05634274875982663]
 
-# # DH1
-# camera_matrix: [1272.39905, 0, 618.61436, 0, 1272.1674, 522.77117, 0, 0, 1]
-# distort_coeffs: [-0.200319, 0.123162, -0.000723, 0.000555, 0.000000]
-
-# # DH2
-# camera_matrix: 
-# distort_coeffs: 
-
-
-# 相机同理想情况的偏角: yaw1.44 pitch-7.28 roll0.96 degree
-# 标定板到世界坐标系原点的水平距离: 1.13 m
-# 标定板同竖直摆放时的偏角: yaw7.61 pitch13.92 roll-0.46 degree
-# R_camera2gimbal: [-0.027182119030230909, -0.12616154330853446, 0.99163723074269183, -0.99949106557517331, 0.019998323121329122, -0.024853106601381177, -0.016695575474690555, -0.99180811252093692, -0.12664093215554434]
-R_camera2gimbal: [0, 0, 1, -1, 0, 0, 0, -1, 0]  # 理想情况
-
-# 机械偏置：表示相机坐标系原点相对于云台坐标系原点的平移向量
-# 数据解读：t_camera2gimbal: [<X>, <Y>, <Z>]，单位：米，X取正值指相机位于云台中心前方，Y取正值指相机位于云台中心左侧，Z取正值指相机位于云台中心上方
-# t_camera2gimbal: [0.13160669975045827, 0.10377721766577375, 0.024908271912914642]
-t_camera2gimbal: [0.14095, 0, 0.13416]  # 理想情况
+# # PLANE-3-10
+# # 重投影误差: 0.1957px
+# camera_matrix: [2508.7138136042017, 0, 646.73120200590392, 0, 2508.7560342575703, 502.48936237488226, 0, 0, 1]
+# distort_coeffs: [-0.0016609344221097332, 0.33422108330336775, -0.0013771157612911913, 0.0019174030459867077, 0]
+# # 相机同理想情况的偏角: yaw0.52 pitch2.72 roll0.29 degree 0.19handeye 3.10
+# R_camera2gimbal: [-0.0089080452263095022, 0.047467815012345205, 0.99883304574298082, -0.9999473078054989, 0.0046733921166786097, -0.0091400776068052188, -0.0051017979948916117, -0.9988618352625539, 0.047423683040668463]
+# t_camera2gimbal: [0.10323981204078483, -0.0060945656744575295, -0.045007750655802162]
 
 # #####-----cboard参数-----#####
 # quaternion_canid: 0x100
@@ -118,22 +110,23 @@ t_camera2gimbal: [0.14095, 0, 0.13416]  # 理想情况
 # can_interface: "can0"
 
 #####-----gimbal参数-----#####
-com_port: "/dev/ttyACM0"
+com_port: auto
 yaw_kp: 0
 yaw_kd: 0
 pitch_kp: 0
 pitch_kd: 0
 
 #####-----planner-----#####
-fire_thresh: 0.0035
+fire_thresh: 0.0001
 
 # max_yaw_acc: 50
-max_yaw_acc: 30
-Q_yaw: [6e6, 0]
+max_yaw_acc: 50
+Q_yaw: [9e6, 0]
+#Q_yaw: [6e6, 0] #zys 1.18
 R_yaw: [1]
 
 # max_pitch_acc: 100
-max_pitch_acc: 80
+max_pitch_acc: 100
 Q_pitch: [9e6, 0]
 R_pitch: [1]
 
@@ -142,4 +135,16 @@ model: "../assets/yolo11_buff_int8.xml"
 
 #####-----buff_aimer参数-----#####
 fire_gap_time: 0.700   # s
-predict_time: 0.12     # s
+predict_time: 0.120     # s
+
+# 弹道解算模式，可选 "no_drag" (默认抛物线) 或 "hero" (带空气阻力迭代)
+ballistic_model: "hero"
+
+#####-----nav速度倍数（仅用于哨兵模式，导航相关）-----#####
+velocity_n: 30
+
+#####-----锁车中心参数-----#####
+aim_center: false # 锁车中心
+aim_center_min_distance: 4 # 触发锁车中心机制的最小距离，单位m，当装甲板距离车中心大于该值时优先锁定车中心点
+armor_yaw_threshold: 10 # 锁车时装甲板yaw角度阈值，degree
+

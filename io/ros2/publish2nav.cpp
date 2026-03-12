@@ -14,7 +14,7 @@ Publish2Nav::Publish2Nav() : Node("auto_aim_target_pos_publisher")
 {
   publisher_ = this->create_publisher<std_msgs::msg::String>("auto_aim_target_pos", 10);
 
-  status_publisher_ = this->create_publisher<sp_msgs::msg::NavStatusMsg>("nav_status", 10);
+  status_publisher_ = this->create_publisher<sp_msgs::msg::NavStatusMsg>("judge_data", 10);
 
   RCLCPP_INFO(this->get_logger(), "auto_aim_target_pos_publisher node initialized.");
 }

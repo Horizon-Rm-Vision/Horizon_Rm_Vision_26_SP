@@ -83,16 +83,38 @@ void YOLOV5_TRT::allocateGPUMemory() {
   CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_output_tensor_), sizeof(float) * output_count_));
   
   // 预分配临时GPU内存用于后处理
-  int max_detections = 1000; // 假设最多1000个检测
-  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_temp_color_ids_), sizeof(int) * max_detections));
-  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_temp_num_ids_), sizeof(int) * max_detections));
-  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_temp_confidences_), sizeof(float) * max_detections));
-  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_temp_boxes_), sizeof(float) * max_detections * 4));
-  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_temp_keypoints_), sizeof(float) * max_detections * 8));
+  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_temp_color_ids_), sizeof(int) * h_max_detections_));
+  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_temp_num_ids_), sizeof(int) * h_max_detections_));
+  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_temp_confidences_), sizeof(float) * h_max_detections_));
+  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_temp_boxes_), sizeof(int) * h_max_detections_ * 4));
+  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_temp_keypoints_), sizeof(float) * h_max_detections_ * 8));
   CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_valid_count_), sizeof(int)));
   
   // 初始化有效计数为0
   CUDA_CHECK(cudaMemset(d_valid_count_, 0, sizeof(int)));
+  
+  // 分配Pinned Host内存 - 加速GPU-CPU数据传输
+  CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&h_pinned_color_ids_), sizeof(int) * h_max_detections_));
+  CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&h_pinned_num_ids_), sizeof(int) * h_max_detections_));
+  CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&h_pinned_confidences_), sizeof(float) * h_max_detections_));
+  CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&h_pinned_boxes_), sizeof(int) * h_max_detections_ * 4));
+  CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&h_pinned_keypoints_), sizeof(float) * h_max_detections_ * 8));
+  
+  // 预分配主机端临时向量
+  h_temp_color_ids_.reserve(h_max_detections_);
+  h_temp_num_ids_.reserve(h_max_detections_);
+  h_temp_confidences_.reserve(h_max_detections_);
+  h_temp_boxes_.reserve(h_max_detections_ * 4);
+  h_temp_keypoints_.reserve(h_max_detections_ * 8);
+
+  // 创建一个非阻塞CUDA流，用于异步拷贝与推理
+  // 创建两个非阻塞CUDA流，用于双缓冲异步拷贝与推理
+  CUDA_CHECK(cudaStreamCreateWithFlags(&streams_[0], cudaStreamNonBlocking));
+  CUDA_CHECK(cudaStreamCreateWithFlags(&streams_[1], cudaStreamNonBlocking));
+
+  // 为双缓冲分配输出缓冲
+  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_output_tensor_[0]), sizeof(float) * output_count_));
+  CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_output_tensor_[1]), sizeof(float) * output_count_));
 }
 
 void YOLOV5_TRT::freeGPUMemory() {
@@ -100,16 +122,34 @@ void YOLOV5_TRT::freeGPUMemory() {
     cudaFree(d_input_tensor_);
     d_input_tensor_ = nullptr;
   }
-  if (d_output_tensor_) {
-    cudaFree(d_output_tensor_);
-    d_output_tensor_ = nullptr;
-  }
+  // d_output_tensor_ handled as double buffer below
   if (d_temp_color_ids_) cudaFree(d_temp_color_ids_);
   if (d_temp_num_ids_) cudaFree(d_temp_num_ids_);
   if (d_temp_confidences_) cudaFree(d_temp_confidences_);
   if (d_temp_boxes_) cudaFree(d_temp_boxes_);
   if (d_temp_keypoints_) cudaFree(d_temp_keypoints_);
   if (d_valid_count_) cudaFree(d_valid_count_);
+  
+  // 释放Pinned内存
+  if (h_pinned_color_ids_) cudaFreeHost(h_pinned_color_ids_);
+  if (h_pinned_num_ids_) cudaFreeHost(h_pinned_num_ids_);
+  if (h_pinned_confidences_) cudaFreeHost(h_pinned_confidences_);
+  if (h_pinned_boxes_) cudaFreeHost(h_pinned_boxes_);
+  if (h_pinned_keypoints_) cudaFreeHost(h_pinned_keypoints_);
+  
+  // 销毁双流
+  for (int i = 0; i < 2; ++i) {
+    if (streams_[i]) {
+      cudaStreamSynchronize(streams_[i]);
+      cudaStreamDestroy(streams_[i]);
+      streams_[i] = nullptr;
+    }
+  }
+
+  // 释放双输出缓冲
+  if (d_output_tensor_[0]) { cudaFree(reinterpret_cast<void*>(d_output_tensor_[0])); d_output_tensor_[0] = nullptr; }
+  if (d_output_tensor_[1]) { cudaFree(reinterpret_cast<void*>(d_output_tensor_[1])); d_output_tensor_[1] = nullptr; }
+
 }
 
 cv::cuda::GpuMat YOLOV5_TRT::preprocessImageGPU(const cv::Mat& bgr_img, double& scale, int& pad_x, int& pad_y)
@@ -172,11 +212,17 @@ void YOLOV5_TRT::parseDetectionsGPU(const float* d_output, int output_rows, int 
                                    std::vector<float>& confidences, std::vector<cv::Rect>& boxes,
                                    std::vector<std::vector<cv::Point2f>>& armor_key_points) {
     
-    // 将输出数据拷贝到主机内存
-    std::vector<float> output_data(output_rows * output_cols);
-    cudaMemcpy(output_data.data(), d_output, sizeof(float) * output_rows * output_cols, cudaMemcpyDeviceToHost);
+    // 使用Pinned内存进行高效的GPU-CPU数据传输
+    static std::vector<float> output_data(1);
+    if (output_data.size() < output_rows * output_cols) {
+      output_data.resize(output_rows * output_cols);
+    }
     
-    // 在CPU上处理
+    // 异步复制TensorRT输出到主机
+    CUDA_CHECK(cudaMemcpy(output_data.data(), d_output, 
+                         sizeof(float) * output_rows * output_cols, cudaMemcpyDeviceToHost));
+    
+    // 在CPU上处理（保留原版本的逻辑，确保准确性）
     for (int r = 0; r < output_rows; r++) {
         float score = output_data[r * output_cols + 8];
         // 使用CPU sigmoid函数
@@ -206,17 +252,6 @@ void YOLOV5_TRT::parseDetectionsGPU(const float* d_output, int output_rows, int 
             }
         }
         
-        // // 关键点坐标
-        // std::vector<cv::Point2f> keypoints;
-        // for (int i = 0; i < 8; i++) {
-        //     float coord = output_data[r * output_cols + i];
-        //     coord = (coord - (i % 2 == 0 ? pad_x : pad_y)) / scale;
-        //     if (i % 2 == 0) {
-        //         keypoints.push_back(cv::Point2f(coord, 0));
-        //     } else {
-        //         keypoints.back().y = coord;
-        //     }
-        // }
         // 按照原版顺序读取关键点
         std::vector<cv::Point2f> keypoints;
         // 点1: (0,1)
@@ -288,24 +323,136 @@ std::list<Armor> YOLOV5_TRT::detect(const cv::Mat & raw_img, int frame_count)
   cv::cuda::GpuMat gpu_blob = preprocessImageGPU(bgr_img, scale, pad_x, pad_y);
 
   // 将预处理后的数据拷贝到输入tensor
-  CUDA_CHECK(cudaMemcpy(d_input_tensor_, gpu_blob.ptr<float>(0), 
-                       sizeof(float) * input_count_, cudaMemcpyDeviceToDevice));
+  // 双缓冲槽选择
+  int slot = (slot_index_++) & 1;
+  // 将预处理后的GPU blob直接作为TensorRT输入指针，避免额外的device->device拷贝
+  trt_engine_->AsyncInference(streams_[slot], const_cast<float*>(gpu_blob.ptr<float>(0)), reinterpret_cast<void*>(d_output_tensor_[slot]));
 
-  // 推理
-  trt_engine_->Inference(d_input_tensor_, d_output_tensor_);
-
-  // 在GPU上解析检测结果
+  // 解析检测结果
+  tmp_img_ = bgr_img;
   std::vector<int> color_ids, num_ids;
   std::vector<float> confidences;
   std::vector<cv::Rect> boxes;
   std::vector<std::vector<cv::Point2f>> armor_key_points;
-  
-  // 使用GPU加速解析
-  parseDetectionsGPU(d_output_tensor_, output_rows_, output_cols_,
-                    score_threshold_, scale, pad_x, pad_y,
-                    color_ids, num_ids, confidences, boxes, armor_key_points);
 
-  // NMS在CPU上执行
+  if (use_gpu_nms_) {
+    // 使用GPU端解析 + NMS，减少从device->host拷贝的数据量
+    int num_detections = gpu_kernel::gpu_parse_detections_nms(
+      reinterpret_cast<const float*>(d_output_tensor_[slot]), output_rows_, output_cols_,
+      score_threshold_, nms_threshold_, (float)scale, pad_x, pad_y,
+      d_temp_color_ids_, d_temp_num_ids_, d_temp_confidences_,
+      d_temp_boxes_, d_temp_keypoints_, d_valid_count_, streams_[slot]);
+
+    if (num_detections > 0) {
+      if (num_detections > h_max_detections_) num_detections = h_max_detections_;
+
+      // 异步将紧凑的检测结果复制到Pinned Host内存（减少IO开销）
+      size_t s_color = sizeof(int) * num_detections;
+      size_t s_num = sizeof(int) * num_detections;
+      size_t s_conf = sizeof(float) * num_detections;
+      size_t s_boxes = sizeof(int) * num_detections * 4;
+      size_t s_kps = sizeof(float) * num_detections * 8;
+
+        CUDA_CHECK(cudaMemcpyAsync(h_pinned_color_ids_, reinterpret_cast<const void*>(d_temp_color_ids_), s_color, cudaMemcpyDeviceToHost, streams_[slot]));
+        CUDA_CHECK(cudaMemcpyAsync(h_pinned_num_ids_, reinterpret_cast<const void*>(d_temp_num_ids_), s_num, cudaMemcpyDeviceToHost, streams_[slot]));
+        CUDA_CHECK(cudaMemcpyAsync(h_pinned_confidences_, reinterpret_cast<const void*>(d_temp_confidences_), s_conf, cudaMemcpyDeviceToHost, streams_[slot]));
+        CUDA_CHECK(cudaMemcpyAsync(h_pinned_boxes_, reinterpret_cast<const void*>(d_temp_boxes_), s_boxes, cudaMemcpyDeviceToHost, streams_[slot]));
+        CUDA_CHECK(cudaMemcpyAsync(h_pinned_keypoints_, reinterpret_cast<const void*>(d_temp_keypoints_), s_kps, cudaMemcpyDeviceToHost, streams_[slot]));
+
+      // 等待该槽流上所有操作完成（包括AsyncInference、解析kernel和拷贝）
+      CUDA_CHECK(cudaStreamSynchronize(streams_[slot]));
+
+      // 重构到 std::vector / 输出结构
+      color_ids.resize(num_detections);
+      num_ids.resize(num_detections);
+      confidences.resize(num_detections);
+      boxes.resize(num_detections);
+      armor_key_points.resize(num_detections);
+
+      for (int i = 0; i < num_detections; ++i) {
+        color_ids[i] = h_pinned_color_ids_[i];
+        num_ids[i] = h_pinned_num_ids_[i];
+        confidences[i] = h_pinned_confidences_[i];
+
+        int bx = h_pinned_boxes_[i * 4 + 0];
+        int by = h_pinned_boxes_[i * 4 + 1];
+        int bw = h_pinned_boxes_[i * 4 + 2];
+        int bh = h_pinned_boxes_[i * 4 + 3];
+        boxes[i] = cv::Rect(bx, by, bw, bh);
+
+        std::vector<cv::Point2f> kps(4);
+        kps[0] = cv::Point2f(h_pinned_keypoints_[i * 8 + 0], h_pinned_keypoints_[i * 8 + 1]);
+        kps[1] = cv::Point2f(h_pinned_keypoints_[i * 8 + 2], h_pinned_keypoints_[i * 8 + 3]);
+        kps[2] = cv::Point2f(h_pinned_keypoints_[i * 8 + 4], h_pinned_keypoints_[i * 8 + 5]);
+        kps[3] = cv::Point2f(h_pinned_keypoints_[i * 8 + 6], h_pinned_keypoints_[i * 8 + 7]);
+        armor_key_points[i] = std::move(kps);
+      }
+    } else {
+      // 没有检测到目标，确保流上的推理完成
+      CUDA_CHECK(cudaStreamSynchronize(streams_[slot]));
+    }
+  } else {
+    // 保留CPU端解析路径，但使用异步拷贝以减少阻塞
+    size_t entire_out = sizeof(float) * output_rows_ * output_cols_;
+    static std::vector<float> output_data;
+    if (output_data.size() < output_rows_ * output_cols_) output_data.resize(output_rows_ * output_cols_);
+
+    CUDA_CHECK(cudaMemcpyAsync(output_data.data(), reinterpret_cast<const void*>(d_output_tensor_[slot]), entire_out, cudaMemcpyDeviceToHost, streams_[slot]));
+    CUDA_CHECK(cudaStreamSynchronize(streams_[slot]));
+
+    // 在CPU上解析输出（原来的parseDetectionsGPU逻辑）
+    for (int r = 0; r < output_rows_; r++) {
+        float score = output_data[r * output_cols_ + 8];
+        double score_double = static_cast<double>(score);
+        score = static_cast<float>(sigmoid(score_double));
+        if (score < score_threshold_) continue;
+
+        float max_color_score = -FLT_MAX;
+        int color_id = 0;
+        for (int i = 0; i < 4; i++) {
+            float s = output_data[r * output_cols_ + 9 + i];
+            if (s > max_color_score) { max_color_score = s; color_id = i; }
+        }
+
+        float max_class_score = -FLT_MAX;
+        int class_id = 0;
+        for (int i = 0; i < 9; i++) {
+            float s = output_data[r * output_cols_ + 13 + i];
+            if (s > max_class_score) { max_class_score = s; class_id = i; }
+        }
+
+        std::vector<cv::Point2f> keypoints;
+        float x1 = (output_data[r * output_cols_ + 0] - pad_x) / scale;
+        float y1 = (output_data[r * output_cols_ + 1] - pad_x) / scale; // kept as original logic
+        keypoints.push_back(cv::Point2f(x1, y1));
+        float x4 = (output_data[r * output_cols_ + 6] - pad_x) / scale;
+        float y4 = (output_data[r * output_cols_ + 7] - pad_x) / scale;
+        keypoints.push_back(cv::Point2f(x4, y4));
+        float x3 = (output_data[r * output_cols_ + 4] - pad_x) / scale;
+        float y3 = (output_data[r * output_cols_ + 5] - pad_x) / scale;
+        keypoints.push_back(cv::Point2f(x3, y3));
+        float x2 = (output_data[r * output_cols_ + 2] - pad_x) / scale;
+        float y2 = (output_data[r * output_cols_ + 3] - pad_x) / scale;
+        keypoints.push_back(cv::Point2f(x2, y2));
+
+        float min_x = keypoints[0].x, max_x = keypoints[0].x, min_y = keypoints[0].y, max_y = keypoints[0].y;
+        for (int i = 1; i < keypoints.size(); i++) {
+            min_x = std::min(min_x, keypoints[i].x);
+            max_x = std::max(max_x, keypoints[i].x);
+            min_y = std::min(min_y, keypoints[i].y);
+            max_y = std::max(max_y, keypoints[i].y);
+        }
+        cv::Rect rect(min_x, min_y, max_x - min_x, max_y - min_y);
+
+        color_ids.push_back(color_id);
+        num_ids.push_back(class_id);
+        confidences.push_back(score);
+        boxes.push_back(rect);
+        armor_key_points.push_back(keypoints);
+    }
+  }
+
+  // NMS在CPU上执行（保持结果一致性）
   std::vector<int> indices;
   cv::dnn::NMSBoxes(boxes, confidences, score_threshold_, nms_threshold_, indices);
 
@@ -319,7 +466,97 @@ std::list<Armor> YOLOV5_TRT::detect(const cv::Mat & raw_img, int frame_count)
     }
   }
 
-  tmp_img_ = bgr_img;
+  for (auto it = armors.begin(); it != armors.end();) {
+    if (!check_name(*it)) {
+      it = armors.erase(it);
+      continue;
+    }
+
+    if (!check_type(*it)) {
+      it = armors.erase(it);
+      continue;
+    }
+
+    // 使用传统方法二次矫正角点
+    if (use_traditional_) detector_.detect(*it, bgr_img);
+
+    it->center_norm = get_center_norm(bgr_img, it->center);
+    ++it;
+  }
+
+  if (debug_) draw_detections(bgr_img, armors, frame_count);
+
+  return armors;
+}
+
+// GPU加速版本的后处理 - 使用CUDA kernels进行并行处理
+std::list<Armor> YOLOV5_TRT::parseDetectionsGPUFast(
+    double scale, int pad_x, int pad_y, const cv::Mat& bgr_img, int frame_count)
+{
+  // 调用GPU kernel进行解析和NMS
+    int num_detections = gpu_kernel::gpu_parse_detections_nms(
+      reinterpret_cast<const float*>(d_output_tensor_[0]), 
+      output_rows_, output_cols_,
+      score_threshold_, 
+      nms_threshold_,
+      scale, pad_x, pad_y,
+      d_temp_color_ids_, 
+      d_temp_num_ids_, 
+      d_temp_confidences_,
+      d_temp_boxes_, 
+      d_temp_keypoints_,
+      d_valid_count_
+    );
+  
+  if (num_detections == 0) {
+    return std::list<Armor>();
+  }
+  
+  // 从GPU复制数据到CPU
+  h_temp_color_ids_.resize(num_detections);
+  h_temp_num_ids_.resize(num_detections);
+  h_temp_confidences_.resize(num_detections);
+  h_temp_boxes_.resize(num_detections * 4);
+  h_temp_keypoints_.resize(num_detections * 8);
+  
+  CUDA_CHECK(cudaMemcpy(h_temp_color_ids_.data(), d_temp_color_ids_, 
+                       sizeof(int) * num_detections, cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaMemcpy(h_temp_num_ids_.data(), d_temp_num_ids_, 
+                       sizeof(int) * num_detections, cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaMemcpy(h_temp_confidences_.data(), d_temp_confidences_, 
+                       sizeof(float) * num_detections, cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaMemcpy(h_temp_boxes_.data(), d_temp_boxes_, 
+                       sizeof(int) * num_detections * 4, cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaMemcpy(h_temp_keypoints_.data(), d_temp_keypoints_, 
+                       sizeof(float) * num_detections * 8, cudaMemcpyDeviceToHost));
+  
+  // 转换GPU数据格式到Armor
+  std::list<Armor> armors;
+  
+  for (int i = 0; i < num_detections; i++) {
+    // 从GPU数据重构关键点
+    std::vector<cv::Point2f> keypoints(4);
+    keypoints[0] = cv::Point2f(h_temp_keypoints_[i * 8 + 0], h_temp_keypoints_[i * 8 + 1]);
+    keypoints[1] = cv::Point2f(h_temp_keypoints_[i * 8 + 2], h_temp_keypoints_[i * 8 + 3]);
+    keypoints[2] = cv::Point2f(h_temp_keypoints_[i * 8 + 4], h_temp_keypoints_[i * 8 + 5]);
+    keypoints[3] = cv::Point2f(h_temp_keypoints_[i * 8 + 6], h_temp_keypoints_[i * 8 + 7]);
+    
+    // 重构边界框
+    cv::Rect rect(h_temp_boxes_[i * 4 + 0], h_temp_boxes_[i * 4 + 1],
+                  h_temp_boxes_[i * 4 + 2], h_temp_boxes_[i * 4 + 3]);
+    
+    if (use_roi_) {
+      armors.emplace_back(
+          h_temp_color_ids_[i], h_temp_num_ids_[i], 
+          h_temp_confidences_[i], rect, keypoints, offset_);
+    } else {
+      armors.emplace_back(
+          h_temp_color_ids_[i], h_temp_num_ids_[i], 
+          h_temp_confidences_[i], rect, keypoints);
+    }
+  }
+  
+  // 后续处理
   for (auto it = armors.begin(); it != armors.end();) {
     if (!check_name(*it)) {
       it = armors.erase(it);
@@ -489,8 +726,8 @@ void YOLOV5_TRT::draw_detections(
     cv::Scalar green(0, 255, 0);
     cv::rectangle(detection, roi_, green, 2);
   }
-  cv::resize(detection, detection, {}, 0.5, 0.5);
-  cv::imshow("detection", detection);
+  //cv::resize(detection, detection, {}, 0.5, 0.5);
+  //cv::imshow("detection", detection);
 }
 
 void YOLOV5_TRT::save(const Armor & armor) const

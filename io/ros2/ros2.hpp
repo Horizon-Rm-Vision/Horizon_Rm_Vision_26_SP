@@ -21,7 +21,7 @@ public:
 
   std::vector<int8_t> subscribe_autoaim_target();
 
-  std::optional<sp_msgs::msg::NavVelocityMsg> get_nav_velocity();
+  std::optional<geometry_msgs::msg::Twist> get_nav_velocity();
 
   template <typename T>
   std::shared_ptr<rclcpp::Publisher<T>> create_publisher(

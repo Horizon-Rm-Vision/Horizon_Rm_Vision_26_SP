@@ -1,3 +1,5 @@
+#ifndef LIM_CODE 
+
 #ifndef IO__Dm_Imu_HPP
 #define IO__Dm_Imu_HPP
 
@@ -92,5 +94,7 @@ private:
 };
 
 }  // namespace io
+
+#endif
 
 #endif

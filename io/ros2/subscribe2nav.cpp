@@ -22,8 +22,8 @@ Subscribe2Nav::Subscribe2Nav()
     "autoaim_target", 10,
     std::bind(&Subscribe2Nav::autoaim_target_callback, this, std::placeholders::_1));
 
-  nav_velocity_subscription_ = this->create_subscription<sp_msgs::msg::NavVelocityMsg>(
-    "nav_velocity", 10,
+  nav_velocity_subscription_ = this->create_subscription<geometry_msgs::msg::Twist>(
+    "cmd_vel", 10,
     std::bind(&Subscribe2Nav::nav_velocity_callback, this, std::placeholders::_1));
 
   RCLCPP_INFO(this->get_logger(), "nav_subscriber node initialized.");
@@ -74,7 +74,7 @@ void Subscribe2Nav::autoaim_target_callback(const sp_msgs::msg::AutoaimTargetMsg
   }
 }
 
-void Subscribe2Nav::nav_velocity_callback(const sp_msgs::msg::NavVelocityMsg::SharedPtr msg)
+void Subscribe2Nav::nav_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg)
 {
     nav_velocity_queue_.clear();  // 只保留最新消息（类似原有逻辑）
     nav_velocity_queue_.push(*msg);
@@ -117,12 +117,12 @@ std::vector<int8_t> Subscribe2Nav::subscribe_autoaim_target()
   return msg.target_ids;
 }
 
-std::optional<sp_msgs::msg::NavVelocityMsg> Subscribe2Nav::get_nav_velocity()
+std::optional<geometry_msgs::msg::Twist> Subscribe2Nav::get_nav_velocity()
 {
     if (nav_velocity_queue_.empty()) {
         return std::nullopt;
     }
-    sp_msgs::msg::NavVelocityMsg msg;
+    geometry_msgs::msg::Twist msg;
     nav_velocity_queue_.back(msg);  // 获取最新消息
     return msg;
 }

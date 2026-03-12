@@ -31,10 +31,12 @@ struct __attribute__((packed)) GimbalToVision
     float yaw_vel;
     float pitch_vel;
   #endif
+  #ifdef SENTRY_SR
   uint8_t game_status;           // 比赛阶段
   uint8_t blood;                 // 血量
   uint8_t bullet;                // 弹量
   // bool superpower;             // 超电开关
+  #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
 };
 
@@ -45,9 +47,11 @@ struct __attribute__((packed)) VisionToGimbal
   float yaw;                  // 四字节 yaw
   uint8_t mode;               // 一字节 mode
   uint32_t timestamp;         // 四字节时间戳
+  #ifdef SENTRY_SR
   float vx;                   // x方向速度
   float vy;                   // y方向速度
   float wz;                   // 角速度
+  #endif
   #ifdef SR_VEL // 添加云台前馈角速度数据收发
     float yaw_vel;
     float pitch_vel;
@@ -83,9 +87,11 @@ struct GimbalState
   float pitch_vel;
   float bullet_speed;
   uint16_t bullet_count;
+  #ifdef SENTRY_SR
   uint8_t game_status;           // 比赛阶段
   uint8_t blood;                 // 血量
   uint8_t bullet;                // 弹量
+  #endif
 };
 
 class Gimbal
@@ -99,10 +105,21 @@ public:
   std::string str(GimbalMode mode) const;
   Eigen::Quaterniond q(std::chrono::steady_clock::time_point t);
   Eigen::Quaterniond imu_at(std::chrono::steady_clock::time_point t);
+  #ifdef NOVA_Q
+  int q_size() const;
+  #endif
 
+  #ifndef SENTRY_SR
+  void send(
+    bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
+    float pitch_acc);
+  #endif
+  
+  #ifdef SENTRY_SR
   void send(
     bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
     float pitch_acc, float vx, float vy, float wz);
+  #endif
 
   void send(io::VisionToGimbal VisionToGimbal);
 

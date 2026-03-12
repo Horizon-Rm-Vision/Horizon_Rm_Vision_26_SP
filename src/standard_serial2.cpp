@@ -82,8 +82,6 @@ int main(int argc, char * argv[])
 
     auto targets = tracker.track(armors, t);
 
-    auto command = aimer.aim(targets, t, bullet_speed);
-
     // 在图像上绘制检测结果（合并原 detection 窗口信息）
     for (const auto & armor : armors) {
       // 画装甲四点与标签
@@ -91,6 +89,7 @@ int main(int argc, char * argv[])
       auto info = fmt::format("{:.2f} {} {} {}", armor.confidence, auto_aim::COLORS[armor.color], auto_aim::ARMOR_NAMES[armor.name],auto_aim::ARMOR_TYPES[armor.type]);
       tools::draw_text(img, info, armor.center, {0, 255, 0});
     }
+    
     
     if (!targets.empty()) {
       auto target = targets.front();
@@ -120,6 +119,7 @@ int main(int argc, char * argv[])
     auto key = cv::waitKey(1);
     if (key == 'q') break;
 
+    auto command = aimer.aim(targets, t, bullet_speed);
 
     gimbal.send(command.control, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0);
 

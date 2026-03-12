@@ -5,7 +5,7 @@
 #include <rclcpp/timer.hpp>
 #include <sp_msgs/msg/detail/autoaim_target_msg__struct.hpp>
 #include <vector>
-
+#include "geometry_msgs/msg/twist.hpp"
 #include "sp_msgs/msg/autoaim_target_msg.hpp"
 #include "sp_msgs/msg/enemy_status_msg.hpp"
 #include "sp_msgs/sp_msgs/msg/nav_velocity_msg.hpp"
@@ -24,12 +24,12 @@ public:
 
   std::vector<int8_t> subscribe_enemy_status();
   std::vector<int8_t> subscribe_autoaim_target();
-  std::optional<sp_msgs::msg::NavVelocityMsg> get_nav_velocity();
+  std::optional<geometry_msgs::msg::Twist> get_nav_velocity();
 
 private:
   void enemy_status_callback(const sp_msgs::msg::EnemyStatusMsg::SharedPtr msg);
   void autoaim_target_callback(const sp_msgs::msg::AutoaimTargetMsg::SharedPtr msg);
-  void nav_velocity_callback(const sp_msgs::msg::NavVelocityMsg::SharedPtr msg);
+  void nav_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg);
 
   int enemy_status_counter_;
   int autoaim_target_counter_;
@@ -41,11 +41,11 @@ private:
 
   rclcpp::Subscription<sp_msgs::msg::EnemyStatusMsg>::SharedPtr enemy_status_subscription_;
   rclcpp::Subscription<sp_msgs::msg::AutoaimTargetMsg>::SharedPtr autoaim_target_subscription_;
-  rclcpp::Subscription<sp_msgs::msg::NavVelocityMsg>::SharedPtr nav_velocity_subscription_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr nav_velocity_subscription_;
 
   tools::ThreadSafeQueue<sp_msgs::msg::EnemyStatusMsg> enemy_statue_queue_;
   tools::ThreadSafeQueue<sp_msgs::msg::AutoaimTargetMsg> autoaim_target_queue_;
-  tools::ThreadSafeQueue<sp_msgs::msg::NavVelocityMsg> nav_velocity_queue_;
+  tools::ThreadSafeQueue<geometry_msgs::msg::Twist> nav_velocity_queue_;
 
 };
 }  // namespace io

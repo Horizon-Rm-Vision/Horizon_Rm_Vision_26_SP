@@ -26,7 +26,7 @@ void ROS2::publish_status(uint8_t game_status, uint8_t blood, uint8_t bullet)
     publish2nav_->send_status(game_status, blood, bullet);
 }
 
-std::optional<sp_msgs::msg::NavVelocityMsg> ROS2::get_nav_velocity()
+std::optional<geometry_msgs::msg::Twist> ROS2::get_nav_velocity()
 {
     return subscribe2nav_->get_nav_velocity();
 }

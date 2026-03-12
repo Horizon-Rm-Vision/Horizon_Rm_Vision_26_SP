@@ -34,9 +34,9 @@ int main(int argc, char ** argv)
 
     auto velocity = ros2.get_nav_velocity();
     if (velocity) {
-        std::cout << "vx=" << velocity->vx 
-                  << ", vy=" << velocity->vy 
-                  << ", wz=" << velocity->wz << std::endl;
+        std::cout << "vx=" << velocity->linear.x 
+                  << ", vy=" << velocity->linear.y 
+                  << ", wz=" << velocity->linear.z << std::endl;
     }
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
