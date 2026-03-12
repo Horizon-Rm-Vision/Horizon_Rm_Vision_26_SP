@@ -98,7 +98,9 @@ void Target::predict(double dt)
 
   // Piecewise White Noise Model
   // https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python/blob/master/07-Kalman-Filter-Math.ipynb
+  #ifndef AIM_CENTER
   double v1, v2;
+  #endif
   if (name == ArmorName::outpost) {
     v1 = 10;   // 前哨站加速度方差
     v2 = 0.1;  // 前哨站角加速度方差

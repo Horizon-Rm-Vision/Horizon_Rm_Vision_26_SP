@@ -127,6 +127,17 @@ int main(int argc, char * argv[])
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
+
+    #ifdef AIM_CENTER
+    if(tracker.aim_strategy_ == "follow") {
+      planner.aim_center_ = false;
+    }
+    else {
+      planner.aim_center_ = true;
+    }
+    tools::draw_text(img, fmt::format("Aim Strategy: {}", tracker.aim_strategy_), {10, 690}, {0, 255, 0});
+    #endif
+
     if (!targets.empty())
       target_queue.push(targets.front());
     else
@@ -143,7 +154,14 @@ int main(int argc, char * argv[])
       tools::draw_text(img, fmt::format("armor_y: {:.2f}", armor.xyz_in_world[1]), {10, 630}, {0, 255, 0});
       tools::draw_text(img, fmt::format("armor_z: {:.2f}", armor.xyz_in_world[2]), {10, 660}, {0, 255, 0});
     }
-    
+    #ifdef AIM_CENTER
+    // 绘制锁定中心
+    if (planner.aim_center_) {
+      auto center_image_points = solver.reproject_point(planner.center_points);
+      tools::draw_points(img, center_image_points, {0, 0, 255}, 10);
+    }
+    #endif
+
     if (!targets.empty()) {
       auto target = targets.front();
 
@@ -158,7 +176,14 @@ int main(int argc, char * argv[])
       Eigen::Vector4d aim_xyza = planner.debug_xyza;
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
+      #ifndef AIM_CENTER
       tools::draw_points(img, image_points, {0, 0, 255});
+      #endif
+      #ifdef AIM_CENTER
+      if(planner.aim_center_ == false){
+        tools::draw_points(img, image_points, {0, 0, 255});
+      }
+      #endif
     }
     
     // 获取云台状态和规划信息用于UI显示
