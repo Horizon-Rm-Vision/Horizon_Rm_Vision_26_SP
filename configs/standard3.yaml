@@ -61,8 +61,8 @@ armor_yaw_threshold: 20 # 锁车时装甲板yaw角度阈值，degree
 
 #####-----相机参数-----#####
 camera_name: "mindvision"
-exposure_ms: 3
-gamma: 15 #已经废弃
+exposure_ms: 1.5
+gamma: 10 #已经废弃
 vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
