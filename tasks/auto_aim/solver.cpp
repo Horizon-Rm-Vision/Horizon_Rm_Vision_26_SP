@@ -126,6 +126,25 @@ std::vector<cv::Point2f> Solver::reproject_armor(
   return image_points;
 }
 
+#ifdef AIM_CENTER
+std::vector<cv::Point2f> Solver::reproject_point(const Eigen::Vector3d &world_point) const
+{
+  Eigen::Vector3d point_cam =
+      R_camera2gimbal_.transpose() *
+      (R_gimbal2world_.transpose() * world_point - t_camera2gimbal_);
+
+  cv::Vec3d rvec(0,0,0);
+  cv::Vec3d tvec(point_cam[0], point_cam[1], point_cam[2]);
+
+  std::vector<cv::Point3f> obj{cv::Point3f(0,0,0)};
+  std::vector<cv::Point2f> img_point;
+
+  cv::projectPoints(obj, rvec, tvec, camera_matrix_, distort_coeffs_, img_point);
+
+  return img_point;
+}
+#endif
+
 double Solver::oupost_reprojection_error(Armor armor, const double & pitch)
 {
   // solve

@@ -206,7 +206,7 @@ class GimbalSimulator:
     
     def send_data(self):
         """发送数据线程"""
-        send_interval = 0.02  # 50Hz发送频率
+        send_interval = 0.001  # 1000Hz发送频率
         
         while self.running:
             if not self.ser or not self.ser.is_open:

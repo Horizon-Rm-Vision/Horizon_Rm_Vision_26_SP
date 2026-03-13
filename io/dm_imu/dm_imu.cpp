@@ -1,3 +1,5 @@
+#ifndef LIM_CODE 
+
 #include "dm_imu.hpp"
 
 #include <atomic>
@@ -129,3 +131,5 @@ Eigen::Quaterniond DM_IMU::imu_at(std::chrono::steady_clock::time_point timestam
 }
 
 }  // namespace io
+
+#endif

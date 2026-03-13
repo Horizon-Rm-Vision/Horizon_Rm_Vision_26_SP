@@ -22,11 +22,9 @@ public:
   ArmorPriority priority;
   bool jumped;
   int last_id;  // debug only
-  
-  // //新版前哨站机制
-  // double z1_in_world;  // m
-  // double z2_in_world;
-  // double z3_in_world;
+  #ifdef AIM_CENTER
+  double v1, v2;
+  #endif
 
   Target() = default;
   Target(

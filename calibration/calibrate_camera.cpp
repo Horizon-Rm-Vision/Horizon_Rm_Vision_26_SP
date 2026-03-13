@@ -8,8 +8,8 @@
 
 const std::string keys =
   "{help h usage ? |                          | 输出命令行参数说明}"
-  "{config-path c  | configs/calibration.yaml | yaml配置文件路径 }"
-  "{@input-folder  | assets/img_with_q        | 输入文件夹路径   }";
+  "{config-path c  | ../configs/calibration.yaml | yaml配置文件路径 }"
+  "{@input-folder  | ../assets/img_with_q        | 输入文件夹路径   }";
 
 std::vector<cv::Point3f> centers_3d(const cv::Size & pattern_size, const float center_distance)
 {
@@ -43,9 +43,19 @@ void load(
     // 设置图片尺寸
     img_size = img.size();
 
-    // 识别标定板
+    // 转换为灰度图
+    cv::Mat gray;
+    cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+
+    // 识别棋盘格角点
     std::vector<cv::Point2f> centers_2d;
-    auto success = cv::findCirclesGrid(img, pattern_size, centers_2d, cv::CALIB_CB_SYMMETRIC_GRID);
+    bool success = cv::findChessboardCorners(gray, pattern_size, centers_2d);
+
+    if (success) {
+      // 亚像素精细化
+      cv::cornerSubPix(gray, centers_2d, cv::Size(11, 11), cv::Size(-1, -1),
+                       cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 30, 0.001));
+    }
 
     // 显示识别结果
     auto drawing = img.clone();

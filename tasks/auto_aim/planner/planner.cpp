@@ -19,6 +19,20 @@ Planner::Planner(const std::string & config_path)
   decision_speed_ = tools::read<double>(yaml, "decision_speed");
   high_speed_delay_time_ = tools::read<double>(yaml, "high_speed_delay_time");
   low_speed_delay_time_ = tools::read<double>(yaml, "low_speed_delay_time");
+  #ifdef AIM_CENTER
+  aim_center_ = tools::read<bool>(yaml, "aim_center");
+  armor_yaw_threshold_ = (tools::read<double>(yaml, "armor_yaw_threshold"))/180.0*M_PI;
+  #endif
+  // 读取弹道模型配置
+  if (yaml["ballistic_model"]) {
+    auto str = yaml["ballistic_model"].as<std::string>();
+    if (str == "hero")
+      ballistic_model_ = BallisticModel::kHero;
+    else
+      ballistic_model_ = BallisticModel::kNoDrag;
+  } else {
+    ballistic_model_ = BallisticModel::kNoDrag;
+  }
 
   setup_yaw_solver(config_path);
   setup_pitch_solver(config_path);
@@ -41,7 +55,10 @@ Plan Planner::plan(Target target, double bullet_speed)
       xyz = xyza.head<3>();
     }
   }
-  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
+  auto bullet_traj = tools::Trajectory(
+    bullet_speed, min_dist, xyz.z(),
+    ballistic_model_ == BallisticModel::kHero ? tools::Trajectory::Model::kHero
+                                               : tools::Trajectory::Model::kNoDrag);
   target.predict(bullet_traj.fly_time);
 
   // 2. Get trajectory
@@ -83,10 +100,10 @@ Plan Planner::plan(Target target, double bullet_speed)
   plan.yaw_acc = yaw_solver_->work->u(0, HALF_HORIZON);
 
   plan.pitch = pitch_solver_->work->x(0, HALF_HORIZON);
-  // //#ifdef SR_VEL
-  // plan.pitch_vel = pitch_solver_->work->x(1, HALF_HORIZON);
-  // plan.pitch_acc = pitch_solver_->work->u(0, HALF_HORIZON);
-  // //#endif
+  #ifdef SR_VEL
+  plan.pitch_vel = pitch_solver_->work->x(1, HALF_HORIZON);
+  plan.pitch_acc = pitch_solver_->work->u(0, HALF_HORIZON);
+  #endif
 
   // //保存上次状态供下次使用，暂时无用
   // plan.last_yaw = plan.yaw + plan.yaw_vel * DT;
@@ -107,24 +124,24 @@ Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 {
   if (!target.has_value()) return {false};
 
-  // // 暂时无用，无识别时状态位会变化
-  // if( !target.has_value()) {
-  //   Plan plan;
-  //   plan.yaw = last_yaw_;
-  //   plan.pitch = last_pitch_;
-  //   plan.control = true;
-  //   return plan;
-  // }else{
-    double delay_time =
+  double delay_time =
     std::abs(target->ekf_x()[7]) > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
 
-    auto future = std::chrono::steady_clock::now() + std::chrono::microseconds(int(delay_time * 1e6));
+  auto future = std::chrono::steady_clock::now() + std::chrono::microseconds(int(delay_time * 1e6));
 
-    target->predict(future);
+  target->predict(future);
 
+  #ifdef AIM_CENTER
+  if (aim_center_) {
+    return aim_at_center(*target, bullet_speed);
+  } else {
     return plan(*target, bullet_speed);
-  // }
+  }
+  #endif
 
+  #ifndef AIM_CENTER
+  return plan(*target, bullet_speed);
+  #endif
 }
 
 void Planner::setup_yaw_solver(const std::string & config_path)
@@ -190,7 +207,10 @@ Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_sp
   debug_xyza = Eigen::Vector4d(xyz.x(), xyz.y(), xyz.z(), yaw);
 
   auto azim = std::atan2(xyz.y(), xyz.x());
-  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
+  auto bullet_traj = tools::Trajectory(
+    bullet_speed, min_dist, xyz.z(),
+    ballistic_model_ == BallisticModel::kHero ? tools::Trajectory::Model::kHero
+                                               : tools::Trajectory::Model::kNoDrag);
   if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
 
   return {tools::limit_rad(azim + yaw_offset_), -bullet_traj.pitch - pitch_offset_};
@@ -221,5 +241,88 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
 
   return traj;
 }
+
+#ifdef AIM_CENTER
+Plan Planner::aim_at_center(Target target, double bullet_speed)
+{
+  target.v1 = 50;
+  target.v2 = 200;
+  Plan plan;
+  // 整车中心坐标减去半径为正对相机装甲板坐标
+  Eigen::Vector3d xyz;
+  xyz = {target.ekf_x()[0] - target.ekf_x()[8], target.ekf_x()[2], target.ekf_x()[4]};
+
+  // 存储世界坐标系中的目标位置，仅重投影用
+  if(target.ekf_x()[0]==0 && target.ekf_x()[2]==0 || target.armor_xyza_list().empty()) {
+    center_points = Eigen::Vector3d(0, 0, 0);
+  } else {
+    center_points = Eigen::Vector3d(target.ekf_x()[0], target.ekf_x()[2], target.ekf_x()[4]);
+  }
+
+  // 计算弹道是否可解
+  double center_dist = xyz.head<2>().norm();
+  float yaw, pitch;
+  //根据弹道飞行时间预测目标位置
+  auto bullet_traj = tools::Trajectory(
+  bullet_speed, center_dist, xyz.z(),
+  ballistic_model_ == BallisticModel::kHero ? tools::Trajectory::Model::kHero
+                                               : tools::Trajectory::Model::kNoDrag);
+  target.predict(bullet_traj.fly_time);
+
+  if (ballistic_model_ == BallisticModel::kHero) {
+      auto azim = std::atan2(xyz.y(), xyz.x());
+      auto bullet_traj = tools::Trajectory(
+      bullet_speed, center_dist, xyz.z(),
+      ballistic_model_ == BallisticModel::kHero ? tools::Trajectory::Model::kHero
+                                                : tools::Trajectory::Model::kNoDrag);
+      if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
+      yaw = tools::limit_rad(azim + yaw_offset_);
+      pitch = -bullet_traj.pitch - pitch_offset_;
+  }
+  else{
+    auto bullet_traj = tools::Trajectory(bullet_speed, center_dist, xyz.z(), tools::Trajectory::Model::kNoDrag);
+    if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
+    
+      // 计算yaw和pitch
+      auto azim = std::atan2(xyz.y(), xyz.x());
+      yaw = tools::limit_rad(azim + yaw_offset_);
+      pitch = -bullet_traj.pitch - pitch_offset_;
+  }
+
+
+  // 开火条件,距离最近的装甲板的yaw与云台夹角小于armor_yaw_threshold_阈值
+  Eigen::Vector3d armor_xyz;
+  double armor_yaw;
+  auto min_dist = 1e10;
+  for (auto & xyza : target.armor_xyza_list()) {
+    auto dist = xyza.head<2>().norm();
+    if (dist < min_dist) {
+      min_dist = dist;
+      armor_xyz = xyza.head<3>();
+      armor_yaw = xyza[3];
+    }
+  }
+  if(armor_yaw  > armor_yaw_threshold_ || armor_yaw < -armor_yaw_threshold_) {
+    plan.control = false;
+    plan.fire = false;
+  }
+  if(armor_yaw  < armor_yaw_threshold_ && armor_yaw  > -armor_yaw_threshold_) {
+    plan.control = true;
+    plan.fire = true;
+  }
+
+  // 返回规划结果
+  plan.target_yaw = yaw;
+  plan.target_pitch = pitch; // 规划值没调用MPC求解，直接返回了计算的yaw和pitch
+  plan.yaw = yaw;
+  plan.yaw_vel = 0;
+  plan.yaw_acc = 0;
+  plan.pitch = pitch;
+  plan.pitch_vel = 0;
+  plan.pitch_acc = 0;
+
+  return plan;
+}
+#endif
 
 }  // namespace auto_aim
