@@ -271,7 +271,21 @@ void Target::update_ypda(const Armor & armor, int id)
   // 观测量只传入中间装甲板的高度数据
   Eigen::VectorXd z{{ypd[0], ypd[1], ypd[2], ypr[0]}};  //获得观测量
 
+  // ekf_.update(z, H, R, h, z_subtract);
+  
+  // 保存更新前角速度
+  double last_w = ekf_.x[7];
+
+  // EKF更新
   ekf_.update(z, H, R, h, z_subtract);
+
+  // 更新后角速度
+  double new_w = ekf_.x[7];
+
+  // 防止观测误差导致反向旋转
+  if (last_w * new_w < 0) {
+    ekf_.x[7] = last_w;
+  }
 }
 
 Eigen::VectorXd Target::ekf_x() const { return ekf_.x; }

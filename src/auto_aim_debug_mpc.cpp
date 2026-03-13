@@ -318,7 +318,7 @@ int main(int argc, char * argv[])
       tools::draw_text(img, fmt::format("armor_x: {:.2f}", armor.xyz_in_world[0]), {10, 600}, {0, 255, 0});
       tools::draw_text(img, fmt::format("armor_y: {:.2f}", armor.xyz_in_world[1]), {10, 630}, {0, 255, 0});
       tools::draw_text(img, fmt::format("armor_z: {:.2f}", armor.xyz_in_world[2]), {10, 660}, {0, 255, 0});
-      tools::draw_text(img, fmt::format("queue_size: {}", gimbal.q_size()), {10, 720}, {0, 255, 0});
+      // tools::draw_text(img, fmt::format("queue_size: {}", gimbal.q_size()), {10, 720}, {0, 255, 0});
     }
     // 绘制锁定中心
     if (planner.aim_center_) {

@@ -60,20 +60,20 @@ aim_center: true # 锁车中心
 armor_yaw_threshold: 20 # 锁车时装甲板yaw角度阈值，degree
 
 #####-----相机参数-----#####
-camera_name: "mindvision"
-exposure_ms: 0.5
-gamma: 3 #已经废弃
-vid_pid: "f622:d13a"
+# camera_name: "mindvision"
+# exposure_ms: 1.5
+# gamma: 3 #已经废弃
+# vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
 # vid_pid: "2bdf:0001"
 
-# camera_name: "daheng"
-# exposure_ms: 2
-# gamma: 2.85
-# vid_pid: "KE0200010097"
+camera_name: "daheng"
+exposure_ms: 2
+gamma: 2.85
+vid_pid: "KE0200010097"
 
 
 #  1  0  0

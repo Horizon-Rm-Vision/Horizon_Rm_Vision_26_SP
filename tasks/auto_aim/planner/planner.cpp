@@ -252,12 +252,13 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
     center_points = Eigen::Vector3d(target.ekf_x()[0], target.ekf_x()[2], target.ekf_x()[4]);
   }
 
-  // 距离
-  double center_dist = xyz.head<2>().norm();
+  // 到装甲板的距离需要加上半径
+  double center_dist = xyz.head<2>().norm() + target.ekf_x()[8];
 
   float yaw, pitch;
 
-  // 计算弹道
+  // 计算弹道,考虑装甲板高低差
+  // auto armor_z = target.h_armor_xyz().[2];  // 加上装甲板高度差
   auto bullet_traj = tools::Trajectory(
       bullet_speed, center_dist, xyz.z(),
       ballistic_model_ == BallisticModel::kHero
