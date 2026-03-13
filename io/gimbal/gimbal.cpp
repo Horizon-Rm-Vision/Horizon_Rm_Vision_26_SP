@@ -19,11 +19,35 @@ Gimbal::Gimbal(const std::string & config_path)
   auto yaml = tools::load(config_path);
   com_port_ = tools::read<std::string>(yaml, "com_port");
 
-  tools::logger()->info("[Gimbal] Initializing gimbal communication on port: {}", com_port_);
-
-  if (!open_serial()) {
-    tools::logger()->error("[Gimbal] Failed to open serial port: {}", com_port_);
-    exit(1);
+  if (com_port_ == "auto") {
+    // 候选串口列表
+    const char* candidates[] = {
+        "/dev/ttyACM0", "/dev/ttyUSB0", "/dev/ttyTHS0","/dev/ttyCH341USB0",
+        "/dev/ttyACM1", "/dev/ttyUSB1", "/dev/ttyTHS1","/dev/ttyCH341USB1",
+        "/dev/ttyACM2", "/dev/ttyUSB2", "/dev/ttyTHS2","/dev/ttyCH341USB2",
+        "/dev/ttyACM3", "/dev/ttyUSB3", "/dev/ttyTHS3","/dev/ttyCH341USB3",
+        "/dev/ttyACM4", "/dev/ttyUSB4", "/dev/ttyTHS4","/dev/ttyCH341USB4",
+        nullptr
+    };
+    bool found = false;
+    for (const char** p = candidates; *p != nullptr; ++p) {
+      com_port_ = *p;  // 临时设置为当前候选端口
+      if (open_serial()) {
+        tools::logger()->info("[Gimbal] Auto selected port: {}", com_port_);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      tools::logger()->error("[Gimbal] No valid serial port found in auto mode.");
+      exit(1);
+    }
+  } else {
+    tools::logger()->info("[Gimbal] Initializing gimbal communication on port: {}", com_port_);
+    if (!open_serial()) {
+      tools::logger()->error("[Gimbal] Failed to open serial port: {}", com_port_);
+      exit(1);
+    }
   }
 
   thread_ = std::thread(&Gimbal::read_thread, this);
@@ -125,6 +149,8 @@ GimbalState Gimbal::state() const
 //       return "INVALID";
 //   }
 // }
+
+//转换GimbalMode数值为对应的字符串
 std::string Gimbal::str(GimbalMode mode) const
 {
   switch (mode) {
@@ -141,22 +167,25 @@ std::string Gimbal::str(GimbalMode mode) const
   }
 }
 
-// Eigen::Quaterniond Gimbal::q(std::chrono::steady_clock::time_point t)
-// {
-//   while (true) {
-//     auto [q_a, t_a] = queue_.pop();
-//     auto [q_b, t_b] = queue_.front();
-//     auto t_ab = tools::delta_time(t_a, t_b);
-//     auto t_ac = tools::delta_time(t_a, t);
-//     auto k = t_ac / t_ab;
-//     Eigen::Quaterniond q_c = q_a.slerp(k, q_b).normalized();
-//     if (t < t_a) return q_c;
-//     if (!(t_a < t && t <= t_b)) continue;
+#ifndef NOVA_Q
+Eigen::Quaterniond Gimbal::q(std::chrono::steady_clock::time_point t)
+{
+  while (true) {
+    auto [q_a, t_a] = queue_.pop();
+    auto [q_b, t_b] = queue_.front();
+    auto t_ab = tools::delta_time(t_a, t_b);
+    auto t_ac = tools::delta_time(t_a, t);
+    auto k = t_ac / t_ab;
+    Eigen::Quaterniond q_c = q_a.slerp(k, q_b).normalized();
+    if (t < t_a) return q_c;
+    if (!(t_a < t && t <= t_b)) continue;
 
-//     return q_c;
-//   }
-// }
+    return q_c;
+  }
+}
+#endif
 
+#ifdef NOVA_Q
 Eigen::Quaterniond Gimbal::q(std::chrono::steady_clock::time_point t)
 {
   while (true) {
@@ -183,6 +212,7 @@ int Gimbal::q_size() const
 {
   return queue_.empty() ? 0 : 1 + queue_.size();
 }
+#endif
 
 std::string Gimbal::packet_to_hex(const void* data, size_t size) const
 {
@@ -196,18 +226,31 @@ std::string Gimbal::packet_to_hex(const void* data, size_t size) const
   return ss.str();
 }
 
+//仅用于fire_test.cpp
 void Gimbal::send(io::VisionToGimbal VisionToGimbal)
 {
   // 复制数据到局部变量以避免packed结构体引用问题
   uint8_t mode = VisionToGimbal.mode;
   float yaw = VisionToGimbal.yaw;
   float pitch = VisionToGimbal.pitch;
+  #ifdef SR_VEL
+    float yaw_vel = VisionToGimbal.yaw_vel;
+    //float yaw_acc = VisionToGimbal.yaw_acc;
+    float pitch_vel = VisionToGimbal.pitch_vel;
+    //float pitch_acc = VisionToGimbal.pitch_acc;
+  #endif
   
   // 赋值给tx_data_
   tx_data_.mode = mode;
   tx_data_.yaw = yaw;
   tx_data_.pitch = pitch;
-  tx_data_.timestamp = 0;  // 时间戳暂时填0
+  // tx_data_.timestamp = 0;  // 时间戳暂时填0
+  #ifdef SR_VEL
+    tx_data_.yaw_vel = yaw_vel;
+    //tx_data_.yaw_acc = yaw_acc;
+    tx_data_.pitch_vel = pitch_vel;
+    //tx_data_.pitch_acc = pitch_acc;
+  #endif
   
   if (fd_ < 0) {
     tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
@@ -227,28 +270,12 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
   }
 }
 
+#ifndef SENTRY_SR
+// 自瞄向电控发送数据(普通模式)
 void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
   float pitch_acc)
 {
-  //uint8_t mode = control ? (fire ? 2 : 1) : 0; //等价于下面的if else
-  // uint8_t mode;
-  // if (control) 
-  // {
-  //     if (fire) 
-  //     {
-  //         mode = 2;  // 控制且开火
-  //     } 
-  //     else 
-  //     {
-  //         mode = 1;  // 控制但不开火
-  //     }
-  // } 
-  // else 
-  // {
-  //     mode = 0;      // 不控制
-  // }
-
   uint8_t mode;
   if (control) 
   {
@@ -266,15 +293,17 @@ void Gimbal::send(
       mode = 1;      // 不控制，对应NT_M6的自瞄模式默认标志位001（十六进制原始数据01）
   }
 
-
-
-  tx_data_.mode = mode;  // 弧度转换为角度
+  tx_data_.mode = mode;  
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
-  tx_data_.yaw_vel = -yaw_vel * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
-  tx_data_.pitch_vel = -pitch_vel * (180.0 / M_PI);  // 弧度转换为角度并取负
-  tx_data_.timestamp = 0;  // 时间戳暂时填0
+  // tx_data_.timestamp = 0;  // 时间戳暂时填0
+  #ifdef SR_VEL
+    tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
+    tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
+    //tx_data_.yaw_acc = -yaw_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
+    //tx_data_.pitch_acc = -pitch_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
+  #endif
   
   if (fd_ < 0) {
     tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
@@ -284,7 +313,7 @@ void Gimbal::send(
   // 使用局部变量记录发送的数据内容
   std::string mode_str = control ? (fire ? "CONTROL_FIRE" : "CONTROL_NO_FIRE") : "NO_CONTROL";
   tools::logger()->debug("[Gimbal] Sending data - Mode: {} ({}), Pitch: {:.3f}, Yaw: {:.3f}",
-                        mode_str, mode, pitch, yaw);
+                        mode_str, mode, -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI));
   
   ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
   if (bytes_written != sizeof(tx_data_)) {
@@ -293,28 +322,97 @@ void Gimbal::send(
   } else {
     tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
     
-    // 记录原始数据
-    tools::logger()->trace("[Gimbal] Raw TX data: {}", 
-                          packet_to_hex(&tx_data_, sizeof(tx_data_)));
+    // // 记录发送原始数据
+    // tools::logger()->trace("[Gimbal] Raw TX data: {}", 
+    //                       packet_to_hex(&tx_data_, sizeof(tx_data_)));
+
   }
 }
+#endif
+#ifdef SENTRY_SR
+// 自瞄向电控发送数据(哨兵模式，带导航通信内容)
+void Gimbal::send(
+  bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
+  float pitch_acc,float vx, float vy, float wz)
+{
+  uint8_t mode;
+  if (control) 
+  {
+      if (fire) 
+      {
+          mode = 57;  // 控制且开火，对应NT_M6的111001（十六进制原始数据39）
+      } 
+      else 
+      {
+          mode = 49;  // 控制但不开火，对应NT_M6的110001（十六进制原始数据31）
+      }
+  } 
+  else 
+  {
+      mode = 1;      // 不控制，对应NT_M6的自瞄模式默认标志位001（十六进制原始数据01）
+  }
 
+  tx_data_.mode = mode;  
+  // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
+  tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
+  tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
+  tx_data_.timestamp = 0;  // 时间戳暂时填0
+  tx_data_.vx = vx;
+  tx_data_.vy = vy;
+  tx_data_.wz = wz;
+  //哨兵导航
+  
+  #ifdef SR_VEL
+    tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
+    tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
+    //tx_data_.yaw_acc = -yaw_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
+    //tx_data_.pitch_acc = -pitch_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
+  #endif
+  
+  if (fd_ < 0) {
+    tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
+    return;
+  }
+  
+  // 使用局部变量记录发送的数据内容
+  std::string mode_str = control ? (fire ? "CONTROL_FIRE" : "CONTROL_NO_FIRE") : "NO_CONTROL";
+  tools::logger()->debug("[Gimbal] Sending data - Mode: {} ({}), Pitch: {:.3f}, Yaw: {:.3f}",
+                        mode_str, mode, -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI));
+  
+  ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
+  if (bytes_written != sizeof(tx_data_)) {
+    tools::logger()->warn("[Gimbal] Failed to write serial, expected {} bytes, got {} bytes, error: {}",
+                         sizeof(tx_data_), bytes_written, strerror(errno));
+  } else {
+    tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
+    
+    // // 记录发送原始数据
+    // tools::logger()->trace("[Gimbal] Raw TX data: {}", 
+    //                       packet_to_hex(&tx_data_, sizeof(tx_data_)));
+
+  }
+}
+#endif
+
+// 自瞄从电控读取数据
 void Gimbal::read_thread()
 {
+  // 统计接收fps,用不到时注释上
   auto fps_start = std::chrono::steady_clock::now();
   int fps_count = 0;
+  
   tools::logger()->info("[Gimbal] read_thread started.");
   int error_count = 0;
   const size_t packet_size = sizeof(GimbalToVision);
   
-  uint8_t buffer[4096];  // 256 → 4096
+  uint8_t buffer[4096];  
   ssize_t bytes_read;
   size_t data_index = 0;
   
   while (!quit_) {
     if (error_count > 5000) {
       tools::logger()->warn("[Gimbal] Too many errors ({}), attempting to reconnect...", error_count);  // 先log
-      error_count = 0;  // 后清零
+      error_count = 0;  
       reconnect();
       continue;
     }
@@ -347,6 +445,7 @@ void Gimbal::read_thread()
       continue;
     }
     
+    // 记录原始接收数据
     tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}", 
                           bytes_read, packet_to_hex(buffer + data_index, bytes_read));
     
@@ -370,17 +469,34 @@ void Gimbal::read_thread()
       }
       
       auto t = std::chrono::steady_clock::now();
-      
+      // Copy valid packet
       std::memcpy(&rx_data_, buffer + i, packet_size);
       
+      // 记录原始数据包
       tools::logger()->debug("[Gimbal] Found complete packet at offset {}, raw: {}",
                             i, packet_to_hex(buffer + i, packet_size));
       
+      // 复制到局部变量以避免packed结构体引用问题
       uint8_t mode = rx_data_.mode;
-      float yaw   = -rx_data_.yaw   * (M_PI / 180.0f);
-      float pitch = -rx_data_.pitch * (M_PI / 180.0f);
+        // uint8_t mode = 0;
+      float yaw   = -rx_data_.yaw   * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
+      float pitch = -rx_data_.pitch * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       uint8_t bullet_speed = rx_data_.bullet_speed;
-      
+      #ifdef SR_VEL
+        float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
+        float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
+        //float yaw_acc = -rx_data_.yaw_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
+        //float pitch_acc = -rx_data_.pitch_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
+      #endif
+      #ifdef SENTRY_SR
+      //哨兵导航相关数据
+      uint8_t game_status = rx_data_.game_status;
+      uint8_t blood = rx_data_.blood;
+      uint8_t bullet = rx_data_.bullet;
+      #endif
+      // 使用yaw和pitch计算四元数（roll设为0）
+      //单位转换
+      //double d2r = M_PI / 180.0;
       Eigen::AngleAxisd yaw_angle  (yaw,   Eigen::Vector3d::UnitZ());
       Eigen::AngleAxisd pitch_angle(pitch, Eigen::Vector3d::UnitY());
       Eigen::AngleAxisd roll_angle (0.0,   Eigen::Vector3d::UnitX());
@@ -391,6 +507,7 @@ void Gimbal::read_thread()
       if (mode <= 3) {
         queue_.push({q, t});
         
+        //fps统计,用不到时注释上
         fps_count++;
         auto fps_now = std::chrono::steady_clock::now();
         std::chrono::duration<double> fps_elapsed = fps_now - fps_start;
@@ -400,29 +517,55 @@ void Gimbal::read_thread()
           fps_start = fps_now;
         }
         
+        //传入数值给state_，供外部调用
         {
-          std::lock_guard<std::mutex> lock(mutex_);
-          state_.yaw        = yaw;
-          state_.yaw_vel    = 0.0f;
-          state_.pitch      = pitch;
-          state_.pitch_vel  = 0.0f;
-          state_.bullet_speed = static_cast<float>(bullet_speed);
-          state_.bullet_count = 0;
+            std::lock_guard<std::mutex> lock(mutex_);
+            state_.yaw = yaw;
+            state_.pitch = pitch;
+            state_.bullet_speed = static_cast<float>(bullet_speed);
+            #ifdef SR_VEL
+              state_.yaw_vel = yaw_vel;
+              state_.pitch_vel = pitch_vel;
+              //state_.yaw_acc = yaw_acc;
+              //state_.pitch_acc = pitch_acc;
+            #endif
+            #ifndef SR_VEL
+            state_.yaw_vel = 0.0f;  // 速度暂时填0
+            state_.pitch_vel = 0.0f;  // 速度暂时填0
+            #endif
+            state_.bullet_count = 0;  // 子弹计数暂时填0
+            #ifdef SENTRY_SR
+            //哨兵导航相关数据
+            state_.game_status = game_status;
+            state_.blood = blood;
+            state_.bullet = bullet;
+            #endif
         }
+            //本次接收前后模式变化记录日志
+            GimbalMode old_mode = mode_;
+            switch (mode) {
+              case 0:
+                mode_ = GimbalMode::AUTO_AIM;
+                break;
+              case 1:
+                mode_ = GimbalMode::SMALL_BUFF;
+                break;
+              case 2:
+                mode_ = GimbalMode::BIG_BUFF;
+                break;
+              case 3:
+                mode_ = GimbalMode::IDLE;
+                break;
+              default:
+                mode_ = GimbalMode::IDLE;
+                break;
+            }
         
-        GimbalMode old_mode = mode_;
-        switch (mode) {
-          case 0: mode_ = GimbalMode::AUTO_AIM;   break;
-          case 1: mode_ = GimbalMode::IDLE;        break;
-          case 2: mode_ = GimbalMode::SMALL_BUFF;  break;
-          case 3: mode_ = GimbalMode::BIG_BUFF;    break;
-          default: mode_ = GimbalMode::IDLE;       break;
-        }
-        
-        tools::logger()->debug("[Gimbal] Parsed data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
-                             "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
-                             str(old_mode), str(mode_), pitch, yaw, bullet_speed,
-                             q.w(), q.x(), q.y(), q.z());
+            // 使用局部变量记录解析后的数据内容
+            tools::logger()->info("[Gimbal] Parsed read data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
+                                 "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
+                                 str(old_mode), str(mode_), -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI), bullet_speed, 
+                                 q.w(), q.x(), q.y(), q.z());
         
         error_count = 0;
       } else {
@@ -443,7 +586,7 @@ void Gimbal::read_thread()
   
   tools::logger()->info("[Gimbal] read_thread stopped.");
 }
-
+//失败重连
 void Gimbal::reconnect()
 {
   tools::logger()->info("[Gimbal] Attempting to reconnect to serial port");

@@ -187,6 +187,10 @@ int main(int argc, char * argv[])
   auto_aim::Tracker tracker(config_path, solver);
   auto_aim::Planner planner(config_path);
 
+  // while(1){
+  // gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
+  // std::this_thread::sleep_for(100ms);
+  // }
   #ifdef EZ_FILTER
   // Load filter config from yaml (optional)
   auto yaml_cfg = tools::load(config_path);

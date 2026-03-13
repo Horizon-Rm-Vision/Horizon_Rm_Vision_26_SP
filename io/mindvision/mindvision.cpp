@@ -78,7 +78,7 @@ void MindVision::open()
 
   CameraSetAeState(handle_, FALSE);                        // 关闭自动曝光
   CameraSetExposureTime(handle_, exposure_ms_ * 1e3);      // 设置曝光
-  //CameraSetGamma(handle_, gamma_ * 1e1);                   // 设置伽马
+  CameraSetGamma(handle_, gain_ * 1e1);                   // 设置伽马
   CameraSetIspOutFormat(handle_, CAMERA_MEDIA_TYPE_BGR8);  // 设置输出格式为BGR
   CameraSetTriggerMode(handle_, 0);                        // 设置为连续采集模式
   CameraSetFrameSpeed(handle_, 1);                         // 设置为低帧率模式
