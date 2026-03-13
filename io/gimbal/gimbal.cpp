@@ -271,7 +271,9 @@ void Gimbal::send(
   tx_data_.mode = mode;  // 弧度转换为角度
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
+  tx_data_.yaw_vel = -yaw_vel * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
+  tx_data_.pitch_vel = -pitch_vel * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.timestamp = 0;  // 时间戳暂时填0
   
   if (fd_ < 0) {
