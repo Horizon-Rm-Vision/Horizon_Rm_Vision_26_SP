@@ -31,7 +31,7 @@ using namespace std::chrono;
 
 const std::string keys =
   "{help h usage ? |      | 输出命令行参数说明}"
-  "{@config-path   | ../configs/standard3_aimer.yaml | 位置参数，yaml配置文件路径 }";
+  "{@config-path   | ../configs/standard3.yaml | 位置参数，yaml配置文件路径 }";
 
 int main(int argc, char * argv[])
 {
@@ -158,7 +158,14 @@ int main(int argc, char * argv[])
     ui_manager.addLeftText("gimbal_status", fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", -gs.yaw * 180.0 / M_PI, -gs.pitch * 180.0 / M_PI));
     
     //发送的数据
-    ui_manager.addLeftText("plan_status", fmt::format("Command Yaw: {:.2f}  Pitch: {:.2f}", -command.yaw * 180.0 / M_PI, -command.pitch * 180.0 / M_PI), cv::Scalar(0, 165, 255));
+    ui_manager.addLeftText("command_status", fmt::format("Command Yaw: {:.2f}  Pitch: {:.2f}", -command.yaw * 180.0 / M_PI, -command.pitch * 180.0 / M_PI), cv::Scalar(0, 165, 255));
+    
+    #ifdef SENTRY_SR
+    // Sentry SR特有的导航相关数据
+    ui_manager.addLeftText("game_status", fmt::format("Game Status: {:.2f} ", gs.game_status));
+    ui_manager.addLeftText("blood", fmt::format("Blood: {:.2f} ", gs.blood));
+    ui_manager.addLeftText("bullet", fmt::format("Bullet: {:.2f} ", gs.bullet));
+    #endif
     
     // 添加右侧UI元素
     ui_manager.addRightText("bullet_speed", fmt::format("Bullet Speed: {:.1f}", gs.bullet_speed));
@@ -171,11 +178,13 @@ int main(int argc, char * argv[])
     ui_manager.render(img);
 
     // 显示图像
-    cv::namedWindow("Vision System", cv::WINDOW_NORMAL);
-    cv::imshow("Vision System", img);
-    int key = cv::waitKey(1);
-    if (key == 'q' || key == 27) {  // q 或 ESC 退出
-      break;
+    if (ui_manager.isImshowEnabled()) {
+      cv::namedWindow("Vision System", cv::WINDOW_NORMAL);
+      cv::imshow("Vision System", img);
+      int key = cv::waitKey(1);
+      if (key == 'q' || key == 27) {  // q 或 ESC 退出
+        break;
+      }
     }
     //#endif
 

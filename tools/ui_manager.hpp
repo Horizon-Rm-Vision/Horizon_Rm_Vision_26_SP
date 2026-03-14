@@ -72,9 +72,13 @@ public:
     
     // 检查UI是否启用
     bool isEnabled() const { return enabled_; }
+    
+    // 检查imshow是否启用
+    bool isImshowEnabled() const { return imshow_enabled_; }
 
 private:
     bool enabled_;
+    bool imshow_enabled_;
     
     // FPS计算
     std::chrono::steady_clock::time_point last_fps_time_;

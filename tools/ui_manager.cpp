@@ -10,14 +10,19 @@ UIManager::UIManager(const std::string& config_path)
         if (config["ui"] && config["ui"]["enabled"]) {
             enabled_ = config["ui"]["enabled"].as<bool>();
         }
+        if (config["ui"] && config["ui"]["imshow"]) {
+            imshow_enabled_ = config["ui"]["imshow"].as<bool>();
+        }
     } catch (const std::exception& e) {
         // 如果配置文件不存在或格式错误，默认禁用UI
         enabled_ = false;
+        imshow_enabled_ = false;
     }
 }
 
 UIManager::UIManager(bool enabled)
     : enabled_(enabled),
+      imshow_enabled_(true),  // 默认启用imshow
       last_fps_time_(std::chrono::steady_clock::now()),
       frame_count_(0),
       fps_(0.0f),

@@ -227,6 +227,13 @@ int main(int argc, char * argv[])
     ui_manager.addLeftText("plan_vel", fmt::format("Plan Vel Y: {:.2f}  P: {:.2f}", -plan.yaw_vel * 180.0 / M_PI, -plan.pitch_vel * 180.0 / M_PI), cv::Scalar(0, 165, 255));
     ui_manager.addLeftText("plan_acc", fmt::format("Plan Acc Y: {:.2f}  P: {:.2f}", plan.yaw_acc, plan.pitch_acc), cv::Scalar(0, 165, 255));
     
+    #ifdef SENTRY_SR
+    // Sentry SR特有的导航相关数据
+    ui_manager.addLeftText("game_status", fmt::format("Game Status: {:.2f} ", gs.game_status));
+    ui_manager.addLeftText("blood", fmt::format("Blood: {:.2f} ", gs.blood));
+    ui_manager.addLeftText("bullet", fmt::format("Bullet: {:.2f} ", gs.bullet));
+    #endif
+    
     // 目标信息
     if (has_target) {
       auto& target = target_opt.value();
@@ -258,11 +265,13 @@ int main(int argc, char * argv[])
     // 应用UI绘制
     ui_manager.render(img);
 
-    //cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
-    cv::namedWindow("reprojection", 0);
-    cv::imshow("reprojection", img);
-    auto key = cv::waitKey(1);
-    if (key == 'q') break;
+    // cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
+    if (ui_manager.isImshowEnabled()) {
+      cv::namedWindow("reprojection", 0);
+      cv::imshow("reprojection", img);
+      auto key = cv::waitKey(1);
+      if (key == 'q') break;
+    }
   }
 
   quit = true;
