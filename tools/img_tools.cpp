@@ -28,4 +28,10 @@ void draw_text(
   cv::putText(img, text, point, cv::FONT_HERSHEY_SIMPLEX, font_scale, color, thickness);
 }
 
+void draw_line(
+  cv::Mat & img, const cv::Point & pt1, const cv::Point & pt2, const cv::Scalar & color, int thickness)
+{
+  cv::line(img, pt1, pt2, color, thickness);
+}
+
 }  // namespace tools

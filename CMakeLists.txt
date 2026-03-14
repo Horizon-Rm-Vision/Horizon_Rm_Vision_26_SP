@@ -10,7 +10,7 @@ set(CMAKE_BUILD_TYPE Release)
 message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}--------------------")
 
 # 编译模式选项：控制是否使用CUDA/TensorRT和OpenVINO
-option(USE_CUDA "Enable CUDA/TensorRT support" OFF)
+option(USE_CUDA "Enable CUDA/TensorRT support" ON)
 option(USE_OPENVINO "Enable OpenVINO support" ON)
 
 if(NOT USE_CUDA AND NOT USE_OPENVINO)
@@ -18,7 +18,7 @@ if(NOT USE_CUDA AND NOT USE_OPENVINO)
 endif()
 
 # 其他编译选项,默认不编译多余组件，可以改OFF为ON来启用或禁用，或者在cmake ..中添加-DBUILD_XXX=ON临时启用
-option(BUILD_SENTRY "Build sentry tools" ON)
+option(BUILD_SENTRY "Build sentry tools" OFF)
 option(BUILD_TEST "Build test tools" OFF)
 option(BUILD_CALIBRATION "Build calibration tools" ON)
 option(BUILD_ALL "Build all components" OFF)
@@ -197,7 +197,7 @@ find_package(geometry_msgs QUIET)
 if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_cpp_FOUND AND sp_msgs_FOUND AND geometry_msgs_FOUND AND BUILD_SENTRY)
     #add_compile_definitions(SENTRY_SR) # 串口通信编译为哨兵导航联合通信版本
     # 编译 sentry 和 publish_test
-    add_executable(auto_aim_debug_mpc_sentry src/auto_aim_debug_mpc_sentry.cpp)
+    add_executable(auto_aim_debug_mpc src/auto_aim_debug_mpc.cpp)
     #add_executable(sentry src/sentry.cpp)
     #add_executable(sentry_bp src/sentry_bp.cpp)
     #add_executable(sentry_debug src/sentry_debug.cpp)
@@ -206,7 +206,7 @@ if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_
     add_executable(subscribe_test tests/subscribe_test.cpp)
     add_executable(topic_loop_test tests/topic_loop_test.cpp)
 
-    target_link_libraries(auto_aim_debug_mpc_sentry ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
+    target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
     #target_link_libraries(sentry ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim omniperception tools io)
     #target_link_libraries(sentry_bp ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim omniperception tools io)
     #target_link_libraries(sentry_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim omniperception tools io)

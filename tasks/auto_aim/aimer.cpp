@@ -173,7 +173,7 @@ AimPoint Aimer::choose_aim_point(const Target & target)
     // 选择在可射击范围内的装甲板
     std::vector<int> id_list;
     for (int i = 0; i < armor_num; i++) {
-      if (std::abs(delta_angle_list[i]) > 60 / 57.3) continue;
+      if (std::abs(delta_angle_list[i]) > 60 / 57.3) continue; //60为最大delta_angle,可测试修改
       id_list.push_back(i);
     }
     // 绝无可能

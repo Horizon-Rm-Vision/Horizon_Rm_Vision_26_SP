@@ -20,7 +20,10 @@ void draw_points(
 
 void draw_text(
   cv::Mat & img, const std::string & text, const cv::Point & point,
-  const cv::Scalar & color = {0, 255, 255}, double font_scale = 1.0, int thickness = 2);
+  const cv::Scalar & color = {0, 255, 255}, double font_scale = 0.6, int thickness = 2);
+
+void draw_line(
+  cv::Mat & img, const cv::Point & pt1, const cv::Point & pt2, const cv::Scalar & color = {0, 255, 255}, int thickness = 2);
 
 }  // namespace tools
 

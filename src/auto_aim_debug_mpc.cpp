@@ -20,13 +20,17 @@
 #include "tools/thread_safe_queue.hpp"
 #include "tools/yaml.hpp"
 
+#ifdef SENTRY_SR
+#include "io/ros2/publish2nav.hpp"
+#include "io/ros2/ros2.hpp"
+#endif
+
 
 using namespace std::chrono_literals;
 
 const std::string keys =
   "{help h usage ? |                        | 输出命令行参数说明}"
   "{@config-path   | ../configs/standard3.yaml | 位置参数，yaml配置文件路径 }";
-bool has_target = 0;
 
 int main(int argc, char * argv[])
 {
@@ -39,6 +43,12 @@ int main(int argc, char * argv[])
     cli.printMessage();
     return 0;
   }
+
+  #ifdef SENTRY_SR
+  auto yaml = YAML::LoadFile(config_path);
+  auto velocity_n = yaml["velocity_n"].as<int>();
+  io::ROS2 ros2;
+  #endif
 
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
@@ -53,10 +63,12 @@ int main(int argc, char * argv[])
 
   std::atomic<bool> quit = false;
   
+  //#ifdef SHOW_UI
   // FPS计算相关变量
   auto last_fps_time = std::chrono::steady_clock::now();
   int frame_count = 0;
   float fps = 0.0f;
+  //#endif
   
   auto plan_thread = std::thread([&]() {
     auto t0 = std::chrono::steady_clock::now();
@@ -65,12 +77,21 @@ int main(int argc, char * argv[])
     while (!quit) {
       auto target = target_queue.front();
       auto gs = gimbal.state();
+      #ifdef SENTRY_SR
+      auto velocity = ros2.get_nav_velocity();
+      #endif
       auto plan = planner.plan(target, gs.bullet_speed);
 
-      std::cout<<plan.control<<std::endl;
+      #ifndef SENTRY_SR
       gimbal.send(
-        has_target, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
+        plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
         plan.pitch_acc);
+      #endif
+      #ifdef SENTRY_SR
+      gimbal.send(
+        plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
+        plan.pitch_acc,velocity->linear.x*velocity_n,velocity->linear.y*velocity_n,velocity->angular.z);
+      #endif
         
       auto fired = gs.bullet_count > last_bullet_count;
       last_bullet_count = gs.bullet_count;
@@ -135,7 +156,6 @@ int main(int argc, char * argv[])
     else {
       planner.aim_center_ = true;
     }
-    tools::draw_text(img, fmt::format("Aim Strategy: {}", tracker.aim_strategy_), {10, 690}, {0, 255, 0});
     #endif
 
     if (!targets.empty())
@@ -149,13 +169,7 @@ int main(int argc, char * argv[])
       tools::draw_points(img, armor.points, {0, 255, 0});
       auto info = fmt::format("{:.2f} {} {} {}", armor.confidence, auto_aim::COLORS[armor.color], auto_aim::ARMOR_NAMES[armor.name],auto_aim::ARMOR_TYPES[armor.type]);
       tools::draw_text(img, info, armor.center, {0, 255, 0});
-      // 绘制世界坐标系数值
-      tools::draw_text(img, fmt::format("armor_x: {:.2f}", armor.xyz_in_world[0]), {10, 600}, {0, 255, 0});
-      tools::draw_text(img, fmt::format("armor_y: {:.2f}", armor.xyz_in_world[1]), {10, 630}, {0, 255, 0});
-      tools::draw_text(img, fmt::format("armor_z: {:.2f}", armor.xyz_in_world[2]), {10, 660}, {0, 255, 0});
-      #ifdef NOVA_Q
-      tools::draw_text(img, fmt::format("queue_size: {}", gimbal.q_size()), {10, 720}, {0, 255, 0});
-      #endif
+
     }
     #ifdef AIM_CENTER
     // 绘制锁定中心
@@ -167,7 +181,6 @@ int main(int argc, char * argv[])
 
     if (!targets.empty()) {
       auto target = targets.front();
-
       // 当前帧target更新后
       std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
       for (const Eigen::Vector4d & xyza : armor_xyza_list) {
@@ -192,10 +205,15 @@ int main(int argc, char * argv[])
     // 获取云台状态和规划信息用于UI显示
     auto gs = gimbal.state();
     std::optional<auto_aim::Target> target_opt = target_queue.front();
-    //bool has_target = target_opt.has_value();
-    has_target = target_opt.has_value();
+    bool has_target = target_opt.has_value();
     auto plan = planner.plan(target_opt, gs.bullet_speed);
     
+    #ifdef SENTRY_SR
+    //发布导航的信息
+    ros2.publish_status(gs.game_status,gs.blood,gs.bullet);
+    #endif
+
+
     // 计算FPS
     frame_count++;
     auto current_time = std::chrono::steady_clock::now();
@@ -222,7 +240,7 @@ int main(int argc, char * argv[])
     y_offset += line_height;
     
     // 运行模式
-    std::string mode_text = "Mode: AutoAim";
+    std::string mode_text = "Mode: AutoAim MPC";
     cv::putText(img, mode_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
     y_offset += line_height;
     
@@ -272,7 +290,20 @@ int main(int argc, char * argv[])
         cv::putText(img, target_w, cv::Point(10, y_offset), font_face, font_scale, cv::Scalar(255, 255, 0), thickness);
         y_offset += line_height;
       }
+      
+      // 添加armor_x/y/z信息
+      Eigen::Vector4d aim_xyza = planner.debug_xyza;
+      std::string armor_xyz = fmt::format("Armor X: {:.2f}  Y: {:.2f}  Z: {:.2f}", aim_xyza[0], aim_xyza[1], aim_xyza[2]);
+      cv::putText(img, armor_xyz, cv::Point(10, y_offset), font_face, font_scale, cv::Scalar(255, 255, 0), thickness);
+      y_offset += line_height;
     }
+    
+    // 添加queue_size信息
+    #ifdef NOVA_Q
+    std::string queue_size_text = fmt::format("Queue Size: {}", gimbal.q_size());
+    cv::putText(img, queue_size_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    y_offset += line_height;
+    #endif
     
     // 在图像右侧添加分隔线和状态指示
     int img_width = img.cols;
@@ -312,6 +343,13 @@ int main(int argc, char * argv[])
                 armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0), thickness);
     y_offset += line_height;
 
+    #ifdef AIM_CENTER
+    // 添加Aim Strategy到右边UI
+    std::string aim_strategy_text = fmt::format("Aim Strategy: {}", tracker.aim_strategy_);
+    cv::putText(img, aim_strategy_text, cv::Point(right_x, y_offset), font_face, font_scale, text_color, thickness);
+    y_offset += line_height;
+    #endif
+
     //cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
     cv::namedWindow("reprojection", 0);
     cv::imshow("reprojection", img);
@@ -321,7 +359,13 @@ int main(int argc, char * argv[])
 
   quit = true;
   if (plan_thread.joinable()) plan_thread.join();
+
+  #ifndef SENTRY_SR
   gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
+  #endif
+  #ifdef SENTRY_SR
+  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  #endif
 
   return 0;
 }
