@@ -273,6 +273,13 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
           ? tools::Trajectory::Model::kHero
           : tools::Trajectory::Model::kNoDrag);
 
+  if (bullet_traj.unsolvable) {
+    tools::logger()->warn("Unsolvable bullet trajectory (center dist={:.2f}, z={:.2f})", center_dist, xyz.z());
+    plan.control = false;
+    plan.fire = false;
+    return plan;
+  }
+
   // 根据飞行时间预测
   target.predict(bullet_traj.fly_time);
 

@@ -229,9 +229,9 @@ int main(int argc, char * argv[])
     
     #ifdef SENTRY_SR
     // Sentry SR特有的导航相关数据
-    ui_manager.addLeftText("game_status", fmt::format("Game Status: {:.2f} ", gs.game_status));
-    ui_manager.addLeftText("blood", fmt::format("Blood: {:.2f} ", gs.blood));
-    ui_manager.addLeftText("bullet", fmt::format("Bullet: {:.2f} ", gs.bullet));
+    ui_manager.addLeftText("game_status", fmt::format("Game Status: {} ", (int)gs.game_status));
+    ui_manager.addLeftText("blood", fmt::format("Blood: {} ", (int)gs.blood));
+    ui_manager.addLeftText("bullet", fmt::format("Bullet: {} ", (int)gs.bullet));
     #endif
     
     // 目标信息
