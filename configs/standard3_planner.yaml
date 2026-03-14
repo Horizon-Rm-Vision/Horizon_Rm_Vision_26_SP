@@ -93,5 +93,4 @@ aim_center_min_distance: 4 # 触发锁车中心机制的最小距离，单位m�
 armor_yaw_threshold: 10 # 锁车时装甲板yaw角度阈值，degree
 
 #####-----UI显示配置-----#####
-ui:
-  enabled: true  # 是否启用UI显示
+ui_manager: false  # 是否启用UI显示

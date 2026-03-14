@@ -45,6 +45,7 @@ struct UIDrawCommand {
 
 class UIManager {
 public:
+    explicit UIManager(const std::string& config_path);
     explicit UIManager(bool enabled = true);
     ~UIManager() = default;
     
@@ -79,6 +80,7 @@ private:
     std::chrono::steady_clock::time_point last_fps_time_;
     int frame_count_;
     float fps_;
+    std::string fps_text_cache_; // 缓存FPS文本，避免重复格式化
     
     // UI布局参数
     int left_y_offset_;

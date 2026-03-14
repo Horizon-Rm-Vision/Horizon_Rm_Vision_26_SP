@@ -13,3 +13,6 @@ add_library(tools OBJECT
     crc.cpp
     ui_manager.cpp
 )
+
+# 链接yaml-cpp库，因为ui_manager.cpp使用了YAML功能
+target_link_libraries(tools PUBLIC yaml-cpp)

@@ -61,7 +61,7 @@ int main(int argc, char * argv[])
   auto_aim::Aimer aimer(config_path);
   auto_aim::Shooter shooter(config_path);
 
-  tools::UIManager ui_manager(true); // 可以通过yaml配置，这里暂时硬编码为true
+  tools::UIManager ui_manager(config_path);
   ui_manager.setProgramMode("AutoAim AIMER");
 
   cv::Mat img;
@@ -110,15 +110,15 @@ int main(int argc, char * argv[])
     //#ifdef SHOW_UI
     for (const auto & armor : armors) {
       // 画装甲四点与标签
-      ui_manager.addDrawPoints(armor.points, cv::Scalar(0, 255, 0));
+      tools::draw_points(img, armor.points, {0, 255, 0});
       auto info = fmt::format("{:.2f} {} {} {}", armor.confidence, auto_aim::COLORS[armor.color], auto_aim::ARMOR_NAMES[armor.name], auto_aim::ARMOR_TYPES[armor.type]);
-      ui_manager.addDrawText(info, armor.center, cv::Scalar(0, 255, 0));
+      tools::draw_text(img, info, armor.center, {0, 255, 0});
       // 绘制世界坐标系数值
-      ui_manager.addDrawText(fmt::format("armor_x: {:.2f}", armor.xyz_in_world[0]), cv::Point(10, 600), cv::Scalar(0, 255, 0));
-      ui_manager.addDrawText(fmt::format("armor_y: {:.2f}", armor.xyz_in_world[1]), cv::Point(10, 630), cv::Scalar(0, 255, 0));
-      ui_manager.addDrawText(fmt::format("armor_z: {:.2f}", armor.xyz_in_world[2]), cv::Point(10, 660), cv::Scalar(0, 255, 0));
+      tools::draw_text(img, fmt::format("armor_x: {:.2f}", armor.xyz_in_world[0]), {10, 600}, {0, 255, 0});
+      tools::draw_text(img, fmt::format("armor_y: {:.2f}", armor.xyz_in_world[1]), {10, 630}, {0, 255, 0});
+      tools::draw_text(img, fmt::format("armor_z: {:.2f}", armor.xyz_in_world[2]), {10, 660}, {0, 255, 0});
       #ifdef NOVA_Q
-      ui_manager.addDrawText(fmt::format("queue_size: {}", gimbal.q_size()), cv::Point(10, 720), cv::Scalar(0, 255, 0));
+      tools::draw_text(img, fmt::format("queue_size: {}", gimbal.q_size()), {10, 720}, {0, 255, 0});
       #endif
     }
 
@@ -128,14 +128,14 @@ int main(int argc, char * argv[])
       std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
       for (const Eigen::Vector4d & xyza : armor_xyza_list) {
         auto image_points = solver.reproject_armor(xyza.head(3), xyza[3], target.armor_type, target.name);
-        ui_manager.addDrawPoints(image_points, cv::Scalar(0, 255, 0));
+        tools::draw_points(img, image_points, {0, 255, 0});
       }
       // aimer瞄准位置
       auto aim_point = aimer.debug_aim_point;
       Eigen::Vector4d aim_xyza = aim_point.xyza;
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
-      if (aim_point.valid) ui_manager.addDrawPoints(image_points, cv::Scalar(0, 0, 255));
+      if (aim_point.valid) tools::draw_points(img, image_points, {0, 0, 255});
     }
 
     // UI初始化

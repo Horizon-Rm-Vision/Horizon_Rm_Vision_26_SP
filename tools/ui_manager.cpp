@@ -1,12 +1,27 @@
 #include "ui_manager.hpp"
+#include "yaml.hpp"
 
 namespace tools {
+
+UIManager::UIManager(const std::string& config_path)
+    : UIManager(true) {  // 默认启用，后面会根据配置调整
+    try {
+        YAML::Node config = YAML::LoadFile(config_path);
+        if (config["ui"] && config["ui"]["enabled"]) {
+            enabled_ = config["ui"]["enabled"].as<bool>();
+        }
+    } catch (const std::exception& e) {
+        // 如果配置文件不存在或格式错误，默认禁用UI
+        enabled_ = false;
+    }
+}
 
 UIManager::UIManager(bool enabled)
     : enabled_(enabled),
       last_fps_time_(std::chrono::steady_clock::now()),
       frame_count_(0),
       fps_(0.0f),
+      fps_text_cache_("FPS: 0.0"),
       left_y_offset_(30),
       right_y_offset_(30),
       line_height_(25),
@@ -87,6 +102,9 @@ void UIManager::updateFPS() {
         fps_ = static_cast<float>(frame_count_) * 1000.0f / static_cast<float>(elapsed_time);
         frame_count_ = 0;
         last_fps_time_ = current_time;
+        
+        // 更新FPS文本缓存
+        fps_text_cache_ = fmt::format("FPS: {:.1f}", fps_);
     }
 }
 
@@ -97,10 +115,10 @@ void UIManager::setProgramMode(const std::string& mode) {
 void UIManager::render(cv::Mat& img) {
     if (!enabled_) return;
     
-    // 更新FPS显示
+    // 更新FPS显示（直接使用缓存）
     for (auto& elem : left_elements_) {
         if (elem.key == "fps") {
-            elem.text = fmt::format("FPS: {:.1f}", fps_);
+            elem.text = fps_text_cache_;
             break;
         }
     }

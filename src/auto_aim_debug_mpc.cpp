@@ -31,7 +31,7 @@ using namespace std::chrono_literals;
 
 const std::string keys =
   "{help h usage ? |                        | 输出命令行参数说明}"
-  "{@config-path   | ../configs/standard3_planner.yaml | 位置参数，yaml配置文件路径 }";
+  "{@config-path   | ../configs/standard3.yaml | 位置参数，yaml配置文件路径 }";
 
 int main(int argc, char * argv[])
 {
@@ -51,7 +51,7 @@ int main(int argc, char * argv[])
   io::ROS2 ros2;
   #endif
 
-  tools::UIManager ui_manager(true); // 可以通过yaml配置，这里暂时硬编码为true
+  tools::UIManager ui_manager(config_path);
   ui_manager.setProgramMode("AutoAim MPC");
 
   io::Gimbal gimbal(config_path);
@@ -166,15 +166,16 @@ int main(int argc, char * argv[])
     // 在图像上绘制检测结果（合并原 detection 窗口信息）
     for (const auto & armor : armors) {
       // 画装甲四点与标签
-      ui_manager.addDrawPoints(armor.points, cv::Scalar(0, 255, 0));
+      tools::draw_points(img, armor.points, {0, 255, 0});
       auto info = fmt::format("{:.2f} {} {} {}", armor.confidence, auto_aim::COLORS[armor.color], auto_aim::ARMOR_NAMES[armor.name],auto_aim::ARMOR_TYPES[armor.type]);
-      ui_manager.addDrawText(info, armor.center, cv::Scalar(0, 255, 0));
+      tools::draw_text(img, info, armor.center, {0, 255, 0});
+
     }
     #ifdef AIM_CENTER
     // 绘制锁定中心
     if (planner.aim_center_) {
       auto center_image_points = solver.reproject_point(planner.center_points);
-      ui_manager.addDrawPoints(center_image_points, cv::Scalar(0, 0, 255), 10);
+      tools::draw_points(img, center_image_points, {0, 0, 255}, 10);
     }
     #endif
 
@@ -185,18 +186,18 @@ int main(int argc, char * argv[])
       for (const Eigen::Vector4d & xyza : armor_xyza_list) {
         auto image_points =
           solver.reproject_armor(xyza.head(3), xyza[3], target.armor_type, target.name);
-        ui_manager.addDrawPoints(image_points, cv::Scalar(0, 255, 0));
+        tools::draw_points(img, image_points, {0, 255, 0});
       }
 
       Eigen::Vector4d aim_xyza = planner.debug_xyza;
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
       #ifndef AIM_CENTER
-      ui_manager.addDrawPoints(image_points, cv::Scalar(0, 0, 255));
+      tools::draw_points(img, image_points, {0, 0, 255});
       #endif
       #ifdef AIM_CENTER
       if(planner.aim_center_ == false){
-        ui_manager.addDrawPoints(image_points, cv::Scalar(0, 0, 255));
+        tools::draw_points(img, image_points, {0, 0, 255});
       }
       #endif
     }
