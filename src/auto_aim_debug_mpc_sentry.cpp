@@ -167,6 +167,7 @@ int main(int argc, char * argv[])
     
     // 获取云台状态和规划信息用于UI显示
     auto gs = gimbal.state();
+    auto velocity = ros2.get_nav_velocity();
     std::optional<auto_aim::Target> target_opt = target_queue.front();
     bool has_target = target_opt.has_value();
     auto plan = planner.plan(target_opt, gs.bullet_speed);
@@ -224,6 +225,19 @@ int main(int argc, char * argv[])
     std::string gimbal_vel = fmt::format("Gimbal Vel Y: {:.2f}  P: {:.2f}", -gs.yaw_vel * 180.0 / M_PI, -gs.pitch_vel * 180.0 / M_PI);
     cv::putText(img, gimbal_vel, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
     y_offset += line_height;
+
+    //导航状态 - 接收到的数据
+    std::string game_status = fmt::format("Game Status: {:.2f} ", gs.game_status);
+    cv::putText(img, gimbal_vel, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    y_offset += line_height;
+
+    std::string blood = fmt::format("Blood: {:.2f} ", gs.bullet_count);
+    cv::putText(img, gimbal_vel, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    y_offset += line_height;
+    
+    std::string bullet = fmt::format("Bullet: {:.2f} ", gs.bullet);
+    cv::putText(img, gimbal_vel, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    y_offset += line_height;
     
     // 规划状态 - 发送的数据
     std::string plan_status = fmt::format("Plan Yaw: {:.2f}  Pitch: {:.2f}", -plan.yaw * 180.0 / M_PI, -plan.pitch * 180.0 / M_PI);
@@ -237,6 +251,10 @@ int main(int argc, char * argv[])
     std::string plan_acc = fmt::format("Plan Acc Y: {:.2f}  P: {:.2f}", plan.yaw_acc, plan.pitch_acc);
     cv::putText(img, plan_acc, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
     y_offset += line_height;
+
+    // std::string velocity = fmt::format("velocity linear X: {:.2f}  Y: {:.2f}  WZ: {:.2f}", velocity->linear.x,velocity->linear.y,velocity->angular.z);
+    // cv::putText(img, velocity, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
+    // y_offset += line_height;
     
     // 目标信息（如果存在）
     if (has_target) {
