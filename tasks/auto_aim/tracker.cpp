@@ -198,7 +198,7 @@ void Tracker::state_machine(bool found)
       detect_count_++;
       if (detect_count_ >= min_detect_count_){
         state_ = "tracking";
-        if(target_.ekf_x()[0] <= 3.5) aim_strategy_ = "follow";
+        if(target_.ekf_x()[0] <= 10.5) aim_strategy_ = "follow";
         else aim_strategy_ = "center";
       }
     } else {

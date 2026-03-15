@@ -76,8 +76,9 @@ int main(int argc, char * argv[])
       auto gs = gimbal.state();
       auto plan = planner.plan(target, gs.bullet_speed);
       // auto plango = planner.go(tracker.armor_);
-      // plotter.drawData({gs.yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
-      plotter.drawData({gs.pitch * 180/M_PI, plan.pitch * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
+      plotter.drawData({gs.yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
+      // plotter.drawData({gs.pitch * 180/M_PI, plan.pitch * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
+      if(std::abs(gs.yaw * 57.3) > 10) plan.fire = false;
 
       std::cout<<plan.control<<std::endl;
       gimbal.send(

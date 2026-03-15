@@ -21,7 +21,7 @@ roi:
   width: 800
   height: 800
 
-use_roi: false
+use_roi: true
 
 #####-----传统方法参数-----#####
 threshold: 150
@@ -40,14 +40,14 @@ max_temp_lost_count: 60
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
-yaw_offset: -1 # degree -2.5
-pitch_offset: -1 # degree 2
+yaw_offset: 0 # degree -2.5
+pitch_offset: 0.8 # degree 2
 comming_angle: 75 # degree
 leaving_angle: 55 # degree
 decision_speed: 3 #8 # rad/s 判定是否小陀螺的速度阈值
-high_speed_delay_time: 0.010 # s
+high_speed_delay_time: 0.015 # s
 #low_speed_delay_time: 0.015 # s planner use this value
-low_speed_delay_time: 0.010 # s planner use this value
+low_speed_delay_time: 0.015 # s planner use this value
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，3 degree
@@ -61,7 +61,7 @@ armor_yaw_threshold: 20 # 锁车时装甲板yaw角度阈值，degree
 
 #####-----相机参数-----#####
 camera_name: "mindvision"
-exposure_ms: 2
+exposure_ms: 8
 gamma: 9 #已经废弃
 vid_pid: "f622:d13a"
 
@@ -165,7 +165,7 @@ pitch_kp: 0
 pitch_kd: 0
 
 #####-----planner-----#####
-fire_thresh: 0.001
+fire_thresh: 0.002
 
 # max_yaw_acc: 50
 max_yaw_acc: 20

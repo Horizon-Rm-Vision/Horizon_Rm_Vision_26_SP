@@ -116,7 +116,7 @@ Plan Planner::plan(Target target, double bullet_speed)
       traj(0, HALF_HORIZON + shoot_offset_) - yaw_solver_->work->x(0, HALF_HORIZON + shoot_offset_),
       traj(2, HALF_HORIZON + shoot_offset_) -
         pitch_solver_->work->x(0, HALF_HORIZON + shoot_offset_)) < fire_thresh_;
-
+  // if(std::abs(target.ekf_x()[2]) > 1.8) plan.fire = false;
   // plan.fire = false
   return plan;
 }
@@ -127,6 +127,7 @@ Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 
   double delay_time =
     std::abs(target->ekf_x()[7]) > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
+    if(target->ekf_x()[3] > 0.5) delay_time = delay_time + 0.015;
 
   auto future = std::chrono::steady_clock::now() + std::chrono::microseconds(int(delay_time * 1e6));
 
