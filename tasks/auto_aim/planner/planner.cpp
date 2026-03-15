@@ -116,6 +116,8 @@ Plan Planner::plan(Target target, double bullet_speed)
       traj(0, HALF_HORIZON + shoot_offset_) - yaw_solver_->work->x(0, HALF_HORIZON + shoot_offset_),
       traj(2, HALF_HORIZON + shoot_offset_) -
         pitch_solver_->work->x(0, HALF_HORIZON + shoot_offset_)) < fire_thresh_;
+
+  // plan.fire = false
   return plan;
 }
 
@@ -236,7 +238,7 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
 }
 Plan Planner::aim_at_center(Target target, double bullet_speed)
 {
-  target.v1 = 20;
+  target.v1 = 30;
   Plan plan;
 
   double azim_;
@@ -259,20 +261,35 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
 
   // 计算弹道,考虑装甲板高低差
   // auto armor_z = target.h_armor_xyz().[2];  // 加上装甲板高度差
+  Eigen::Vector3d armor_xyz;
+  auto min_dist = 1e10;
+  for (auto & xyza : target.armor_xyza_list()) {
+    auto dist = xyza.head<2>().norm();
+    if (dist < min_dist) {
+      min_dist = dist;
+      armor_xyz = xyza.head<3>();
+    }
+  }
+
+  auto armor_z = armor_xyz.z();  // 加上装甲板高度差
+
   auto bullet_traj = tools::Trajectory(
-      bullet_speed, center_dist, xyz.z(),
+      bullet_speed, center_dist, armor_z,
       ballistic_model_ == BallisticModel::kHero
           ? tools::Trajectory::Model::kHero
           : tools::Trajectory::Model::kNoDrag);
 
   // 根据飞行时间预测
-  target.predict(bullet_traj.fly_time);
+  target.predict(bullet_traj.fly_time + 0.05);
 
   if (bullet_traj.unsolvable)
     throw std::runtime_error("Unsolvable bullet trajectory!");
 
   // 云台指向目标中心方向
-  auto azim = std::atan2(xyz.y(), xyz.x());
+  auto per_xyz = {target.ekf_x()[0] - target.ekf_x()[8], target.ekf_x()[2], target.ekf_x()[4]};
+  // auto azim = std::atan2(xyz.y(), xyz.x());
+  auto azim = std::atan2(target.ekf_x()[2] - target.ekf_x()[8], target.ekf_x()[0]);
+
   azim_ = azim;
 
   yaw = tools::limit_rad(azim + yaw_offset_);
@@ -308,6 +325,10 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
       plan.control = false;
       plan.fire = false;
     }
+  }
+  if(target.ekf_x()[3] >= 0) {
+    plan.control = false;
+    plan.fire = false;
   }
 
   plan.target_yaw = yaw;

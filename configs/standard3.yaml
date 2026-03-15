@@ -18,10 +18,10 @@ use_traditional: true
 roi: 
   x: 420
   y: 50
-  width: 600
-  height: 600
+  width: 800
+  height: 800
 
-use_roi: true
+use_roi: false
 
 #####-----传统方法参数-----#####
 threshold: 150
@@ -35,23 +35,23 @@ max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
 
 #####-----tracker参数-----#####
-min_detect_count: 8
-max_temp_lost_count: 45
+min_detect_count: 30
+max_temp_lost_count: 60
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
-yaw_offset: 0 # degree -2.5
-pitch_offset: 2 # degree 2
+yaw_offset: -1 # degree -2.5
+pitch_offset: -1 # degree 2
 comming_angle: 75 # degree
 leaving_angle: 55 # degree
-decision_speed: 4 #8 # rad/s 判定是否小陀螺的速度阈值
-high_speed_delay_time: 0.02 # s
+decision_speed: 3 #8 # rad/s 判定是否小陀螺的速度阈值
+high_speed_delay_time: 0.010 # s
 #low_speed_delay_time: 0.015 # s planner use this value
 low_speed_delay_time: 0.010 # s planner use this value
 
 #####-----shooter参数-----#####
-first_tolerance: 3 # 近距离射击容差，degree
-second_tolerance: 2 # 远距离射击容差，degree
+first_tolerance: 3 # 近距离射击容差，3 degree
+second_tolerance: 2 # 远距离射击容差，2 degree
 judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
@@ -61,8 +61,8 @@ armor_yaw_threshold: 20 # 锁车时装甲板yaw角度阈值，degree
 
 #####-----相机参数-----#####
 camera_name: "mindvision"
-exposure_ms: 1.5
-gamma: 10 #已经废弃
+exposure_ms: 2
+gamma: 9 #已经废弃
 vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
@@ -93,9 +93,9 @@ R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 # camera_matrix: [2530.4449, 0, 631.46289, 0, 2536.11534, 513.61409, 0, 0, 1]
 # distort_coeffs: [-0.093721, 0.207229, 0.002192, -0.000909, 0]
 
-# # MD_HERO_UC
-# camera_matrix: [2467.89248,0, 648.86375, 0, 2468.83665, 467.29131, 0, 0, 1]
-# distort_coeffs: [-0.007537, 0.377799, 0.000311, 0.001523, 0.000000]
+# MD_HERO_UC
+camera_matrix: [2467.89248,0, 648.86375, 0, 2468.83665, 467.29131, 0, 0, 1]
+distort_coeffs: [-0.007537, 0.377799, 0.000311, 0.001523, 0.000000]
 
 # #MD2
 # camera_matrix: [1279.1579, 0, 660.93386, 0, 1285.86608, 539.38196, 0, 0, 1]
@@ -165,7 +165,7 @@ pitch_kp: 0
 pitch_kd: 0
 
 #####-----planner-----#####
-fire_thresh: 0.0001
+fire_thresh: 0.001
 
 # max_yaw_acc: 50
 max_yaw_acc: 20

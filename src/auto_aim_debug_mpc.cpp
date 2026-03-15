@@ -32,141 +32,6 @@ const std::string keys =
   "{@config-path   | ../configs/standard3.yaml | 位置参数，yaml配置文件路径 }";
 bool has_target = 0;
 
-#ifdef EZ_FILTER
-//简易极端值过滤器，用于抑制目前出现的异常的pitch/yaw命令发送，待测试
-struct SendCmd
-{
-  bool control;
-  bool fire;
-  float yaw;
-  float yaw_vel;
-  float yaw_acc;
-  float pitch;
-  float pitch_vel;
-  float pitch_acc;
-};
-
-class SpikeFilter
-{
-public:
-  SpikeFilter(const YAML::Node &cfg)
-  {
-    enabled_ = cfg["enabled"] ? cfg["enabled"].as<bool>() : true;
-    m_ = cfg["m"] ? cfg["m"].as<int>() : 30;
-    n_ = cfg["n"] ? cfg["n"].as<int>() : 3;
-    d_degree_ = cfg["d_degree"] ? cfg["d_degree"].as<double>() : 5.0; // degrees
-    x_ = cfg["x"] ? cfg["x"].as<int>() : 5;
-    // ensure sane values
-    if (m_ <= 0) m_ = 30;
-    if (n_ <= 0) n_ = 3;
-    if (x_ <= 0) x_ = 5;
-  }
-
-  // process a new candidate; returns a list of commands that should be sent now (may be empty)
-  std::vector<SendCmd> process(const SendCmd &cmd)
-  {
-    std::vector<SendCmd> out;
-    if (!enabled_) {
-      out.push_back(cmd);
-      last_normal_ = cmd;
-      push_history(cmd);
-      return out;
-    }
-
-    // compute average of last n history (or use last_normal_ if not enough samples)
-    double avg_yaw_deg = 0.0, avg_pitch_deg = 0.0;
-    int count = 0;
-    for (int i = (int)history_.size() - 1; i >= 0 && count < n_; --i, ++count) {
-      avg_yaw_deg += history_[i].yaw * 180.0 / M_PI;
-      avg_pitch_deg += history_[i].pitch * 180.0 / M_PI;
-    }
-    if (count == 0) {
-      avg_yaw_deg = last_normal_.yaw * 180.0 / M_PI;
-      avg_pitch_deg = last_normal_.pitch * 180.0 / M_PI;
-      count = 1;
-    } else {
-      avg_yaw_deg /= count;
-      avg_pitch_deg /= count;
-    }
-
-    double cmd_yaw_deg = cmd.yaw * 180.0 / M_PI;
-    double cmd_pitch_deg = cmd.pitch * 180.0 / M_PI;
-    double diff = std::max(std::abs(cmd_yaw_deg - avg_yaw_deg), std::abs(cmd_pitch_deg - avg_pitch_deg));
-
-    if (diff > d_degree_) {
-      // mark as abnormal (do not send)
-      abnormal_buffer_.push_back(cmd);
-      // reset counters
-      consecutive_like_abnormal_ = 0;
-      consecutive_like_normal_ = 0;
-      return out;
-    }
-
-    // This cmd is similar to recent history (candidate normal)
-    // If there are pending abnormal frames, check reconciliation conditions
-    if (!abnormal_buffer_.empty()) {
-      // Compare this cmd to last abnormal and to last normal
-      const SendCmd &last_ab = abnormal_buffer_.back();
-      double last_ab_yaw_deg = last_ab.yaw * 180.0 / M_PI;
-      double last_ab_pitch_deg = last_ab.pitch * 180.0 / M_PI;
-      double diff_to_ab = std::max(std::abs(cmd_yaw_deg - last_ab_yaw_deg), std::abs(cmd_pitch_deg - last_ab_pitch_deg));
-
-      double last_norm_yaw_deg = last_normal_.yaw * 180.0 / M_PI;
-      double last_norm_pitch_deg = last_normal_.pitch * 180.0 / M_PI;
-      double diff_to_norm = std::max(std::abs(cmd_yaw_deg - last_norm_yaw_deg), std::abs(cmd_pitch_deg - last_norm_pitch_deg));
-
-      if (diff_to_ab < d_degree_) {
-        consecutive_like_abnormal_++;
-      } else {
-        consecutive_like_abnormal_ = 0;
-      }
-
-      if (diff_to_norm < d_degree_) {
-        consecutive_like_normal_++;
-      } else {
-        consecutive_like_normal_ = 0;
-      }
-
-      if (consecutive_like_abnormal_ >= x_) {
-        // treat previous abnormal buffer as actually normal -> send them now
-        for (const auto &c : abnormal_buffer_) out.push_back(c);
-        abnormal_buffer_.clear();
-        consecutive_like_abnormal_ = 0;
-      } else if (consecutive_like_normal_ >= x_) {
-        // previous abnormal frames are true anomalies -> drop them
-        abnormal_buffer_.clear();
-        consecutive_like_normal_ = 0;
-      }
-    }
-
-    // send current cmd as normal
-    out.push_back(cmd);
-    last_normal_ = cmd;
-    push_history(cmd);
-    return out;
-  }
-
-private:
-  void push_history(const SendCmd &c)
-  {
-    history_.push_back(c);
-    if ((int)history_.size() > m_) history_.pop_front();
-  }
-
-  bool enabled_ = true;
-  int m_ = 30; // history capacity
-  int n_ = 3;  // compare with last n frames
-  double d_degree_ = 5.0; // threshold in degrees
-  int x_ = 5; // consecutive frames threshold
-
-  std::deque<SendCmd> history_;
-  std::vector<SendCmd> abnormal_buffer_;
-  SendCmd last_normal_{};
-  int consecutive_like_abnormal_ = 0;
-  int consecutive_like_normal_ = 0;
-};
-#endif
-
 int main(int argc, char * argv[])
 {
   tools::Exiter exiter;
@@ -191,12 +56,6 @@ int main(int argc, char * argv[])
   // gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
   // std::this_thread::sleep_for(100ms);
   // }
-  #ifdef EZ_FILTER
-  // Load filter config from yaml (optional)
-  auto yaml_cfg = tools::load(config_path);
-  YAML::Node filter_node = yaml_cfg["filter"] ? yaml_cfg["filter"] : YAML::Node();
-  SpikeFilter spike_filter(filter_node);
-  #endif
 
   tools::ThreadSafeQueue<std::optional<auto_aim::Target>, true> target_queue(1);
   target_queue.push(std::nullopt);
@@ -217,30 +76,13 @@ int main(int argc, char * argv[])
       auto gs = gimbal.state();
       auto plan = planner.plan(target, gs.bullet_speed);
       // auto plango = planner.go(tracker.armor_);
-      plotter.drawData({gs.yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
+      // plotter.drawData({gs.yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
+      plotter.drawData({gs.pitch * 180/M_PI, plan.pitch * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
 
-      #ifdef EZ_FILTER
-      //准备命令并通过过滤器处理
-      SendCmd cmd;
-      cmd.control = has_target;
-      cmd.fire = plan.fire;
-      cmd.yaw = plan.yaw;
-      cmd.yaw_vel = plan.yaw_vel;
-      cmd.yaw_acc = plan.yaw_acc;
-      cmd.pitch = plan.pitch;
-      cmd.pitch_vel = plan.pitch_vel;
-      cmd.pitch_acc = plan.pitch_acc;
-
-      auto to_send = spike_filter.process(cmd);
-      for (const auto &c : to_send) {
-        gimbal.send(c.control, c.fire, c.yaw, c.yaw_vel, c.yaw_acc, c.pitch, c.pitch_vel, c.pitch_acc);
-      }
-      #else
       std::cout<<plan.control<<std::endl;
       gimbal.send(
         has_target, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
         plan.pitch_acc);
-      #endif
 
       auto fired = gs.bullet_count > last_bullet_count;
       last_bullet_count = gs.bullet_count;
@@ -281,7 +123,7 @@ int main(int argc, char * argv[])
       //plotter.plot(data);
       // plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
 
-      std::this_thread::sleep_for(10ms);
+      std::this_thread::sleep_for(5ms);
     }
   });
 
