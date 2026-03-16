@@ -1,7 +1,32 @@
 #!/usr/bin/env python3
 """
 云台电控模拟程序
-模拟接收视觉程序数据并返回云台状态
+
+通信模式说明：
+- 普通模式 (NORMAL=0): 基础通信，不包含扩展数据
+  VisionToGimbal: head(1) + pitch(4) + yaw(4) + mode(1) + timestamp(4) + tail(1) = 15字节
+  GimbalToVision: head(1) + pitch(4) + yaw(4) + mode(1) + timestamp(4) + bullet_speed(1) + tail(1) = 16字节
+
+- 只启用SR_VEL (SR_VEL_ONLY=1): 包含云台前馈角速度数据
+  VisionToGimbal: 基础 + yaw_vel(4) + pitch_vel(4) = 23字节
+  GimbalToVision: 基础 + yaw_vel(4) + pitch_vel(4) = 24字节
+  扩展数据填0
+
+- 只启用SENTRY_SR (SENTRY_SR_ONLY=2): 包含哨兵相关数据
+  VisionToGimbal: 基础 + vx(4) + vy(4) + wz(4) = 27字节
+  GimbalToVision: 基础 + game_status(1) + blood(1) + bullet(1) = 19字节
+  扩展数据填0
+
+- 同时启用两者 (BOTH_ENABLED=3): 包含所有扩展数据
+  VisionToGimbal: 基础 + yaw_vel(4) + pitch_vel(4) + vx(4) + vy(4) + wz(4) = 35字节
+  GimbalToVision: 基础 + yaw_vel(4) + pitch_vel(4) + game_status(1) + blood(1) + bullet(1) = 27字节
+  扩展数据填0
+
+新的使用方法：
+python3 SPSREMU_V7.py --mode 0  # 普通模式
+python3 SPSREMU_V7.py --mode 1  # 只启用SR_VEL
+python3 SPSREMU_V7.py --mode 2  # 只启用SENTRY_SR
+python3 SPSREMU_V7.py --mode 3  # 同时启用两者
 """
 #除了可以两个实体串口自收自发，也可以用虚拟串口 socat -d -d pty,b115200 pty,b115200
 
@@ -12,6 +37,7 @@ import threading
 import logging
 from typing import Optional, Tuple
 from dataclasses import dataclass
+from enum import Enum
 
 # 配置日志
 logging.basicConfig(
@@ -19,6 +45,13 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("GimbalSimulator")
+
+class CommunicationMode(Enum):
+    """通信模式枚举"""
+    NORMAL = 0          # 普通模式
+    SR_VEL_ONLY = 1     # 只启用SR_VEL
+    SENTRY_SR_ONLY = 2  # 只启用SENTRY_SR
+    BOTH_ENABLED = 3    # 同时启用SR_VEL和SENTRY_SR
 
 @dataclass
 class VisionToGimbal:
@@ -28,6 +61,13 @@ class VisionToGimbal:
     yaw: float = 0.0
     mode: int = 0
     timestamp: int = 0
+    # SR_VEL扩展字段
+    yaw_vel: float = 0.0
+    pitch_vel: float = 0.0
+    # SENTRY_SR扩展字段
+    vx: float = 0.0
+    vy: float = 0.0
+    wz: float = 0.0
     tail: int = 0xDC
 
 @dataclass
@@ -39,14 +79,23 @@ class GimbalToVision:
     mode: int = 1  # 固定为自瞄模式
     timestamp: int = 0
     bullet_speed: int = 10  # 模拟弹速
+    # SR_VEL扩展字段
+    yaw_vel: float = 0.0
+    pitch_vel: float = 0.0
+    # SENTRY_SR扩展字段
+    game_status: int = 0
+    blood: int = 0
+    bullet: int = 0
     tail: int = 0xDC
 
 class GimbalSimulator:
     """云台模拟器"""
     
-    def __init__(self, serial_port: str = "/dev/ttyUSB0", baudrate: int = 115200):
+    def __init__(self, serial_port: str = "/dev/ttyUSB0", baudrate: int = 115200, comm_mode: CommunicationMode = CommunicationMode.NORMAL):
         self.serial_port = serial_port
         self.baudrate = baudrate
+        self.comm_mode = comm_mode
+        
         self.ser: Optional[serial.Serial] = None
         
         # 云台状态
@@ -59,11 +108,35 @@ class GimbalSimulator:
         self.receive_thread: Optional[threading.Thread] = None
         self.send_thread: Optional[threading.Thread] = None
         
-        # 数据包大小
-        self.rx_packet_size = 15  # VisionToGimbal 大小
-        self.tx_packet_size = 16  # GimbalToVision 大小
+        # 根据通信模式计算数据包大小
+        self.rx_packet_size = self._calculate_rx_packet_size()
+        self.tx_packet_size = self._calculate_tx_packet_size()
         
-        logger.info(f"初始化云台模拟器，串口: {serial_port}, 波特率: {baudrate}")
+        logger.info(f"初始化云台模拟器，串口: {serial_port}, 波特率: {baudrate}, 通信模式: {comm_mode.name}")
+    
+    def _calculate_rx_packet_size(self) -> int:
+        """计算接收数据包大小（VisionToGimbal）"""
+        base_size = 15  # CD(1) + pitch(4) + yaw(4) + mode(1) + timestamp(4) + DC(1)
+        
+        if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
+            base_size += 8  # yaw_vel(4) + pitch_vel(4)
+        
+        if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
+            base_size += 12  # vx(4) + vy(4) + wz(4)
+        
+        return base_size
+    
+    def _calculate_tx_packet_size(self) -> int:
+        """计算发送数据包大小（GimbalToVision）"""
+        base_size = 16  # CD(1) + pitch(4) + yaw(4) + mode(1) + timestamp(4) + bullet_speed(1) + DC(1)
+        
+        if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
+            base_size += 8  # yaw_vel(4) + pitch_vel(4)
+        
+        if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
+            base_size += 3  # game_status(1) + blood(1) + bullet(1)
+        
+        return base_size
     
     def open_serial(self) -> bool:
         """打开串口"""
@@ -96,22 +169,49 @@ class GimbalSimulator:
             return None
         
         try:
-            # 解析数据包: CD + pitch(4) + yaw(4) + mode(1) + timestamp(4) + DC
-            unpacked = struct.unpack('<BffBIB', data)
+            # 基础格式: CD + pitch(4) + yaw(4) + mode(1) + timestamp(4)
+            base_format = '<BffBI'
+            base_size = 14  # CD(1) + pitch(4) + yaw(4) + mode(1) + timestamp(4)
+            
+            # 根据通信模式构建格式字符串
+            format_str = base_format
+            
+            if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
+                format_str += 'ff'  # yaw_vel(4) + pitch_vel(4)
+            
+            if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
+                format_str += 'fff'  # vx(4) + vy(4) + wz(4)
+            
+            format_str += 'B'  # tail(1)
+            
+            unpacked = struct.unpack(format_str, data)
             
             # 检查包头包尾
             if unpacked[0] != 0xCD or unpacked[-1] != 0xDC:
                 logger.warning("包头或包尾错误")
                 return None
             
-            packet = VisionToGimbal(
-                head=unpacked[0],
-                pitch=unpacked[1],
-                yaw=unpacked[2],
-                mode=unpacked[3],
-                timestamp=unpacked[4],
-                tail=unpacked[5]
-            )
+            # 创建数据包对象
+            packet = VisionToGimbal()
+            packet.head = unpacked[0]
+            packet.pitch = unpacked[1]
+            packet.yaw = unpacked[2]
+            packet.mode = unpacked[3]
+            packet.timestamp = unpacked[4]
+            
+            index = 5
+            if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
+                packet.yaw_vel = unpacked[index]
+                packet.pitch_vel = unpacked[index + 1]
+                index += 2
+            
+            if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
+                packet.vx = unpacked[index]
+                packet.vy = unpacked[index + 1]
+                packet.wz = unpacked[index + 2]
+                index += 3
+            
+            packet.tail = unpacked[-1]
             
             return packet
             
@@ -125,16 +225,32 @@ class GimbalSimulator:
             # 使用当前时间戳
             timestamp = int(time.time() * 1000) & 0xFFFFFFFF
             
-            packet_data = struct.pack(
-                '<BffBIBB',
+            # 基础数据
+            data_list = [
                 0xCD,  # head
                 self.current_pitch,
                 self.current_yaw,
                 self.mode,  # 固定为自瞄模式
                 timestamp,
                 10,  # bullet_speed
-                0xDC  # tail
-            )
+            ]
+            
+            # 基础格式
+            format_str = '<BffBIB'
+            
+            # 根据通信模式添加扩展数据
+            if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
+                data_list.extend([0.0, 0.0])  # yaw_vel, pitch_vel (填0)
+                format_str += 'ff'
+            
+            if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
+                data_list.extend([0, 0, 0])  # game_status, blood, bullet (填0)
+                format_str += 'BBB'
+            
+            data_list.append(0xDC)  # tail
+            format_str += 'B'
+            
+            packet_data = struct.pack(format_str, *data_list)
             
             return packet_data
             
@@ -144,7 +260,15 @@ class GimbalSimulator:
     
     def process_vision_command(self, vision_data: VisionToGimbal):
         """处理视觉指令"""
-        logger.info(f"收到视觉数据 - 模式: {vision_data.mode}, Pitch: {vision_data.pitch:.3f}, Yaw: {vision_data.yaw:.3f}")
+        log_msg = f"收到视觉数据 - 模式: {vision_data.mode}, Pitch: {vision_data.pitch:.3f}, Yaw: {vision_data.yaw:.3f}"
+        
+        if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
+            log_msg += f", YawVel: {vision_data.yaw_vel:.3f}, PitchVel: {vision_data.pitch_vel:.3f}"
+        
+        if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
+            log_msg += f", Vx: {vision_data.vx:.3f}, Vy: {vision_data.vy:.3f}, Wz: {vision_data.wz:.3f}"
+        
+        logger.info(log_msg)
         
         # 如果模式是57（控制且开火），更新云台位置
         if vision_data.mode == 57:
@@ -269,6 +393,9 @@ class GimbalSimulator:
             print(f"  Pitch: {self.current_pitch:.3f}")
             print(f"  Yaw: {self.current_yaw:.3f}")
             print(f"  模式: {self.mode} (自瞄模式)")
+            print(f"  通信模式: {self.comm_mode.name}")
+            print(f"  RX数据包大小: {self.rx_packet_size} 字节")
+            print(f"  TX数据包大小: {self.tx_packet_size} 字节")
             print("按Ctrl+C停止")
             
             # 主循环
@@ -290,6 +417,8 @@ def main():
                        help='串口设备路径 (默认: /dev/ttyUSB0)')
     parser.add_argument('--baudrate', '-b', type=int, default=115200,
                        help='波特率 (默认: 115200)')
+    parser.add_argument('--mode', '-m', type=int, default=0, choices=[0, 1, 2, 3],
+                       help='通信模式: 0=普通模式, 1=只启用SR_VEL, 2=只启用SENTRY_SR, 3=同时启用两者 (默认: 0)')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='详细日志输出')
     
@@ -299,8 +428,11 @@ def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
+    # 转换通信模式
+    comm_mode = CommunicationMode(args.mode)
+    
     # 创建并运行模拟器
-    simulator = GimbalSimulator(args.port, args.baudrate)
+    simulator = GimbalSimulator(args.port, args.baudrate, comm_mode)
     simulator.run_interactive()
 
 if __name__ == "__main__":

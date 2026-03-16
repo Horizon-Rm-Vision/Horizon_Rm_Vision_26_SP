@@ -28,6 +28,7 @@ option(BUILD_ALL "Build all components" OFF)
 add_compile_definitions(LIM_CODE) #简化代码模式，启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销
 add_compile_definitions(AIM_CENTER) # 锁车中心模式，启用后会增加一个锁车中心点的计算和显示，并且在满足条件时优先锁定中心点而非装甲板
 add_compile_definitions(NOVA_Q) #基于peek2的四元数取数方式,待多几个版本测试以验证可靠性
+add_compile_definitions(FIRE_CONSTRAINT) # 开火约束
 
 if(BUILD_SENTRY)
 add_compile_definitions(SENTRY_SR) # 串口通信编译为哨兵导航联合通信版本

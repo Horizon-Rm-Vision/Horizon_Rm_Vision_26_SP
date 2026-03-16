@@ -49,6 +49,12 @@ leaving_angle: 10 # degree (调小，更谨慎切换)
 decision_speed: 0.5 #8 # rad/s (调大，不容易进入小陀螺模式，使用角度差最小选择逻辑)
 high_speed_delay_time: 0.015 # s
 low_speed_delay_time: 0.015 # s 
+gyro_angle_threshold: 60 # degree
+gyro_speed_threshold: 2 # rad/s
+
+#####-----开火约束参数-----#####
+gimbal_yaw_threshold: 30 # degree, 云台yaw角度约束阈值
+target_distance_threshold: 5 # meter, 目标距离约束阈值
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree

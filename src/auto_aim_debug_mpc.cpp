@@ -51,6 +51,13 @@ int main(int argc, char * argv[])
   io::ROS2 ros2;
   #endif
 
+  #ifdef FIRE_CONSTRAINT
+  // 读取开火约束配置
+  auto yaml_config = YAML::LoadFile(config_path);
+  double gimbal_yaw_threshold = yaml_config["gimbal_yaw_threshold"].as<double>() / 180.0 * M_PI; // degree to rad
+  double target_distance_threshold = yaml_config["target_distance_threshold"].as<double>();
+  #endif
+
   tools::UIManager ui_manager(config_path);
   ui_manager.setProgramMode("AutoAim MPC");
 
@@ -65,6 +72,12 @@ int main(int argc, char * argv[])
   tools::ThreadSafeQueue<std::optional<auto_aim::Target>, true> target_queue(1);
   target_queue.push(std::nullopt);
 
+  #ifdef FIRE_CONSTRAINT
+  // 记录初始云台yaw
+  auto initial_gimbal_state = gimbal.state();
+  double initial_yaw = initial_gimbal_state.yaw;
+  #endif
+
   std::atomic<bool> quit = false;
   
   auto plan_thread = std::thread([&]() {
@@ -78,6 +91,24 @@ int main(int argc, char * argv[])
       auto velocity = ros2.get_nav_velocity();
       #endif
       auto plan = planner.plan(target, gs.bullet_speed);
+
+      #ifdef FIRE_CONSTRAINT
+      // 开火约束检查
+      bool allow_fire = plan.fire;
+      // 云台角度约束
+      if (std::abs(plan.yaw - initial_yaw) > gimbal_yaw_threshold) {
+        allow_fire = false;
+      }
+      // 目标距离约束
+      if (target.has_value()) {
+        Eigen::VectorXd x = target->ekf_x();
+        double distance = std::sqrt(x[0]*x[0] + x[2]*x[2]); // x[0] is x, x[2] is z
+        if (distance > target_distance_threshold) {
+          allow_fire = false;
+        }
+      }
+      plan.fire = allow_fire;
+      #endif
 
       #ifndef SENTRY_SR
       gimbal.send(
@@ -169,6 +200,10 @@ int main(int argc, char * argv[])
       tools::draw_points(img, armor.points, {0, 255, 0});
       auto info = fmt::format("{:.2f} {} {} {}", armor.confidence, auto_aim::COLORS[armor.color], auto_aim::ARMOR_NAMES[armor.name],auto_aim::ARMOR_TYPES[armor.type]);
       tools::draw_text(img, info, armor.center, {0, 255, 0});
+      // 绘制世界坐标系数值
+      tools::draw_text(img, fmt::format("armor_x: {:.2f}", armor.xyz_in_world[0]), {10, 600}, {0, 255, 0});
+      tools::draw_text(img, fmt::format("armor_y: {:.2f}", armor.xyz_in_world[1]), {10, 630}, {0, 255, 0});
+      tools::draw_text(img, fmt::format("armor_z: {:.2f}", armor.xyz_in_world[2]), {10, 660}, {0, 255, 0});
 
     }
     #ifdef AIM_CENTER
@@ -243,8 +278,8 @@ int main(int argc, char * argv[])
         ui_manager.addLeftText("target_w", fmt::format("Target W: {:.2f}", target.ekf_x()[7]), cv::Scalar(255, 255, 0));
       }
       
-      Eigen::Vector4d aim_xyza = planner.debug_xyza;
-      ui_manager.addLeftText("armor_xyz", fmt::format("Armor X: {:.2f}  Y: {:.2f}  Z: {:.2f}", aim_xyza[0], aim_xyza[1], aim_xyza[2]), cv::Scalar(255, 255, 0));
+      // Eigen::Vector4d aim_xyza = planner.debug_xyza;
+      // ui_manager.addLeftText("armor_xyz", fmt::format("Armor X: {:.2f}  Y: {:.2f}  Z: {:.2f}", aim_xyza[0], aim_xyza[1], aim_xyza[2]), cv::Scalar(255, 255, 0));
     }
     
     #ifdef NOVA_Q

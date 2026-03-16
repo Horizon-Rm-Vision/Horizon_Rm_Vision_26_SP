@@ -48,6 +48,13 @@ int main(int argc, char * argv[])
   io::ROS2 ros2;
   #endif
 
+  #ifdef FIRE_CONSTRAINT
+  // 读取开火约束配置
+  auto yaml = YAML::LoadFile(config_path);
+  double gimbal_yaw_threshold = yaml["gimbal_yaw_threshold"].as<double>() / 180.0 * M_PI; // degree to rad
+  double target_distance_threshold = yaml["target_distance_threshold"].as<double>();
+  #endif
+
   tools::Exiter exiter;
   tools::Plotter plotter;
   tools::Recorder recorder;
@@ -67,6 +74,12 @@ int main(int argc, char * argv[])
   cv::Mat img;
   Eigen::Quaterniond q;
   std::chrono::steady_clock::time_point t;
+
+  #ifdef FIRE_CONSTRAINT
+  // 记录初始云台yaw
+  auto initial_gimbal_state = gimbal.state();
+  double initial_yaw = initial_gimbal_state.yaw;
+  #endif
 
   auto mode = io::Mode::idle;
   auto last_mode = io::Mode::idle;
@@ -174,6 +187,17 @@ int main(int argc, char * argv[])
     ui_manager.addRightText("armor_count", fmt::format("Armors: {}", armors.size()), 
                            armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
     
+    #ifdef FIRE_CONSTRAINT
+    // 添加is gyro状态到右侧UI
+    if (!targets.empty()) {
+      auto target = targets.front();
+      Eigen::VectorXd x = target.ekf_x();
+      bool is_gyro = std::abs(x[8]) > aimer.get_gyro_speed_threshold();
+      ui_manager.addRightText("is_gyro", fmt::format("Is Gyro: {}", is_gyro ? "TRUE" : "FALSE"), 
+                             is_gyro ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+    }
+    #endif
+    
     // 应用UI绘制
     ui_manager.render(img);
 
@@ -189,6 +213,26 @@ int main(int argc, char * argv[])
     //#endif
 
     plotter.drawData({gs.yaw * 180/M_PI, command.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw"});
+    
+    #ifdef FIRE_CONSTRAINT
+    // 开火约束检查
+    bool allow_fire = command.shoot;
+    // 云台角度约束
+    if (std::abs(command.yaw - initial_yaw) > gimbal_yaw_threshold) {
+      allow_fire = false;
+    }
+    // 目标距离约束
+    if (!targets.empty()) {
+      auto target = targets.front();
+      Eigen::VectorXd x = target.ekf_x();
+      double distance = std::sqrt(x[0]*x[0] + x[2]*x[2]); // x[0] is x, x[2] is z
+      if (distance > target_distance_threshold) {
+        allow_fire = false;
+      }
+    }
+    command.shoot = allow_fire;
+    #endif
+    
     #ifndef SENTRY_SR
     gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0);
     #endif
