@@ -333,7 +333,7 @@ void Gimbal::send(
 // 自瞄向电控发送数据(哨兵模式，带导航通信内容)
 void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-  float pitch_acc,float vx, float vy, float wz)
+  float pitch_acc,float vx, float vy, float wz,int form)
 {
   uint8_t mode;
   if (control) 
@@ -360,6 +360,7 @@ void Gimbal::send(
   tx_data_.vx = vx;
   tx_data_.vy = vy;
   tx_data_.wz = wz;
+  tx_data_.form = form;
   //哨兵导航
   
   #ifdef SR_VEL

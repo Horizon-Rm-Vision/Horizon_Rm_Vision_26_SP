@@ -23,6 +23,10 @@ public:
 
   std::optional<geometry_msgs::msg::Twist> get_nav_velocity();
 
+  std_msgs::msg::Int8 subscribe_form();
+
+  
+
   template <typename T>
   std::shared_ptr<rclcpp::Publisher<T>> create_publisher(
     const std::string & node_name, const std::string & topic_name, size_t queue_size)

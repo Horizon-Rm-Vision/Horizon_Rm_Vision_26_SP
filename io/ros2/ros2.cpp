@@ -31,6 +31,11 @@ std::optional<geometry_msgs::msg::Twist> ROS2::get_nav_velocity()
     return subscribe2nav_->get_nav_velocity();
 }
 
+std_msgs::msg::Int8 ROS2::subscribe_form()
+{
+    return subscribe2nav_->subscribe_form();
+}
+
 void ROS2::publish(const Eigen::Vector4d & target_pos) { publish2nav_->send_data(target_pos); }
 
 std::vector<int8_t> ROS2::subscribe_enemy_status()

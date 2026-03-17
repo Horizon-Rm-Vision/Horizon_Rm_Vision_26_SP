@@ -69,14 +69,16 @@ int main(int argc, char * argv[])
       auto target = target_queue.front();
       auto gs = gimbal.state();
       auto velocity = ros2.get_nav_velocity();
+      auto form = ros2.subscribe_form();
+
       auto plan = planner.plan(target, gs.bullet_speed);
 
       gimbal.send(
         plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
-        plan.pitch_acc,velocity->linear.x*velocity_n,velocity->linear.y*velocity_n,velocity->angular.z);
+        plan.pitch_acc,velocity->linear.x*velocity_n,velocity->linear.y*velocity_n,velocity->angular.z,form.data);
 
       auto fired = gs.bullet_count > last_bullet_count;
-      last_bullet_count = gs.bullet_count;
+      last_bullet_count = gs.bullet_count;(180.0 / M_PI);
 
       nlohmann::json data;
       data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);
@@ -317,7 +319,7 @@ int main(int argc, char * argv[])
 
   quit = true;
   if (plan_thread.joinable()) plan_thread.join();
-  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0,0);
 
   return 0;
 }
