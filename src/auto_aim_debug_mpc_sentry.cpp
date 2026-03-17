@@ -41,6 +41,7 @@ int main(int argc, char * argv[])
   }
   auto yaml = YAML::LoadFile(config_path);
   auto velocity_n = yaml["velocity_n"].as<int>();
+  const int FIRE_THRESHOLD = yaml["fire_threshold"].as<int>();
 
   io::ROS2 ros2;
   io::Gimbal gimbal(config_path);
@@ -64,21 +65,39 @@ int main(int argc, char * argv[])
   auto plan_thread = std::thread([&]() {
     auto t0 = std::chrono::steady_clock::now();
     uint16_t last_bullet_count = 0;
+    int COUNT = 0;
 
     while (!quit) {
       auto target = target_queue.front();
       auto gs = gimbal.state();
       auto velocity = ros2.get_nav_velocity();
       auto form = ros2.subscribe_form();
-
       auto plan = planner.plan(target, gs.bullet_speed);
+      // 新增：连续fire计数逻辑
+      
+      static int consecutive_fire_count = 0;
+      
+      if (plan.fire) {
+          consecutive_fire_count++;
+          if (consecutive_fire_count >= FIRE_THRESHOLD) {
+              plan.fire = true;  // 达到阈值，保持true
+          } else {
+              plan.fire = false; // 未达到阈值，设为false
+          }
+      } else {
+          consecutive_fire_count = 0; // 重置计数器
+      }
+      // plan.fire = false;
+      if(std::abs(gs.yaw * 180/M_PI)>10){
+        plan.fire = false;
+      }
 
       gimbal.send(
         plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
         plan.pitch_acc,velocity->linear.x*velocity_n,velocity->linear.y*velocity_n,velocity->angular.z,form.data);
 
       auto fired = gs.bullet_count > last_bullet_count;
-      last_bullet_count = gs.bullet_count;(180.0 / M_PI);
+      last_bullet_count = gs.bullet_count;
 
       nlohmann::json data;
       data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);
@@ -115,7 +134,11 @@ int main(int argc, char * argv[])
 
       //plotter.plot(data);
       // plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
-      plotter.drawData({velocity->linear.x,velocity->linear.y,velocity->angular.z}, {"x", "y", "wz"});
+      plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
+      // plotter.drawData({gs.yaw * 180/M_PI, plan.fire, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plan_fire", "plann_yaw"});
+
+      // plotter.drawData({gs.pitch * 180/M_PI, plan.target_pitch * 180/M_PI, plan.pitch * 180/M_PI}, {"gimbal_pitch", "target_pitch", "plann_pitch"});
+      // plotter.drawData({velocity->linear.x,velocity->linear.y,velocity->angular.z}, {"x", "y", "wz"});
 
       std::this_thread::sleep_for(10ms);
     }
@@ -253,10 +276,6 @@ int main(int argc, char * argv[])
     std::string plan_acc = fmt::format("Plan Acc Y: {:.2f}  P: {:.2f}", plan.yaw_acc, plan.pitch_acc);
     cv::putText(img, plan_acc, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
     y_offset += line_height;
-
-    // std::string velocity = fmt::format("velocity linear X: {:.2f}  Y: {:.2f}  WZ: {:.2f}", velocity->linear.x,velocity->linear.y,velocity->angular.z);
-    // cv::putText(img, velocity, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
-    // y_offset += line_height;
     
     // 目标信息（如果存在）
     if (has_target) {

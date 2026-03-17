@@ -24,7 +24,7 @@ option(BUILD_CALIBRATION "Build calibration tools" ON)
 option(BUILD_ALL "Build all components" OFF)
 
 # 全局宏控制，注释上即禁用，不注释即启用，亦可直接在cmake命令中添加 -DBUILD_GIMAL_ADD_VEL=ON 即可
-#add_compile_definitions(SR_VEL) # 带前馈角速度的串口收发模式
+add_compile_definitions(SR_VEL) # 带前馈角速度的串口收发模式
 add_compile_definitions(LIM_CODE) #简化代码模式，启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销
 add_compile_definitions(AIM_CENTER) # 锁车中心模式，启用后会增加一个锁车中心点的计算和显示，并且在满足条件时优先锁定中心点而非装甲板
 add_compile_definitions(NOVA_Q) #基于peek2的四元数取数方式,待多几个版本测试以验证可靠性

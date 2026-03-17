@@ -48,10 +48,10 @@ struct __attribute__((packed)) VisionToGimbal
   uint8_t mode;               // 一字节 mode
   uint32_t timestamp;         // 四字节时间戳
   #ifdef SR_VEL // 添加云台前馈角速度数据收发
-    float yaw_vel;
-    float pitch_vel;
-    // float yaw_acc;
-    // float pitch_acc;
+  float pitch_vel;
+  float yaw_vel;
+  // float pitch_acc;
+  // float yaw_acc;
   #endif
   #ifdef SENTRY_SR
   float vx;                   // x方向速度
