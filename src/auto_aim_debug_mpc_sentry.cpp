@@ -252,16 +252,16 @@ int main(int argc, char * argv[])
     y_offset += line_height;
 
     //导航状态 - 接收到的数据
-    std::string game_status = fmt::format("Game Status: {:.2f} ", gs.game_status);
-    cv::putText(img, gimbal_vel, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    std::string game_status = fmt::format("Game Status: {} ", gs.game_status);
+    cv::putText(img, game_status, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
     y_offset += line_height;
 
-    std::string blood = fmt::format("Blood: {:.2f} ", gs.bullet_count);
-    cv::putText(img, gimbal_vel, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    std::string blood = fmt::format("Blood: {} ", gs.blood);
+    cv::putText(img, blood, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
     y_offset += line_height;
     
-    std::string bullet = fmt::format("Bullet: {:.2f} ", gs.bullet);
-    cv::putText(img, gimbal_vel, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    std::string bullet = fmt::format("Bullet: {} ", gs.bullet);
+    cv::putText(img, bullet, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
     y_offset += line_height;
     
     // 规划状态 - 发送的数据

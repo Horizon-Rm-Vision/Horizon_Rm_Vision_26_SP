@@ -28,13 +28,13 @@ struct __attribute__((packed)) GimbalToVision
   uint32_t timestamp;         // 四字节时间戳
   uint8_t bullet_speed;       // 一字节弹速
   #ifdef SR_VEL // 添加云台前馈角速度数据收发
-    float yaw_vel;
-    float pitch_vel;
+    // float yaw_vel;
+    // float pitch_vel;
   #endif
   #ifdef SENTRY_SR
   uint8_t game_status;           // 比赛阶段
-  uint8_t blood;                 // 血量
-  uint8_t bullet;                // 弹量
+  uint16_t blood;                 // 血量
+  uint16_t bullet;                // 弹量
   // bool superpower;             // 超电开关
   #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
@@ -90,8 +90,8 @@ struct GimbalState
   uint16_t bullet_count;
   #ifdef SENTRY_SR
   uint8_t game_status;           // 比赛阶段
-  uint8_t blood;                 // 血量
-  uint8_t bullet;                // 弹量
+  uint16_t blood;                 // 血量
+  uint16_t bullet;                // 弹量
   #endif
 };
 

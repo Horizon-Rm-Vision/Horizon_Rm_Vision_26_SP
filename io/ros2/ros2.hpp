@@ -15,7 +15,7 @@ public:
 
   void publish(const Eigen::Vector4d & target_pos);
 
-  void publish_status(uint8_t game_status, uint8_t blood, uint8_t bullet);
+  void publish_status(uint8_t game_status, uint16_t blood, uint16_t bullet);
 
   std::vector<int8_t> subscribe_enemy_status();
 

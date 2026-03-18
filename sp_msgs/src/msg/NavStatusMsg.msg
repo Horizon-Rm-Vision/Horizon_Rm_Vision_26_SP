@@ -1,4 +1,4 @@
 uint8 game_status
-uint8 blood
-uint8 bullet
-uint8 form
+uint16 blood
+uint16 bullet
+

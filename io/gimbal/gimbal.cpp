@@ -482,16 +482,16 @@ void Gimbal::read_thread()
       float pitch = -rx_data_.pitch * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       uint8_t bullet_speed = rx_data_.bullet_speed;
       #ifdef SR_VEL
-        float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
-        float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
+        // float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
+        // float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
         //float yaw_acc = -rx_data_.yaw_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
         //float pitch_acc = -rx_data_.pitch_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
       #endif
       #ifdef SENTRY_SR
       //哨兵导航相关数据
       uint8_t game_status = rx_data_.game_status;
-      uint8_t blood = rx_data_.blood;
-      uint8_t bullet = rx_data_.bullet;
+      uint16_t blood = rx_data_.blood;
+      uint16_t bullet = rx_data_.bullet;
       #endif
       // 使用yaw和pitch计算四元数（roll设为0）
       //单位转换
@@ -523,8 +523,8 @@ void Gimbal::read_thread()
             state_.pitch = pitch;
             state_.bullet_speed = static_cast<float>(bullet_speed);
             #ifdef SR_VEL
-              state_.yaw_vel = yaw_vel;
-              state_.pitch_vel = pitch_vel;
+              // state_.yaw_vel = yaw_vel;
+              // state_.pitch_vel = pitch_vel;
               //state_.yaw_acc = yaw_acc;
               //state_.pitch_acc = pitch_acc;
             #endif

@@ -21,7 +21,7 @@ ROS2::~ROS2()
   subscribe_spin_thread_->join();
 }
 
-void ROS2::publish_status(uint8_t game_status, uint8_t blood, uint8_t bullet)
+void ROS2::publish_status(uint8_t game_status, uint16_t blood, uint16_t bullet)
 {
     publish2nav_->send_status(game_status, blood, bullet);
 }
