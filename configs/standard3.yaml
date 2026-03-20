@@ -41,7 +41,7 @@ outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
 yaw_offset: 0 # degree -2.5
-pitch_offset: 0.8 # degree 2
+pitch_offset: 0.5 # degree 2
 comming_angle: 75 # degree
 leaving_angle: 55 # degree
 decision_speed: 3 #8 # rad/s 判定是否小陀螺的速度阈值
@@ -61,7 +61,7 @@ armor_yaw_threshold: 20 # 锁车时装甲板yaw角度阈值，degree
 
 #####-----相机参数-----#####
 camera_name: "mindvision"
-exposure_ms: 8
+exposure_ms: 1
 gamma: 9 #已经废弃
 vid_pid: "f622:d13a"
 
@@ -157,7 +157,7 @@ t_camera2gimbal: [0.12501580483081576, 0.007616350691297802, 0.05634274875982663
 # can_interface: "can0"
 
 #####-----gimbal参数-----#####
-com_port: "/dev/ttyACM0"
+com_port: "/dev/ttyACM1"
 # com_port: "/dev/pts/5"
 yaw_kp: 0
 yaw_kd: 0

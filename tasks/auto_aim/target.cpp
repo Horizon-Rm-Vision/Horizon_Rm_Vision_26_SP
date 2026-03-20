@@ -286,6 +286,27 @@ void Target::update_ypda(const Armor & armor, int id)
   // if (last_w * new_w < 0) {
   //   ekf_.x[7] = last_w;
   // }
+  // 预测观测
+  Eigen::VectorXd z_pred = h(ekf_.x);
+
+  // innovation
+    // innovation
+  Eigen::VectorXd nu = z - z_pred;
+
+  // 处理角度 wrap
+  nu = z_subtract(z, z_pred);
+
+  // 打印
+  tools::logger()->debug("nu norm = {}", nu.norm());
+
+  nu_ = nu.norm();
+  
+  Eigen::MatrixXd P = ekf_.P;
+  Eigen::MatrixXd S = H * P * H.transpose() + R;
+
+  nis = nu.transpose() * S.inverse() * nu;
+
+  tools::logger()->debug("NIS = {}", nis);
 }
 
 Eigen::VectorXd Target::ekf_x() const { return ekf_.x; }

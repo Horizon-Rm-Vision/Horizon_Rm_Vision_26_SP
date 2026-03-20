@@ -23,7 +23,8 @@ public:
   bool jumped;
   int last_id;  // debug only
   double v1, v2;
-  
+  double nu_; // 观测噪声协方差 测量残差的方差
+  double nis; // 最近一次更新的NIS值 卡方检验用
   // //新版前哨站机制
   // double z1_in_world;  // m
   // double z2_in_world;

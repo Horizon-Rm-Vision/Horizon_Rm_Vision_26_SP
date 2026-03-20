@@ -258,8 +258,8 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
   }
   
   // 使用局部变量记录发送的数据内容
-  tools::logger()->debug("[Gimbal] Sending data - Mode: {}, Pitch: {:.3f}, Yaw: {:.3f}",
-                        mode, pitch, yaw);
+  // tools::logger()->debug("[Gimbal] Sending data - Mode: {}, Pitch: {:.3f}, Yaw: {:.3f}",
+  //                       mode, pitch, yaw);
   
   ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
   if (bytes_written != sizeof(tx_data_)) {
@@ -312,15 +312,15 @@ void Gimbal::send(
   
   // 使用局部变量记录发送的数据内容
   std::string mode_str = control ? (fire ? "CONTROL_FIRE" : "CONTROL_NO_FIRE") : "NO_CONTROL";
-  tools::logger()->debug("[Gimbal] Sending data - Mode: {} ({}), Pitch: {:.3f}, Yaw: {:.3f}",
-                        mode_str, mode, -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI));
+  // tools::logger()->debug("[Gimbal] Sending data - Mode: {} ({}), Pitch: {:.3f}, Yaw: {:.3f}",
+  //                       mode_str, mode, -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI));
   
   ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
   if (bytes_written != sizeof(tx_data_)) {
-    tools::logger()->warn("[Gimbal] Failed to write serial, expected {} bytes, got {} bytes, error: {}",
-                         sizeof(tx_data_), bytes_written, strerror(errno));
+    // tools::logger()->warn("[Gimbal] Failed to write serial, expected {} bytes, got {} bytes, error: {}",
+                        //  sizeof(tx_data_), bytes_written, strerror(errno));
   } else {
-    tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
+    // tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
     
     // // 记录发送原始数据
     // tools::logger()->trace("[Gimbal] Raw TX data: {}", 
@@ -446,8 +446,8 @@ void Gimbal::read_thread()
     }
     
     // 记录原始接收数据
-    tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}", 
-                          bytes_read, packet_to_hex(buffer + data_index, bytes_read));
+    // tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}", 
+    //                       bytes_read, packet_to_hex(buffer + data_index, bytes_read));
     
     data_index += bytes_read;
     
@@ -462,8 +462,8 @@ void Gimbal::read_thread()
       
       // 校验包尾
       if (buffer[i + packet_size - 1] != 0xDC) {
-        tools::logger()->warn("[Gimbal] Packet tail mismatch at offset {}, expected 0xDC, got 0x{:02x}",
-                             i, buffer[i + packet_size - 1]);
+        // tools::logger()->warn("[Gimbal] Packet tail mismatch at offset {}, expected 0xDC, got 0x{:02x}",
+        //                      i, buffer[i + packet_size - 1]);
         i++;
         continue;
       }
@@ -473,8 +473,8 @@ void Gimbal::read_thread()
       std::memcpy(&rx_data_, buffer + i, packet_size);
       
       // 记录原始数据包
-      tools::logger()->debug("[Gimbal] Found complete packet at offset {}, raw: {}",
-                            i, packet_to_hex(buffer + i, packet_size));
+      // tools::logger()->debug("[Gimbal] Found complete packet at offset {}, raw: {}",
+      //                       i, packet_to_hex(buffer + i, packet_size));
       
       // 复制到局部变量以避免packed结构体引用问题
       uint8_t mode = rx_data_.mode;
@@ -562,10 +562,10 @@ void Gimbal::read_thread()
             }
         
             // 使用局部变量记录解析后的数据内容
-            tools::logger()->info("[Gimbal] Parsed read data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
-                                 "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
-                                 str(old_mode), str(mode_), -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI), bullet_speed, 
-                                 q.w(), q.x(), q.y(), q.z());
+            // tools::logger()->info("[Gimbal] Parsed read data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
+            //                      "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
+            //                      str(old_mode), str(mode_), -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI), bullet_speed, 
+            //                      q.w(), q.x(), q.y(), q.z());
         
         error_count = 0;
       } else {
