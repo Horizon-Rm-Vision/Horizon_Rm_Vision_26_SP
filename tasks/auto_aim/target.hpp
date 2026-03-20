@@ -23,8 +23,8 @@ public:
   bool jumped;
   int last_id;  // debug only
   double v1, v2;
-  double nu_; // 观测噪声协方差 测量残差的方差
-  double nis; // 最近一次更新的NIS值 卡方检验用
+  double nu_; // 观测噪声协方差 测量残差的方差（越小越信任观测值）
+  double nis; // 最近一次更新的NIS值 卡方检验用(应该是跟跟踪器维度相当，一般在10-20之间，过大说明观测值和预测值差距过大，过小说明观测值和预测值差距过小，可能是过拟合了）)
   // //新版前哨站机制
   // double z1_in_world;  // m
   // double z2_in_world;

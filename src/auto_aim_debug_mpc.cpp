@@ -61,6 +61,7 @@ int main(int argc, char * argv[])
   target_queue.push(std::nullopt);
 
   std::atomic<bool> quit = false;
+  double nu, nis;
   
   // FPS计算相关变量
   auto last_fps_time = std::chrono::steady_clock::now();
@@ -76,9 +77,9 @@ int main(int argc, char * argv[])
       auto gs = gimbal.state();
       auto plan = planner.plan(target, gs.bullet_speed);
       // auto plango = planner.go(tracker.armor_);
-      plotter.drawData({gs.yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
+      // plotter.drawData({gs.yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
       // plotter.drawData({gs.pitch * 180/M_PI, plan.pitch * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
-      if(std::abs(gs.yaw * 57.3) > 10) plan.fire = false;
+      // if(std::abs(gs.yaw * 57.3) > 10) plan.fire = false;
 
       std::cout<<plan.control<<std::endl;
       gimbal.send(
@@ -89,8 +90,8 @@ int main(int argc, char * argv[])
       last_bullet_count = gs.bullet_count;
 
       //plotter.plot(data);
-      // plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
-
+      plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
+      // plotter.drawData({nu, nis}, {"nu", "nis"});
       std::this_thread::sleep_for(5ms);
     }
   });
@@ -108,6 +109,7 @@ int main(int argc, char * argv[])
 
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
+
 
     
     if(tracker.aim_strategy_ == "follow") {
@@ -164,6 +166,8 @@ int main(int argc, char * argv[])
     std::optional<auto_aim::Target> target_opt = target_queue.front();
     //bool has_target = target_opt.has_value();
     has_target = target_opt.has_value();
+    nu = target_opt.has_value() ? target_opt->nu_ : 0.0;
+    nis = target_opt.has_value() ? target_opt->nis : 0.0;
     auto plan = planner.plan(target_opt, gs.bullet_speed);
     
     // 计算FPS
@@ -285,7 +289,7 @@ int main(int argc, char * argv[])
     //cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
     cv::namedWindow("reprojection", 0);
     cv::imshow("reprojection", img);
-    auto key = cv::waitKey(1);
+    auto key = cv::waitKey(15);
     if (key == 'q') break;
   }
 
