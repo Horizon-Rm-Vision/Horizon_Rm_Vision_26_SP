@@ -229,6 +229,13 @@ std::string Gimbal::packet_to_hex(const void* data, size_t size) const
 //仅用于fire_test.cpp
 void Gimbal::send(io::VisionToGimbal VisionToGimbal)
 {
+  // 生成序列号并记录发送时间
+  uint32_t seq = ++seq_counter_;
+  {
+    std::lock_guard<std::mutex> lock(send_times_mutex_);
+    send_times_[seq] = std::chrono::steady_clock::now();
+  }
+
   // 复制数据到局部变量以避免packed结构体引用问题
   uint8_t mode = VisionToGimbal.mode;
   float yaw = VisionToGimbal.yaw;
@@ -244,7 +251,8 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
   tx_data_.mode = mode;
   tx_data_.yaw = yaw;
   tx_data_.pitch = pitch;
-  tx_data_.timestamp = 0;  // 时间戳暂时填0
+  // tx_data_.timestamp = 0;  // 时间戳暂时填0
+  tx_data_.seq_num = seq;  // 设置序列号
   #ifdef SR_VEL
     tx_data_.yaw_vel = yaw_vel;
     //tx_data_.yaw_acc = yaw_acc;
@@ -276,6 +284,13 @@ void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
   float pitch_acc)
 {
+  // 生成序列号并记录发送时间
+  uint32_t seq = ++seq_counter_;
+  {
+    std::lock_guard<std::mutex> lock(send_times_mutex_);
+    send_times_[seq] = std::chrono::steady_clock::now();
+  }
+
   uint8_t mode;
   if (control) 
   {
@@ -297,7 +312,9 @@ void Gimbal::send(
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
-  tx_data_.timestamp = 0;  // 时间戳暂时填0
+  auto t = std::chrono::steady_clock::now();
+  // tx_data_.timestamp = 0;  // 时间戳暂时填0
+  tx_data_.seq_num = seq;  // 设置序列号
   #ifdef SR_VEL
     tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
@@ -335,6 +352,13 @@ void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
   float pitch_acc,float vx, float vy, float wz,int form)
 {
+  // 生成序列号并记录发送时间
+  uint32_t seq = ++seq_counter_;
+  {
+    std::lock_guard<std::mutex> lock(send_times_mutex_);
+    send_times_[seq] = std::chrono::steady_clock::now();
+  }
+
   uint8_t mode;
   if (control) 
   {
@@ -356,7 +380,8 @@ void Gimbal::send(
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
-  tx_data_.timestamp = 0;  // 时间戳暂时填0
+  // tx_data_.timestamp = 0;  // 时间戳暂时填0
+  tx_data_.seq_num = seq;  // 设置序列号
   #ifdef SR_VEL
     tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
@@ -475,6 +500,18 @@ void Gimbal::read_thread()
       // 记录原始数据包
       tools::logger()->debug("[Gimbal] Found complete packet at offset {}, raw: {}",
                             i, packet_to_hex(buffer + i, packet_size));
+      
+      // 计算通信延迟
+      uint32_t received_seq = rx_data_.seq_num;
+      {
+        std::lock_guard<std::mutex> lock(send_times_mutex_);
+        auto it = send_times_.find(received_seq);
+        if (it != send_times_.end()) {
+          auto delay = std::chrono::duration<double, std::milli>(t - it->second).count();
+          tools::logger()->info("Communication delay for seq {}: {:.3f} ms", received_seq, delay);
+          send_times_.erase(it);
+        }
+      }
       
       // 复制到局部变量以避免packed结构体引用问题
       uint8_t mode = rx_data_.mode;
