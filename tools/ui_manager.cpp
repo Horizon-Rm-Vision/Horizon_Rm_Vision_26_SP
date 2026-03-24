@@ -76,34 +76,6 @@ void UIManager::addRightText(const std::string& key, const std::string& text, cv
     right_elements_.push_back({key, text, color, true});
 }
 
-void UIManager::addDrawPoints(const std::vector<cv::Point2f>& points, cv::Scalar color, int size) {
-    if (!enabled_) return;
-    UIDrawCommand cmd;
-    cmd.type = UIDrawCommand::DRAW_POINTS;
-    cmd.points = points;
-    cmd.point_color = color;
-    cmd.point_size = size;
-    draw_commands_.push_back(cmd);
-}
-
-void UIManager::addDrawText(const std::string& text, const cv::Point& position, cv::Scalar color) {
-    if (!enabled_) return;
-    UIDrawCommand cmd;
-    cmd.type = UIDrawCommand::DRAW_TEXT;
-    cmd.text = text;
-    cmd.position = position;
-    cmd.text_color = color;
-    draw_commands_.push_back(cmd);
-}
-
-void UIManager::addCustomDraw(std::function<void(cv::Mat&)> draw_func) {
-    if (!enabled_) return;
-    UIDrawCommand cmd;
-    cmd.type = UIDrawCommand::CUSTOM;
-    cmd.custom_draw = draw_func;
-    draw_commands_.push_back(cmd);
-}
-
 void UIManager::updateFPS() {
     if (!enabled_) return;
     
@@ -207,6 +179,49 @@ void UIManager::resetForFrame() {
     // 重置偏移量
     left_y_offset_ = 30;
     right_y_offset_ = 30;
+}
+
+//原img_tools中的绘制函数，添加UI启用检查
+void draw_point(cv::Mat & img, const cv::Point & point, const cv::Scalar & color, int radius)
+{
+  // 检查UI是否启用
+  if (!UIManager::isUIEnabled()) return;
+  cv::circle(img, point, radius, color, -1);
+}
+
+void draw_points(
+  cv::Mat & img, const std::vector<cv::Point> & points, const cv::Scalar & color, int thickness)
+{
+  // 检查UI是否启用
+  if (!UIManager::isUIEnabled()) return;
+  std::vector<std::vector<cv::Point>> contours = {points};
+  cv::drawContours(img, contours, -1, color, thickness);
+}
+
+void draw_points(
+  cv::Mat & img, const std::vector<cv::Point2f> & points, const cv::Scalar & color, int thickness)
+{
+  // 检查UI是否启用
+  if (!UIManager::isUIEnabled()) return;
+  std::vector<cv::Point> int_points(points.begin(), points.end());
+  draw_points(img, int_points, color, thickness);
+}
+
+void draw_text(
+  cv::Mat & img, const std::string & text, const cv::Point & point, const cv::Scalar & color,
+  double font_scale, int thickness)
+{
+  // 检查UI是否启用
+  if (!UIManager::isUIEnabled()) return;
+  cv::putText(img, text, point, cv::FONT_HERSHEY_SIMPLEX, font_scale, color, thickness);
+}
+
+void draw_line(
+  cv::Mat & img, const cv::Point & pt1, const cv::Point & pt2, const cv::Scalar & color, int thickness)
+{
+  // 检查UI是否启用
+  if (!UIManager::isUIEnabled()) return;
+  cv::line(img, pt1, pt2, color, thickness);
 }
 
 } // namespace tools

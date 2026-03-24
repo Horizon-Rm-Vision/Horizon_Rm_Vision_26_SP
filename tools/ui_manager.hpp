@@ -56,11 +56,6 @@ public:
     void addLeftText(const std::string& key, const std::string& text, cv::Scalar color = cv::Scalar(0, 255, 0));
     void addRightText(const std::string& key, const std::string& text, cv::Scalar color = cv::Scalar(0, 255, 0));
     
-    // 添加绘制命令
-    void addDrawPoints(const std::vector<cv::Point2f>& points, cv::Scalar color = cv::Scalar(0, 255, 0), int size = 5);
-    void addDrawText(const std::string& text, const cv::Point& position, cv::Scalar color = cv::Scalar(0, 255, 0));
-    void addCustomDraw(std::function<void(cv::Mat&)> draw_func);
-    
     // 更新FPS
     void updateFPS();
     
@@ -122,5 +117,24 @@ private:
     void executeDrawCommands(cv::Mat& img);
     void resetForFrame();
 };
+
+// 原img_tools中的绘制函数，添加UI启用检查
+void draw_point(
+  cv::Mat & img, const cv::Point & point, const cv::Scalar & color = {0, 0, 255}, int radius = 3);
+
+void draw_points(
+  cv::Mat & img, const std::vector<cv::Point> & points, const cv::Scalar & color = {0, 0, 255},
+  int thickness = 2);
+
+void draw_points(
+  cv::Mat & img, const std::vector<cv::Point2f> & points, const cv::Scalar & color = {0, 0, 255},
+  int thickness = 2);
+
+void draw_text(
+  cv::Mat & img, const std::string & text, const cv::Point & point,
+  const cv::Scalar & color = {0, 255, 255}, double font_scale = 0.6, int thickness = 2);
+
+void draw_line(
+  cv::Mat & img, const cv::Point & pt1, const cv::Point & pt2, const cv::Scalar & color = {0, 255, 255}, int thickness = 2);
 
 } // namespace tools

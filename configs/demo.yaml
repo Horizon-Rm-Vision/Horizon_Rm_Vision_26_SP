@@ -133,4 +133,3 @@ ballistic_model: "no_drag"
 aim_center: false # 锁车中心
 aim_center_min_distance: 4 # 触发锁车中心机制的最小距离，单位m，当装甲板距离车中心大于该值时优先锁定车中心点
 armor_yaw_threshold: 10 # 锁车时装甲板yaw角度阈值，degree
-
