@@ -3,12 +3,17 @@
 
 namespace tools {
 
+// 初始化静态成员变量
+bool UIManager::global_ui_enabled_ = true;
+
 UIManager::UIManager(const std::string& config_path)
     : UIManager(true) {  // 默认启用，后面会根据配置调整
     try {
         YAML::Node config = YAML::LoadFile(config_path);
         if (config["ui"] && config["ui"]["enabled"]) {
             enabled_ = config["ui"]["enabled"].as<bool>();
+            // 更新全局UI启用状态
+            global_ui_enabled_ = enabled_;
         }
         if (config["ui"] && config["ui"]["imshow"]) {
             imshow_enabled_ = config["ui"]["imshow"].as<bool>();
@@ -17,6 +22,7 @@ UIManager::UIManager(const std::string& config_path)
         // 如果配置文件不存在或格式错误，默认禁用UI
         enabled_ = false;
         imshow_enabled_ = false;
+        global_ui_enabled_ = false;
     }
 }
 
@@ -36,6 +42,8 @@ UIManager::UIManager(bool enabled)
       default_color_(0, 255, 0),
       highlight_color_(0, 165, 255),
       program_mode_("default") {
+    // 更新全局UI启用状态
+    global_ui_enabled_ = enabled;
 }
 
 void UIManager::initialize(cv::Mat& img) {

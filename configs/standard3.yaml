@@ -75,7 +75,7 @@ Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----gimbal参数-----#####
-com_port: /dev/pts/4
+com_port: /dev/pts/3
 
 # #####-----相机参数-----#####
 # camera_name: "mindvision"

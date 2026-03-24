@@ -75,10 +75,19 @@ public:
     
     // 检查imshow是否启用
     bool isImshowEnabled() const { return imshow_enabled_; }
+    
+    // 静态方法：获取全局UI启用状态（供img_tools使用）
+    static bool isUIEnabled() { return global_ui_enabled_; }
+    
+    // 静态方法：设置全局UI启用状态
+    static void setGlobalUIEnabled(bool enabled) { global_ui_enabled_ = enabled; }
 
 private:
     bool enabled_;
     bool imshow_enabled_;
+    
+    // 静态全局UI启用状态（供img_tools使用）
+    static bool global_ui_enabled_;
     
     // FPS计算
     std::chrono::steady_clock::time_point last_fps_time_;

@@ -2,7 +2,7 @@
 #V1版自启动脚本
 #部署程序自启动方法：在“启动应用程序”中添加启动项，名字随便
 #启动项命令为：gnome-terminal  --  bash    /home/horizon/Horizon_Rm_Vision_26_SP/autostart_V1.sh
-#NX风扇满速一直转
+#NX风扇满速一直转,其他类型的设备不受影响
 echo '1' | sudo -S jetson_clocks --fan
 sec=2
 cnt=0
