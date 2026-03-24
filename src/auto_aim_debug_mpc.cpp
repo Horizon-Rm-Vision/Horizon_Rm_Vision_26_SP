@@ -78,6 +78,7 @@ int main(int argc, char * argv[])
       auto plan = planner.plan(target, gs.bullet_speed);
       // auto plango = planner.go(tracker.armor_);
       // plotter.drawData({gs.yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
+      // plotter.drawData({gs.yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
       // plotter.drawData({gs.pitch * 180/M_PI, plan.pitch * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
       // if(std::abs(gs.yaw * 57.3) > 10) plan.fire = false;
 
@@ -89,9 +90,9 @@ int main(int argc, char * argv[])
       auto fired = gs.bullet_count > last_bullet_count;
       last_bullet_count = gs.bullet_count;
 
-      //plotter.plot(data);
-      plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
-      // plotter.drawData({nu, nis}, {"nu", "nis"});
+      plotter.plot(data);
+      // plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
+
       std::this_thread::sleep_for(5ms);
     }
   });
@@ -194,6 +195,7 @@ int main(int argc, char * argv[])
     std::string fps_text = fmt::format("FPS: {:.1f}", fps);
     cv::putText(img, fps_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
     y_offset += line_height;
+    tools::logger()->debug("FPS:{}", fps);
     
     // 运行模式
     std::string mode_text = "Mode: AutoAim";
@@ -287,9 +289,9 @@ int main(int argc, char * argv[])
     y_offset += line_height;
 
     //cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
-    cv::namedWindow("reprojection", 0);
-    cv::imshow("reprojection", img);
-    auto key = cv::waitKey(15);
+    // cv::namedWindow("reprojection", 0);
+    // cv::imshow("reprojection", img);
+    auto key = cv::waitKey(1);
     if (key == 'q') break;
   }
 

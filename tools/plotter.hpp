@@ -24,7 +24,7 @@ struct CurveData {
 class Plotter
 {
 public:
-  Plotter(std::string host = "127.0.0.1", uint16_t port = 9870);
+  Plotter(std::string host = "10.192.119.217", uint16_t port = 9870);
 
   ~Plotter();
 
