@@ -35,7 +35,7 @@ bool has_target = 0;
 int main(int argc, char * argv[])
 {
   tools::Exiter exiter;
-  tools::Plotter plotter;
+  // tools::Plotter plotter;
 
   cv::CommandLineParser cli(argc, argv, keys);
   auto config_path = cli.get<std::string>(0);
@@ -52,10 +52,6 @@ int main(int argc, char * argv[])
   auto_aim::Tracker tracker(config_path, solver);
   auto_aim::Planner planner(config_path);
 
-  // while(1){
-  // gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
-  // std::this_thread::sleep_for(100ms);
-  // }
 
   tools::ThreadSafeQueue<std::optional<auto_aim::Target>, true> target_queue(1);
   target_queue.push(std::nullopt);
@@ -104,22 +100,13 @@ int main(int argc, char * argv[])
     auto loop_start_time = std::chrono::steady_clock::now();
     
     camera.read(img, t);
-    auto q = gimbal.q(t); // 获取50ms前的云台姿态用于补偿，待测试不同时间差的效果
+    auto q = gimbal.q(t);
 
     solver.set_R_gimbal2world(q);
 
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
 
-
-    
-    if(tracker.aim_strategy_ == "follow") {
-      planner.aim_center_ = false;
-    }
-    else {
-      planner.aim_center_ = true;
-    }
-    tools::draw_text(img, fmt::format("Aim Strategy: {}", tracker.aim_strategy_), {10, 690}, {0, 255, 0});
     if (!targets.empty())
       target_queue.push(targets.front());
     else
