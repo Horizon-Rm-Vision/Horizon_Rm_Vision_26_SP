@@ -42,6 +42,11 @@ int main(int argc, char * argv[])
     return 0;
   }
 
+  // 终端 FPS 显示变量
+  auto last_fps_time = std::chrono::steady_clock::now();
+  int frame_count = 0;
+  float terminal_fps = 0.0f;
+
   #ifdef SENTRY_SR
   auto yaml = YAML::LoadFile(config_path);
   auto velocity_n = yaml["velocity_n"].as<int>();
@@ -87,6 +92,21 @@ int main(int argc, char * argv[])
   while (!exiter.exit()) {
     // UI FPS更新
     ui_manager.updateFPS();
+    
+    // 终端 FPS 计算和显示
+    frame_count++;
+    auto current_time = std::chrono::steady_clock::now();
+    auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_fps_time).count();
+    
+    if (elapsed_time >= 1000) {
+      terminal_fps = static_cast<float>(frame_count) * 1000.0f / static_cast<float>(elapsed_time);
+      frame_count = 0;
+      last_fps_time = current_time;
+      
+      // 输出 FPS 到终端
+      fmt::print("[FPS] {:.1f}\n", terminal_fps);
+    }
+    
     camera.read(img, t);
     q = gimbal.q(t);
     auto gimbal_mode = gimbal.mode();

@@ -480,7 +480,7 @@ void Gimbal::read_thread()
       uint8_t mode = rx_data_.mode;
       float yaw   = -rx_data_.yaw   * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       float pitch = -rx_data_.pitch * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
-      uint8_t bullet_speed = rx_data_.bullet_speed;
+      float bullet_speed = rx_data_.bullet_speed/10.0f; //弹速除10从整数转换为浮点数，单位为m/s
       #ifdef SR_VEL
         float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
         float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
@@ -521,7 +521,7 @@ void Gimbal::read_thread()
             std::lock_guard<std::mutex> lock(mutex_);
             state_.yaw = yaw;
             state_.pitch = pitch;
-            state_.bullet_speed = static_cast<float>(bullet_speed);
+            state_.bullet_speed = bullet_speed;
             #ifdef SR_VEL
               state_.yaw_vel = yaw_vel;
               state_.pitch_vel = pitch_vel;

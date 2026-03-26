@@ -38,6 +38,7 @@ int main(int argc, char * argv[])
 
   tools::Plotter plotter;
   tools::Exiter exiter;
+  tools::UIManager ui_manager(config_path);
 
   auto video_path = fmt::format("{}.avi", input_path);
   auto text_path = fmt::format("{}.txt", input_path);
