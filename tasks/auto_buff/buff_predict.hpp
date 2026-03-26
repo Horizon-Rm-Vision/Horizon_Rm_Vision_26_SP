@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "tools/extended_kalman_filter.hpp"
-#include "tools/img_tools.hpp"
+#include "tools/ui_manager.hpp"
 #include "tools/plotter.hpp"
 const double SMALL_W = CV_PI / 3;
 

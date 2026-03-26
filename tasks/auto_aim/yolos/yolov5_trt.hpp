@@ -15,6 +15,7 @@
 #include "tasks/auto_aim/detector.hpp"
 #include "tasks/auto_aim/yolo.hpp"
 #include "tasks/auto_aim/trt_engine.h"
+#include "tasks/auto_aim/yolos/yolov5_trt_gpu_kernel.cuh"
 
 namespace auto_aim
 {
@@ -54,7 +55,6 @@ private:
 
   // GPU内存指针
   float* d_input_tensor_ = nullptr;
-  float* d_output_tensor_ = nullptr;
   size_t input_count_;
   size_t output_count_;
   
@@ -62,9 +62,34 @@ private:
   int* d_temp_color_ids_ = nullptr;
   int* d_temp_num_ids_ = nullptr;
   float* d_temp_confidences_ = nullptr;
-  float* d_temp_boxes_ = nullptr;
+  int* d_temp_boxes_ = nullptr;        // 改为int*存储整数格式的边界框
   float* d_temp_keypoints_ = nullptr;
   int* d_valid_count_ = nullptr;
+  
+  // Pinned Host Memory - 减少CPU-GPU数据传输延迟
+  int* h_pinned_color_ids_ = nullptr;
+  int* h_pinned_num_ids_ = nullptr;
+  float* h_pinned_confidences_ = nullptr;
+  int* h_pinned_boxes_ = nullptr;
+  float* h_pinned_keypoints_ = nullptr;
+  
+  // GPU处理过程中的临时变量
+  std::vector<int> h_temp_color_ids_;
+  std::vector<int> h_temp_num_ids_;
+  std::vector<float> h_temp_confidences_;
+  std::vector<int> h_temp_boxes_;
+  std::vector<float> h_temp_keypoints_;
+  int h_max_detections_ = 1000;
+  // CUDA streams用于异步拷贝与并行推理（双缓冲）
+  cudaStream_t streams_[2] = {nullptr, nullptr};
+  // 交替槽索引
+  int slot_index_ = 0;
+
+  // 是否使用GPU端NMS和解析（默认开启以减少IO开销）
+  bool use_gpu_nms_ = true;
+
+  // 双输出缓冲以支持并发推理
+  float* d_output_tensor_[2] = {nullptr, nullptr};
   
   // OpenCV CUDA对象
   cv::cuda::GpuMat gpu_bgr_img_;
@@ -83,6 +108,10 @@ private:
                          std::vector<int>& color_ids, std::vector<int>& num_ids,
                          std::vector<float>& confidences, std::vector<cv::Rect>& boxes,
                          std::vector<std::vector<cv::Point2f>>& armor_key_points);
+  
+  // GPU加速版本的后处理
+  std::list<Armor> parseDetectionsGPUFast(
+      double scale, int pad_x, int pad_y, const cv::Mat& bgr_img, int frame_count);
 
   bool check_name(const Armor & armor) const;
   bool check_type(const Armor & armor) const;

@@ -17,6 +17,9 @@ namespace auto_aim
 class Tracker
 {
 public:
+#ifdef AIM_CENTER
+  std::string aim_strategy_; // "center" or "follow"
+#endif
   Tracker(const std::string & config_path, Solver & solver);
 
   std::string state() const;
@@ -42,6 +45,10 @@ private:
   Target target_;
   std::chrono::steady_clock::time_point last_timestamp_;
   ArmorPriority omni_target_priority_;
+
+  #ifdef AIM_CENTER
+  float aim_center_min_distance_;
+  #endif
 
   void state_machine(bool found);
 

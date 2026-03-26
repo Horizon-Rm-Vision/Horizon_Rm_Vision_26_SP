@@ -5,15 +5,17 @@
 #include <opencv2/opencv.hpp>
 
 #include "io/camera.hpp"
-#include "io/cboard.hpp"
-#include "tools/img_tools.hpp"
+//#include "io/cboard.hpp"
+#include "io/gimbal/gimbal.hpp"
+#include "tools/ui_manager.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
+#include <yaml-cpp/yaml.h>
 
 const std::string keys =
   "{help h usage ?  |                          | 输出命令行参数说明}"
-  "{@config-path c  | configs/calibration.yaml | yaml配置文件路径 }"
-  "{output-folder o |      assets/img_with_q   | 输出文件夹路径   }";
+  "{@config-path c  | ../configs/calibration.yaml | yaml配置文件路径 }"
+  "{output-folder o |      ../assets/img_with_q   | 输出文件夹路径   }";
 
 void write_q(const std::string q_path, const Eigen::Quaterniond & q)
 {
@@ -27,7 +29,14 @@ void write_q(const std::string q_path, const Eigen::Quaterniond & q)
 void capture_loop(
   const std::string & config_path, const std::string & can, const std::string & output_folder)
 {
-  io::CBoard cboard(config_path);
+  // 读取配置文件中的棋盘格尺寸
+  auto yaml = YAML::LoadFile(config_path);
+  auto pattern_cols = yaml["pattern_cols"].as<int>();
+  auto pattern_rows = yaml["pattern_rows"].as<int>();
+  cv::Size pattern_size(pattern_cols, pattern_rows);
+
+  //io::CBoard cboard(config_path);
+  io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
   cv::Mat img;
   std::chrono::steady_clock::time_point timestamp;
@@ -35,7 +44,7 @@ void capture_loop(
   int count = 0;
   while (true) {
     camera.read(img, timestamp);
-    Eigen::Quaterniond q = cboard.imu_at(timestamp);
+    Eigen::Quaterniond q = gimbal.q(timestamp);
 
     // 在图像上显示欧拉角，用来判断imuabs系的xyz正方向，同时判断imu是否存在零漂
     auto img_with_ypr = img.clone();
@@ -44,9 +53,10 @@ void capture_loop(
     tools::draw_text(img_with_ypr, fmt::format("Y {:.2f}", zyx[1]), {40, 80}, {0, 0, 255});
     tools::draw_text(img_with_ypr, fmt::format("X {:.2f}", zyx[2]), {40, 120}, {0, 0, 255});
 
+    // 检测棋盘格角点（用于显示，不进行亚像素细化以提高实时性）
     std::vector<cv::Point2f> centers_2d;
-    auto success = cv::findCirclesGrid(img, cv::Size(10, 7), centers_2d);  // 默认是对称圆点图案
-    cv::drawChessboardCorners(img_with_ypr, cv::Size(10, 7), centers_2d, success);  // 显示识别结果
+    bool success = cv::findChessboardCorners(img, pattern_size, centers_2d);
+    cv::drawChessboardCorners(img_with_ypr, pattern_size, centers_2d, success);  // 显示识别结果
     cv::resize(img_with_ypr, img_with_ypr, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
 
     // 按“s”保存图片和对应四元数，按“q”退出程序
@@ -83,7 +93,9 @@ int main(int argc, char * argv[])
   // 新建输出文件夹
   std::filesystem::create_directory(output_folder);
 
-  tools::logger()->info("默认标定板尺寸为10列7行");
+  // 提示用户注意配置文件中的棋盘格尺寸
+  tools::logger()->info("棋盘格尺寸从配置文件读取，请确保 pattern_cols 和 pattern_rows 为内角点数");
+
   // 主循环，保存图片和对应四元数
   capture_loop(config_path, "can0", output_folder);
 

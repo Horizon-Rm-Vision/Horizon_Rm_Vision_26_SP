@@ -62,6 +62,8 @@ yaw_offset: -2.5 # degree -2.5
 pitch_offset: 3 # degree 2
 comming_angle: 60 # degree
 leaving_angle: 20 # degree
+# 弹道模型: "no_drag" 或 "hero"（可选）
+ballistic_model: "no_drag"
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree

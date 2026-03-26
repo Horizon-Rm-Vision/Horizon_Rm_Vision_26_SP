@@ -22,6 +22,16 @@ Aimer::Aimer(const std::string & config_path)
   high_speed_delay_time_ = yaml["high_speed_delay_time"].as<double>();
   low_speed_delay_time_ = yaml["low_speed_delay_time"].as<double>();
   decision_speed_ = yaml["decision_speed"].as<double>();
+  gyro_angle_threshold_ = yaml["gyro_angle_threshold"].as<double>() / 57.3;  // degree to rad
+  gyro_speed_threshold_ = yaml["gyro_speed_threshold"].as<double>();
+  // 弹道模型配置，可选 "hero" 使用带阻力迭代解算
+  if (yaml["ballistic_model"].IsDefined()) {
+    auto str = yaml["ballistic_model"].as<std::string>();
+    if (str == "hero")
+      ballistic_model_ = tools::Trajectory::Model::kHero;
+    else
+      ballistic_model_ = tools::Trajectory::Model::kNoDrag;
+  }
   if (yaml["left_yaw_offset"].IsDefined() && yaml["right_yaw_offset"].IsDefined()) {
     left_yaw_offset_ = yaml["left_yaw_offset"].as<double>() / 57.3;    // degree to rad
     right_yaw_offset_ = yaml["right_yaw_offset"].as<double>() / 57.3;  // degree to rad
@@ -67,7 +77,8 @@ io::Command Aimer::aim(
 
   Eigen::Vector3d xyz0 = aim_point0.xyza.head(3);
   auto d0 = std::sqrt(xyz0[0] * xyz0[0] + xyz0[1] * xyz0[1]);
-  tools::Trajectory trajectory0(bullet_speed, d0, xyz0[2]);
+  tools::Trajectory trajectory0(
+    bullet_speed, d0, xyz0[2], ballistic_model_);
   if (trajectory0.unsolvable) {
     tools::logger()->debug(
       "[Aimer] Unsolvable trajectory0: {:.2f} {:.2f} {:.2f}", bullet_speed, d0, xyz0[2]);
@@ -96,7 +107,7 @@ io::Command Aimer::aim(
     // 计算新弹道
     Eigen::Vector3d xyz = aim_point.xyza.head(3);
     double d = std::sqrt(xyz.x() * xyz.x() + xyz.y() * xyz.y());
-    current_traj = tools::Trajectory(bullet_speed, d, xyz.z());
+    current_traj = tools::Trajectory(bullet_speed, d, xyz.z(), ballistic_model_);
 
     // 检查弹道是否可解
     if (current_traj.unsolvable) {
@@ -160,11 +171,11 @@ AimPoint Aimer::choose_aim_point(const Target & target)
   }
 
   // 不考虑小陀螺
-  if (std::abs(target.ekf_x()[8]) <= 2 && target.name != ArmorName::outpost) {
+  if (std::abs(target.ekf_x()[8]) <= gyro_speed_threshold_ && target.name != ArmorName::outpost) {
     // 选择在可射击范围内的装甲板
     std::vector<int> id_list;
     for (int i = 0; i < armor_num; i++) {
-      if (std::abs(delta_angle_list[i]) > 60 / 57.3) continue;
+      if (std::abs(delta_angle_list[i]) > gyro_angle_threshold_) continue; //60为最大delta_angle,可测试修改
       id_list.push_back(i);
     }
     // 绝无可能

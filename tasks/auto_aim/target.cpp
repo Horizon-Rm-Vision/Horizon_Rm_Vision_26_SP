@@ -93,7 +93,9 @@ void Target::predict(double dt)
 
   // Piecewise White Noise Model
   // https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python/blob/master/07-Kalman-Filter-Math.ipynb
+  #ifndef AIM_CENTER
   double v1, v2;
+  #endif
   if (name == ArmorName::outpost) {
     v1 = 10;   // 前哨站加速度方差
     v2 = 0.1;  // 前哨站角加速度方差
@@ -135,6 +137,7 @@ void Target::predict(double dt)
   ekf_.predict(F, Q, f);
 }
 
+ // tracker update函数，传入检测到的armor
 void Target::update(const Armor & armor)
 {
   // 装甲板匹配
@@ -146,7 +149,8 @@ void Target::update(const Armor & armor)
   for (int i = 0; i < armor_num_; i++) {
     xyza_i_list.push_back({xyza_list[i], i});
   }
-
+  
+  // 按distance排序,匹配id
   std::sort(
     xyza_i_list.begin(), xyza_i_list.end(),
     [](const std::pair<Eigen::Vector4d, int> & a, const std::pair<Eigen::Vector4d, int> & b) {
@@ -156,7 +160,7 @@ void Target::update(const Armor & armor)
     });
 
   // 取前3个distance最小的装甲板
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++) { 
     const auto & xyza = xyza_i_list[i].first;
     Eigen::Vector3d ypd = tools::xyz2ypd(xyza.head(3));
     auto angle_error = std::abs(tools::limit_rad(armor.ypr_in_world[0] - xyza[3])) +
@@ -180,7 +184,6 @@ void Target::update(const Armor & armor)
 
   last_id = id;
   update_count_++;
-
   update_ypda(armor, id);
 }
 
@@ -217,6 +220,7 @@ void Target::update_ypda(const Armor & armor, int id)
 
   const Eigen::VectorXd & ypd = armor.ypd_in_world;
   const Eigen::VectorXd & ypr = armor.ypr_in_world;
+  // 观测量只传入中间装甲板的高度数据
   Eigen::VectorXd z{{ypd[0], ypd[1], ypd[2], ypr[0]}};  //获得观测量
 
   ekf_.update(z, H, R, h, z_subtract);
@@ -272,7 +276,7 @@ Eigen::Vector3d Target::h_armor_xyz(const Eigen::VectorXd & x, int id) const
   auto r = (use_l_h) ? x[8] + x[9] : x[8];
   auto armor_x = x[0] - r * std::cos(angle);
   auto armor_y = x[2] - r * std::sin(angle);
-  auto armor_z = (use_l_h) ? x[4] + x[10] : x[4];
+  auto armor_z = (use_l_h) ? x[4] + x[10] : x[4]; 
 
   return {armor_x, armor_y, armor_z};
 }

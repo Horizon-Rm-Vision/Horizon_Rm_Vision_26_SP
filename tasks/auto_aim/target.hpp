@@ -22,6 +22,9 @@ public:
   ArmorPriority priority;
   bool jumped;
   int last_id;  // debug only
+  #ifdef AIM_CENTER
+  double v1, v2;
+  #endif
 
   Target() = default;
   Target(

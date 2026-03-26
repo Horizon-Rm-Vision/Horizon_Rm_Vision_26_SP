@@ -7,7 +7,7 @@
 #include <optional>
 
 #include "buff_type.hpp"
-#include "tools/img_tools.hpp"
+#include "tools/ui_manager.hpp"
 #include "yolo11_buff.hpp"
 const int LOSE_MAX = 20;  // 丢失的阙值
 namespace auto_buff

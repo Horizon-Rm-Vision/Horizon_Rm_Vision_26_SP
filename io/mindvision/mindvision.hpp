@@ -25,7 +25,7 @@ private:
     std::chrono::steady_clock::time_point timestamp;
   };
 
-  double exposure_ms_, gamma_;
+  double exposure_ms_, gain_;
   CameraHandle handle_;
   int height_, width_;
   bool quit_, ok_;

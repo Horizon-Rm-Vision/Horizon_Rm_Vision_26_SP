@@ -9,7 +9,7 @@
 #include <random>
 
 #include "tasks/auto_aim/classifier.hpp"
-#include "tools/img_tools.hpp"
+#include "tools/ui_manager.hpp"
 #include "tools/logger.hpp"
 
 namespace auto_aim
