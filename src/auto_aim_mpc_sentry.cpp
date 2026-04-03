@@ -41,7 +41,6 @@ int main(int argc, char * argv[])
   }
   auto yaml = YAML::LoadFile(config_path);
   auto velocity_n = yaml["velocity_n"].as<int>();
-  auto UI_show = yaml["UI_show"].as<int>();
   const int FIRE_THRESHOLD = yaml["fire_threshold"].as<int>();
 
   io::ROS2 ros2;
@@ -132,16 +131,14 @@ int main(int argc, char * argv[])
       } else {
         data["w"] = 0.0;
       }
-      if (UI_show) {
 
-        //plotter.plot(data);
-        // plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
-        plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
-        // plotter.drawData({gs.yaw * 180/M_PI, plan.fire, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plan_fire", "plann_yaw"});
-        
-        // plotter.drawData({gs.pitch * 180/M_PI, plan.target_pitch * 180/M_PI, plan.pitch * 180/M_PI}, {"gimbal_pitch", "target_pitch", "plann_pitch"});
-        // plotter.drawData({velocity->linear.x,velocity->linear.y,velocity->angular.z}, {"x", "y", "wz"});
-      }
+      //plotter.plot(data);
+      // plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
+      // plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
+      // plotter.drawData({gs.yaw * 180/M_PI, plan.fire, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plan_fire", "plann_yaw"});
+
+      // plotter.drawData({gs.pitch * 180/M_PI, plan.target_pitch * 180/M_PI, plan.pitch * 180/M_PI}, {"gimbal_pitch", "target_pitch", "plann_pitch"});
+      // plotter.drawData({velocity->linear.x,velocity->linear.y,velocity->angular.z}, {"x", "y", "wz"});
 
       std::this_thread::sleep_for(10ms);
     }
@@ -213,131 +210,128 @@ int main(int argc, char * argv[])
       frame_count = 0;
       last_fps_time = current_time;
     }
-    tools::logger()->error("[Main] fps: {:.1f}", fps);
-    if(UI_show) {
+    
+    // // 在图像上绘制UI信息
+    // int y_offset = 30;
+    // int line_height = 25;
+    // cv::Scalar text_color(0, 255, 0); // 绿色文本
+    // cv::Scalar highlight_color(0, 165, 255); // 橙色高亮文本
+    // int font_face = cv::FONT_HERSHEY_SIMPLEX;
+    // double font_scale = 0.6;
+    // int thickness = 2;
+    
+    // // FPS信息
+    // std::string fps_text = fmt::format("FPS: {:.1f}", fps);
+    // cv::putText(img, fps_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    // y_offset += line_height;
+    
+    // // 运行模式
+    // std::string mode_text = "Mode: AutoAim";
+    // cv::putText(img, mode_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    // y_offset += line_height;
+    
+    // // 目标检测状态
+    // std::string detect_text = fmt::format("Detect: {}", has_target ? "YES" : "NO");
+    // cv::putText(img, detect_text, cv::Point(10, y_offset), font_face, font_scale, 
+    //             has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), thickness);
+    // y_offset += line_height;
+    
+    // // 开火状态
+    // std::string fire_text = fmt::format("Fire: {}", plan.fire ? "YES" : "NO");
+    // cv::putText(img, fire_text, cv::Point(10, y_offset), font_face, font_scale, 
+    //             plan.fire ? cv::Scalar(0, 0, 255) : text_color, thickness);
+    // y_offset += line_height;
+    
+    // // 云台状态 - 接收到的数据
+    // std::string gimbal_status = fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", -gs.yaw * 180.0 / M_PI, -gs.pitch * 180.0 / M_PI);
+    // cv::putText(img, gimbal_status, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    // y_offset += line_height;
 
-      // 在图像上绘制UI信息
-      int y_offset = 30;
-      int line_height = 25;
-      cv::Scalar text_color(0, 255, 0); // 绿色文本
-      cv::Scalar highlight_color(0, 165, 255); // 橙色高亮文本
-      int font_face = cv::FONT_HERSHEY_SIMPLEX;
-      double font_scale = 0.6;
-      int thickness = 2;
+    // std::string gimbal_vel = fmt::format("Gimbal Vel Y: {:.2f}  P: {:.2f}", -gs.yaw_vel * 180.0 / M_PI, -gs.pitch_vel * 180.0 / M_PI);
+    // cv::putText(img, gimbal_vel, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    // y_offset += line_height;
+
+    // //导航状态 - 接收到的数据
+    // std::string game_status = fmt::format("Game Status: {} ", gs.game_status);
+    // cv::putText(img, game_status, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    // y_offset += line_height;
+
+    // std::string blood = fmt::format("Blood: {} ", gs.blood);
+    // cv::putText(img, blood, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    // y_offset += line_height;
+    
+    // std::string bullet = fmt::format("Bullet: {} ", gs.bullet);
+    // cv::putText(img, bullet, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
+    // y_offset += line_height;
+    
+    // // 规划状态 - 发送的数据
+    // std::string plan_status = fmt::format("Plan Yaw: {:.2f}  Pitch: {:.2f}", -plan.yaw * 180.0 / M_PI, -plan.pitch * 180.0 / M_PI);
+    // cv::putText(img, plan_status, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
+    // y_offset += line_height;
+    
+    // std::string plan_vel = fmt::format("Plan Vel Y: {:.2f}  P: {:.2f}", -plan.yaw_vel * 180.0 / M_PI, -plan.pitch_vel * 180.0 / M_PI);
+    // cv::putText(img, plan_vel, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
+    // y_offset += line_height;
+    
+    // std::string plan_acc = fmt::format("Plan Acc Y: {:.2f}  P: {:.2f}", plan.yaw_acc, plan.pitch_acc);
+    // cv::putText(img, plan_acc, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
+    // y_offset += line_height;
+    
+    // // 目标信息（如果存在）
+    // if (has_target) {
+    //   auto& target = target_opt.value();
+    //   std::string target_info = fmt::format("Target Z: {:.2f}  Vz: {:.2f}", target.ekf_x()[4], target.ekf_x()[5]);
+    //   cv::putText(img, target_info, cv::Point(10, y_offset), font_face, font_scale, cv::Scalar(255, 255, 0), thickness);
+    //   y_offset += line_height;
       
-      // FPS信息
-      std::string fps_text = fmt::format("FPS: {:.1f}", fps);
-      cv::putText(img, fps_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-      y_offset += line_height;
+    //   if (target.ekf_x().size() > 7) {
+    //     std::string target_w = fmt::format("Target W: {:.2f}", target.ekf_x()[7]);
+    //     cv::putText(img, target_w, cv::Point(10, y_offset), font_face, font_scale, cv::Scalar(255, 255, 0), thickness);
+    //     y_offset += line_height;
+    //   }
+    // }
     
-    // 运行模式
-    std::string mode_text = "Mode: AutoAim";
-    cv::putText(img, mode_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
+    // // 在图像右侧添加分隔线和状态指示
+    // int img_width = img.cols;
+    // cv::line(img, cv::Point(img_width - 200, 20), cv::Point(img_width - 200, y_offset + 20), cv::Scalar(0, 255, 255), 2);
     
-    // 目标检测状态
-    std::string detect_text = fmt::format("Detect: {}", has_target ? "YES" : "NO");
-    cv::putText(img, detect_text, cv::Point(10, y_offset), font_face, font_scale, 
-                has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), thickness);
-    y_offset += line_height;
+    // // 右侧状态指示
+    // int right_x = img_width - 180;
+    // y_offset = 30;
     
-    // 开火状态
-    std::string fire_text = fmt::format("Fire: {}", plan.fire ? "YES" : "NO");
-    cv::putText(img, fire_text, cv::Point(10, y_offset), font_face, font_scale, 
-                plan.fire ? cv::Scalar(0, 0, 255) : text_color, thickness);
-    y_offset += line_height;
+    // std::string status_title = "STATUS";
+    // cv::putText(img, status_title, cv::Point(right_x, y_offset), font_face, font_scale + 0.1, cv::Scalar(255, 255, 0), thickness);
+    // y_offset += line_height + 10;
     
-    // 云台状态 - 接收到的数据
-    std::string gimbal_status = fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", -gs.yaw * 180.0 / M_PI, -gs.pitch * 180.0 / M_PI);
-    cv::putText(img, gimbal_status, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
+    // // 系统时间
+    // auto now = std::chrono::system_clock::now();
+    // auto now_c = std::chrono::system_clock::to_time_t(now);
+    // std::string time_str = std::ctime(&now_c);
+    // time_str = time_str.substr(11, 8); // 只取HH:MM:SS部分
+    // std::string time_text = fmt::format("Time: {}", time_str);
+    // cv::putText(img, time_text, cv::Point(right_x, y_offset), font_face, font_scale, text_color, thickness);
+    // y_offset += line_height;
     
-    std::string gimbal_vel = fmt::format("Gimbal Vel Y: {:.2f}  P: {:.2f}", -gs.yaw_vel * 180.0 / M_PI, -gs.pitch_vel * 180.0 / M_PI);
-    cv::putText(img, gimbal_vel, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
+    // // 子弹速度
+    // std::string bullet_speed_text = fmt::format("Bullet Speed: {:.3f}", gs.bullet_speed);
+    // cv::putText(img, bullet_speed_text, cv::Point(right_x, y_offset), font_face, font_scale, text_color, thickness);
+    // y_offset += line_height;
     
-    //导航状态 - 接收到的数据
-    std::string game_status = fmt::format("Game Status: {} ", gs.game_status);
-    cv::putText(img, game_status, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
+    // // 目标数量
+    // std::string target_count_text = fmt::format("Targets: {}", targets.size());
+    // cv::putText(img, target_count_text, cv::Point(right_x, y_offset), font_face, font_scale, 
+    //             targets.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0), thickness);
+    // y_offset += line_height;
     
-    std::string blood = fmt::format("Blood: {} ", gs.blood);
-    cv::putText(img, blood, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-    
-    std::string bullet = fmt::format("Bullet: {} ", gs.bullet);
-    cv::putText(img, bullet, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-    
-    // 规划状态 - 发送的数据
-    std::string plan_status = fmt::format("Plan Yaw: {:.2f}  Pitch: {:.2f}", -plan.yaw * 180.0 / M_PI, -plan.pitch * 180.0 / M_PI);
-    cv::putText(img, plan_status, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
-    y_offset += line_height;
-    
-    std::string plan_vel = fmt::format("Plan Vel Y: {:.2f}  P: {:.2f}", -plan.yaw_vel * 180.0 / M_PI, -plan.pitch_vel * 180.0 / M_PI);
-    cv::putText(img, plan_vel, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
-    y_offset += line_height;
-    
-    std::string plan_acc = fmt::format("Plan Acc Y: {:.2f}  P: {:.2f}", plan.yaw_acc, plan.pitch_acc);
-    cv::putText(img, plan_acc, cv::Point(10, y_offset), font_face, font_scale, highlight_color, thickness);
-    y_offset += line_height;
-    
-    // 目标信息（如果存在）
-    if (has_target) {
-      auto& target = target_opt.value();
-      std::string target_info = fmt::format("Target Z: {:.2f}  Vz: {:.2f}", target.ekf_x()[4], target.ekf_x()[5]);
-      cv::putText(img, target_info, cv::Point(10, y_offset), font_face, font_scale, cv::Scalar(255, 255, 0), thickness);
-      y_offset += line_height;
-      
-      if (target.ekf_x().size() > 7) {
-        std::string target_w = fmt::format("Target W: {:.2f}", target.ekf_x()[7]);
-        cv::putText(img, target_w, cv::Point(10, y_offset), font_face, font_scale, cv::Scalar(255, 255, 0), thickness);
-        y_offset += line_height;
-      }
-    }
-    
-    // 在图像右侧添加分隔线和状态指示
-    int img_width = img.cols;
-    cv::line(img, cv::Point(img_width - 200, 20), cv::Point(img_width - 200, y_offset + 20), cv::Scalar(0, 255, 255), 2);
-    
-    // 右侧状态指示
-    int right_x = img_width - 180;
-    y_offset = 30;
-    
-    std::string status_title = "STATUS";
-    cv::putText(img, status_title, cv::Point(right_x, y_offset), font_face, font_scale + 0.1, cv::Scalar(255, 255, 0), thickness);
-    y_offset += line_height + 10;
-    
-    // 系统时间
-    auto now = std::chrono::system_clock::now();
-    auto now_c = std::chrono::system_clock::to_time_t(now);
-    std::string time_str = std::ctime(&now_c);
-    time_str = time_str.substr(11, 8); // 只取HH:MM:SS部分
-    std::string time_text = fmt::format("Time: {}", time_str);
-    cv::putText(img, time_text, cv::Point(right_x, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-    
-    // 子弹速度
-    std::string bullet_speed_text = fmt::format("Bullet Speed: {:.3f}", gs.bullet_speed);
-    cv::putText(img, bullet_speed_text, cv::Point(right_x, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-    
-    // 目标数量
-    std::string target_count_text = fmt::format("Targets: {}", targets.size());
-    cv::putText(img, target_count_text, cv::Point(right_x, y_offset), font_face, font_scale, 
-                targets.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0), thickness);
-    y_offset += line_height;
-    
-    // 检测到的装甲板数量
-    std::string armor_count_text = fmt::format("Armors: {}", armors.size());
-    cv::putText(img, armor_count_text, cv::Point(right_x, y_offset), font_face, font_scale, 
-                armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0), thickness);
-    y_offset += line_height;
-                
-    cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
-    cv::namedWindow("reprojection", 0);
-    cv::imshow("reprojection", img);
-    }
+    // // 检测到的装甲板数量
+    // std::string armor_count_text = fmt::format("Armors: {}", armors.size());
+    // cv::putText(img, armor_count_text, cv::Point(right_x, y_offset), font_face, font_scale, 
+    //             armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0), thickness);
+    // y_offset += line_height;
+
+    //cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
+    // cv::namedWindow("reprojection", 0);
+    // cv::imshow("reprojection", img);
     auto key = cv::waitKey(1);
     if (key == 'q') break;
   }

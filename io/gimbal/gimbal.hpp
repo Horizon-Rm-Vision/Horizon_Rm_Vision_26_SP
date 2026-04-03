@@ -27,8 +27,9 @@ struct __attribute__((packed)) GimbalToVision
   float yaw;                  // 四字节 yaw
   uint8_t mode;               // 一字节 mode
   // uint32_t timestamp;         // 四字节时间戳
-  uint32_t seq_num;           // 四字节序列号，用于延迟测量
-  uint8_t bullet_speed;       // 一字节弹速
+  // uint32_t seq_num;           // 四字节序列号，用于延迟测量
+  float bullet_speed;       // 四字节弹速
+  uint8_t time;       // 一字节弹速
   #ifdef SR_VEL // 添加云台前馈角速度数据收发
     // float yaw_vel;
     // float pitch_vel;
@@ -48,8 +49,8 @@ struct __attribute__((packed)) VisionToGimbal
   float pitch;                // 四字节 pitch
   float yaw;                  // 四字节 yaw
   uint8_t mode;               // 一字节 mode
-  // uint32_t timestamp;         // 四字节时间戳
-  uint32_t seq_num;           // 四字节序列号，用于延迟测量
+  uint32_t timestamp;         // 四字节时间戳
+  // uint32_t seq_num;           // 四字节序列号，用于延迟测量
   #ifdef SR_VEL // 添加云台前馈角速度数据收发
   float pitch_vel;
   float yaw_vel;

@@ -6,7 +6,7 @@
 # echo '1' | sudo -S jetson_clocks --fan
 sec=2
 cnt=0
-name=robo/Horizon_Rm_Vision_26_SP
+name=horizon/code/Horizon_Rm_Vision_26_SP
 program_name=auto_aim_debug_mpc_sentry
 cd /home/$name/build/
 
