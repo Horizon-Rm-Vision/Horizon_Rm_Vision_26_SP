@@ -63,18 +63,29 @@
   1.基于peek2的四元数取数方式,待多几个版本测试以验证可靠性(from infantry)
 ## 
 
-#### MileStone 7 DEV6：
+#### MileStone 7 STABLE：
 
 - **功能更新:**
-  1.SPSREMU更新V8版本,支持扩展通信,详细使用方法见py文件注释
-  2.面向完整形态的距离和角度约束(宏FIRE_CONSTRAINT控制)
-  3.初版自启脚本
-  4.aimer模式的反陀螺判定参数引出2rad/s,delta_angle,加入当前敌车是否小陀螺的ui显示
+  1.统一UI架构,统一standard_serial和auto_aim_debug_mpc的ui显示,合并img_tools和新增UI绘制的全部内容,支持现有src和test调用,支持使用yaml控制UI绘制与否和imshow启用与否
+  2.合并哨兵模式到auto_aim_debug_mpc,为standard_serial引入哨兵模式
+  3.UI显示新增哨兵导航内容(from sentry)
+  4.添加开火约束(由宏FIRE_CONSTRAINT启用),分为角度约束和距离约束
+  5.SPSREMU更新V8版本,支持扩展通信,详细使用方法见py文件注释
+  6.新增自启脚本,分为无ROS依赖的V1和有ROS依赖的V2
+  7.aimer模式的反陀螺判定参数引出2rad/s,delta_angle,加入当前敌车是否小陀螺的ui显示
+  8.新增能量机关识别测试用yaml(auto_buff_test)
+  9.合并哨兵通信协议修改至UL版本,修改长度和使用浮点数收发弹速,新增form信息(from sentry)
+  10.串口收发弹速采用将电控发送时乘10的数值接收时除以10的方法获得一位浮点数
 - **质量更新:**
-  1.修正统一ui显示的在mpc模式的armor_x/y/z问题
-  2.修正串口通信SR_VEL和SENTRY_MODE的兼容问题,现在两者可同时启动
+  1.standard_serial无法开火问题修复
+  2.锁中心机制修改(from infantryA)
+  3.修正统一ui显示的在mpc模式的armor_x/y/z问题
+  4.修正串口通信SR_VEL和SENTRY_MODE的兼容问题,现在两者可同时启动
+  5.合并完整形态和RMUL以来新标定的内外参
 - **已验证:**
+  1.基于peek2的四元数取数方式,经测试已验证其可靠(from infantry)
 - **待验证:**
+  1.aimer模式下英雄弹道解算可能存在问题,待测试验证
 ## 
 待开发任务：
 1.TRT推理性能进一步优化
@@ -82,4 +93,3 @@
 3.分析bullet_count对火控的影响
 4.新版前哨站机制
 5.打符子程序
-6.合并img_tool和ui_manager

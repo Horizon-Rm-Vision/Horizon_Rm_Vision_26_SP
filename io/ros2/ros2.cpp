@@ -21,7 +21,7 @@ ROS2::~ROS2()
   subscribe_spin_thread_->join();
 }
 
-void ROS2::publish_status(uint8_t game_status, uint8_t blood, uint8_t bullet)
+void ROS2::publish_status(uint8_t game_status, uint16_t blood, uint16_t bullet)
 {
     publish2nav_->send_status(game_status, blood, bullet);
 }
@@ -29,6 +29,11 @@ void ROS2::publish_status(uint8_t game_status, uint8_t blood, uint8_t bullet)
 std::optional<geometry_msgs::msg::Twist> ROS2::get_nav_velocity()
 {
     return subscribe2nav_->get_nav_velocity();
+}
+
+std_msgs::msg::Int8 ROS2::subscribe_form()
+{
+    return subscribe2nav_->subscribe_form();
 }
 
 void ROS2::publish(const Eigen::Vector4d & target_pos) { publish2nav_->send_data(target_pos); }

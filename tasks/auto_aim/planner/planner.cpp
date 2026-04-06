@@ -105,12 +105,6 @@ Plan Planner::plan(Target target, double bullet_speed)
   plan.pitch_acc = pitch_solver_->work->u(0, HALF_HORIZON);
   #endif
 
-  // //保存上次状态供下次使用，暂时无用
-  // plan.last_yaw = plan.yaw + plan.yaw_vel * DT;
-  // plan.last_pitch = plan.pitch + plan.yaw_vel * DT;
-  // last_yaw_ = plan.last_yaw;
-  // last_pitch_ = plan.last_pitch;
-
   auto shoot_offset_ = 2;
   plan.fire =
     std::hypot(

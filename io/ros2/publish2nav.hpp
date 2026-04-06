@@ -26,7 +26,7 @@ public:
 
   void send_data(const Eigen::Vector4d & data);
 
-  void send_status(uint8_t game_status, uint8_t blood, uint8_t bullet);
+  void send_status(uint8_t game_status, uint16_t blood, uint16_t bullet);
 
 private:
   // ROS2 发布者

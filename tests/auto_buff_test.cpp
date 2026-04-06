@@ -17,11 +17,11 @@
 #include "tools/plotter.hpp"
 
 const std::string keys =
-  "{help h usage ? |                        | 输出命令行参数说明 }"
-  "{config-path c  | ../configs/sentry.yaml    | yaml配置文件的路径}"
-  "{start-index s  | 0                      | 视频起始帧下标    }"
-  "{end-index e    | 0                      | 视频结束帧下标    }"
-  "{@input-path    |                        | avi和txt文件的路径}";
+  "{help h usage ? |                   | 输出命令行参数说明 }"
+  "{config-path c  | ../configs/auto_buff_test.yaml | yaml配置文件的路径}"
+  "{start-index s  | 0                 | 视频起始帧下标    }"
+  "{end-index e    | 0                 | 视频结束帧下标    }"
+  "{@input-path    | ../assets/demo/demo  | avi和txt文件的路径}";
 
 int main(int argc, char * argv[])
 {
@@ -39,7 +39,7 @@ int main(int argc, char * argv[])
   tools::Plotter plotter;
   tools::Exiter exiter;
 
-  auto video_path = fmt::format("{}.avi", input_path);
+  auto video_path = fmt::format("{}.mp4", input_path);
   auto text_path = fmt::format("{}.txt", input_path);
   cv::VideoCapture video(video_path);
   std::ifstream text(text_path);
