@@ -55,7 +55,9 @@ int main(int argc, char * argv[])
 
   #ifdef FIRE_CONSTRAINT
   // 读取开火约束配置
+  #ifndef SENTRY_SR
   auto yaml = YAML::LoadFile(config_path);
+  #endif
   double gimbal_yaw_threshold = yaml["gimbal_yaw_threshold"].as<double>() / 180.0 * M_PI; // degree to rad
   double target_distance_threshold = yaml["target_distance_threshold"].as<double>();
   #endif
@@ -185,6 +187,7 @@ int main(int argc, char * argv[])
     auto gs = gimbal.state();
     #ifdef SENTRY_SR
     auto velocity = ros2.get_nav_velocity();
+    auto form = ros2.subscribe_form();
     //发布导航的信息
     ros2.publish_status(gs.game_status, gs.blood, gs.bullet);
     #endif
@@ -257,7 +260,7 @@ int main(int argc, char * argv[])
     gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0);
     #endif
     #ifdef SENTRY_SR
-    gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z);
+    gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z, form.data);
     #endif
   }
 

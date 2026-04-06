@@ -19,7 +19,7 @@ endif()
 
 # 其他编译选项,默认不编译多余组件，可以改OFF为ON来启用或禁用，或者在cmake ..中添加-DBUILD_XXX=ON临时启用
 option(BUILD_SENTRY "Build sentry tools" OFF)
-option(BUILD_TEST "Build test tools" OFF)
+option(BUILD_TEST "Build test tools" ON)
 option(BUILD_CALIBRATION "Build calibration tools" ON)
 option(BUILD_ALL "Build all components" OFF)
 

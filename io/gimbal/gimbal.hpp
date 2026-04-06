@@ -25,16 +25,24 @@ struct __attribute__((packed)) GimbalToVision
   float pitch;                // 四字节 pitch
   float yaw;                  // 四字节 yaw
   uint8_t mode;               // 一字节 mode
+  #ifndef SENTRY_SR
   uint32_t timestamp;         // 四字节时间戳
   uint8_t bullet_speed;       // 一字节弹速
+  #endif
+  #ifdef SENTRY_SR
+  float bullet_speed;       // 四字节弹速
+  uint8_t time;       // 一字节弹速
+  #endif
   #ifdef SR_VEL // 添加云台前馈角速度数据收发
+    #ifndef SENTRY_SR
     float yaw_vel;
     float pitch_vel;
+    #endif
   #endif
   #ifdef SENTRY_SR
   uint8_t game_status;           // 比赛阶段
-  uint8_t blood;                 // 血量
-  uint8_t bullet;                // 弹量
+  uint16_t blood;                 // 血量
+  uint16_t bullet;                // 弹量
   // bool superpower;             // 超电开关
   #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
@@ -57,6 +65,7 @@ struct __attribute__((packed)) VisionToGimbal
   float vx;                   // x方向速度
   float vy;                   // y方向速度
   float wz;                   // 角速度
+  int8_t form;                // 哨兵姿态
   #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
 };
@@ -89,8 +98,8 @@ struct GimbalState
   uint16_t bullet_count;
   #ifdef SENTRY_SR
   uint8_t game_status;           // 比赛阶段
-  uint8_t blood;                 // 血量
-  uint8_t bullet;                // 弹量
+  uint16_t blood;                 // 血量
+  uint16_t bullet;                // 弹量
   #endif
 };
 
@@ -118,7 +127,7 @@ public:
   #ifdef SENTRY_SR
   void send(
     bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-    float pitch_acc, float vx, float vy, float wz);
+    float pitch_acc, float vx, float vy, float wz,int form);
   #endif
 
   void send(io::VisionToGimbal VisionToGimbal);

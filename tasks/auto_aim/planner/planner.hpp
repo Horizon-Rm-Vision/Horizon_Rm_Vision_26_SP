@@ -28,10 +28,6 @@ struct Plan
   float pitch;
   float pitch_vel;
   float pitch_acc;
-
-  // //保存上一次识别结果，暂时没什么用
-  // float last_yaw;
-  // float last_pitch;
 };
 
 class Planner
@@ -62,10 +58,6 @@ private:
   // 弹道模型选择
   enum class BallisticModel { kNoDrag, kHero };
   BallisticModel ballistic_model_ = BallisticModel::kNoDrag;
-
-  // //保存上一次识别结果，暂时没什么用
-  // double last_yaw_ = 0.0;
-  // double last_pitch_ = 0.0;
 
   TinySolver * yaw_solver_;
   TinySolver * pitch_solver_;

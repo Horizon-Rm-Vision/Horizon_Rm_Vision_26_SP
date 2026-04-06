@@ -297,7 +297,9 @@ void Gimbal::send(
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
+  #ifndef SENTRY_SR
   tx_data_.timestamp = 0;  // 时间戳暂时填0
+  #endif
   #ifdef SR_VEL
     tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
@@ -333,7 +335,7 @@ void Gimbal::send(
 // 自瞄向电控发送数据(哨兵模式，带导航通信内容)
 void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-  float pitch_acc,float vx, float vy, float wz)
+  float pitch_acc,float vx, float vy, float wz,int form)
 {
   uint8_t mode;
   if (control) 
@@ -356,7 +358,7 @@ void Gimbal::send(
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
-  tx_data_.timestamp = 0;  // 时间戳暂时填0
+  //tx_data_.timestamp = 0;  // 时间戳暂时填0
   #ifdef SR_VEL
     tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
@@ -368,6 +370,7 @@ void Gimbal::send(
   tx_data_.vx = vx;
   tx_data_.vy = vy;
   tx_data_.wz = wz;
+  tx_data_.form = form;
 
   if (fd_ < 0) {
     tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
@@ -480,18 +483,25 @@ void Gimbal::read_thread()
       uint8_t mode = rx_data_.mode;
       float yaw   = -rx_data_.yaw   * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       float pitch = -rx_data_.pitch * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
+      #ifndef SENTRY_SR
       float bullet_speed = rx_data_.bullet_speed/10.0f; //弹速除10从整数转换为浮点数，单位为m/s
+      #endif
+      #ifdef SENTRY_SR
+      float bullet_speed = rx_data_.bullet_speed;
+      #endif
       #ifdef SR_VEL
+        #ifndef SENTRY_SR
         float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
         float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
+        #endif
         //float yaw_acc = -rx_data_.yaw_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
         //float pitch_acc = -rx_data_.pitch_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
       #endif
       #ifdef SENTRY_SR
       //哨兵导航相关数据
       uint8_t game_status = rx_data_.game_status;
-      uint8_t blood = rx_data_.blood;
-      uint8_t bullet = rx_data_.bullet;
+      uint16_t blood = rx_data_.blood;
+      uint16_t bullet = rx_data_.bullet;
       #endif
       // 使用yaw和pitch计算四元数（roll设为0）
       //单位转换
@@ -521,10 +531,17 @@ void Gimbal::read_thread()
             std::lock_guard<std::mutex> lock(mutex_);
             state_.yaw = yaw;
             state_.pitch = pitch;
+            #ifndef SENTRY_SR
             state_.bullet_speed = bullet_speed;
+            #endif
+            #ifdef SENTRY_SR
+            state_.bullet_speed = static_cast<float>(bullet_speed);
+            #endif
             #ifdef SR_VEL
+              #ifndef SENTRY_SR
               state_.yaw_vel = yaw_vel;
               state_.pitch_vel = pitch_vel;
+              #endif
               //state_.yaw_acc = yaw_acc;
               //state_.pitch_acc = pitch_acc;
             #endif

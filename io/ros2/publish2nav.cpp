@@ -41,7 +41,7 @@ void Publish2Nav::send_data(const Eigen::Vector4d & target_pos)
   //   message->data.c_str());
 }
 
-void Publish2Nav::send_status(uint8_t game_status, uint8_t blood, uint8_t bullet)
+void Publish2Nav::send_status(uint8_t game_status, uint16_t blood, uint16_t bullet)
 {
     auto message = sp_msgs::msg::NavStatusMsg();
     message.game_status = game_status;
