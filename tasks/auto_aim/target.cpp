@@ -21,11 +21,6 @@ Target::Target(
   is_converged_(false),
   switch_count_(0)
 {
-  // //新版前哨站机制
-  // z1_in_world = 0;
-  // z2_in_world = 0;
-  // z3_in_world = 0;
-
   auto r = radius;
   priority = armor.priority;
   const Eigen::VectorXd & xyz = armor.xyz_in_world;
@@ -41,6 +36,7 @@ Target::Target(
   // w: angular velocity
   // l: r2 - r1
   // h: z2 - z1
+  // x9 x10在前哨站中复用，分别表示与第一块装甲板的高度差outpost_z01 outpost_z02
   Eigen::VectorXd x0{{center_x, 0, center_y, 0, center_z, 0, ypr[0], 0, r, 0, 0}};  //初始化预测量
   Eigen::MatrixXd P0 = P0_dig.asDiagonal();
 
@@ -74,7 +70,6 @@ void Target::predict(std::chrono::steady_clock::time_point t)
 {
   auto dt = tools::delta_time(t, t_);
   predict(dt);
-  // predict(0.01);
   t_ = t;
 }
 
@@ -99,7 +94,7 @@ void Target::predict(double dt)
 
   // Piecewise White Noise Model
   // https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python/blob/master/07-Kalman-Filter-Math.ipynb
-
+  double v1, v2;
   if (name == ArmorName::outpost) {
     v1 = 10;   // 前哨站加速度方差
     v2 = 0.1;  // 前哨站角加速度方差
@@ -110,6 +105,9 @@ void Target::predict(double dt)
   auto a = dt * dt * dt * dt / 4;
   auto b = dt * dt * dt / 2;
   auto c = dt * dt;
+  auto q_r = 1e-4;
+  auto q_l = 1e-4;
+  auto q_h = 1e-4;
   // 预测过程噪声偏差的方差
   // clang-format off
   Eigen::MatrixXd Q{
@@ -121,11 +119,10 @@ void Target::predict(double dt)
     {     0,      0,      0,      0, b * v1, c * v1,      0,      0, 0, 0, 0},
     {     0,      0,      0,      0,      0,      0, a * v2, b * v2, 0, 0, 0},
     {     0,      0,      0,      0,      0,      0, b * v2, c * v2, 0, 0, 0},
-    {     0,      0,      0,      0,      0,      0,      0,      0, 0, 0, 0},
-    {     0,      0,      0,      0,      0,      0,      0,      0, 0, 0, 0},
-    {     0,      0,      0,      0,      0,      0,      0,      0, 0, 0, 0}
+    {     0,      0,      0,      0,      0,      0,      0,      0, q_r, 0, 0},
+    {     0,      0,      0,      0,      0,      0,      0,      0, 0, q_l, 0},
+    {     0,      0,      0,      0,      0,      0,      0,      0, 0, 0, q_h}
   };
-  // Q = Q*100;
   // clang-format on
 
   // 防止夹角求和出现异常值
@@ -142,11 +139,10 @@ void Target::predict(double dt)
   ekf_.predict(F, Q, f);
 }
 
- // tracker update函数，传入检测到的armor
 void Target::update(const Armor & armor)
 {
   // 装甲板匹配
-  int id;
+  int id = 0;
   auto min_angle_error = 1e10;
   const std::vector<Eigen::Vector4d> & xyza_list = armor_xyza_list();
 
@@ -154,8 +150,7 @@ void Target::update(const Armor & armor)
   for (int i = 0; i < armor_num_; i++) {
     xyza_i_list.push_back({xyza_list[i], i});
   }
-  
-  // 按distance排序,匹配id
+
   std::sort(
     xyza_i_list.begin(), xyza_i_list.end(),
     [](const std::pair<Eigen::Vector4d, int> & a, const std::pair<Eigen::Vector4d, int> & b) {
@@ -164,33 +159,8 @@ void Target::update(const Armor & armor)
       return ypd1[2] < ypd2[2];
     });
 
-  // // 新版前哨站机制: 重新按z高度分配id
-  // if(armor.name == ArmorName::outpost && armor_num_ == 3) {
-  //   // 按z坐标排序,让id=0/1/2对应下/中/上
-  //   std::sort(
-  //     xyza_i_list.begin(), xyza_i_list.end(),
-  //     [](const std::pair<Eigen::Vector4d, int> & a, const std::pair<Eigen::Vector4d, int> & b) {
-  //       return a.first[2] < b.first[2];  // 按z坐标排序
-  //     });
-    
-  //   // 重新分配id: 按排序后的顺序赋值为0,1,2
-  //   for (int i = 0; i < armor_num_; i++) {
-  //     xyza_i_list[i].second = i;
-  //   }
-    
-  //   // 然后再按距离排序用于后续匹配
-  //   std::sort(
-  //     xyza_i_list.begin(), xyza_i_list.end(),
-  //     [](const std::pair<Eigen::Vector4d, int> & a, const std::pair<Eigen::Vector4d, int> & b) {
-  //       Eigen::Vector3d ypd1 = tools::xyz2ypd(a.first.head(3));
-  //       Eigen::Vector3d ypd2 = tools::xyz2ypd(b.first.head(3));
-  //       return ypd1[2] < ypd2[2];
-  //     });
-  // }
-
   // 取前3个distance最小的装甲板
-  for (int i = 0; i < 3; i++) { //old
-  //for (int i = 0; i < std::min(3, armor_num_); i++) { 
+  for (int i = 0; i < 3; i++) {
     const auto & xyza = xyza_i_list[i].first;
     Eigen::Vector3d ypd = tools::xyz2ypd(xyza.head(3));
     auto angle_error = std::abs(tools::limit_rad(armor.ypr_in_world[0] - xyza[3])) +
@@ -214,24 +184,8 @@ void Target::update(const Armor & armor)
 
   last_id = id;
   update_count_++;
+  ID = id;  // debug only
 
-  // // 新版前哨站机制：前哨站z坐标处理: 现在id已经按高度排序,直接取中间id
-  // if(armor.name == ArmorName::outpost) {
-  //   if(id == 0) z1_in_world = armor.xyz_in_world[2];
-  //   if(id == 1) z2_in_world = armor.xyz_in_world[2];
-  //   if(id == 2) z3_in_world = armor.xyz_in_world[2];
-    
-  //   // 将三个值放入数组并排序取中间值
-  //   double z_values[3] = {z1_in_world, z2_in_world, z3_in_world};
-  //   std::sort(z_values, z_values + 3);
-    
-  //   // 更新装甲板的z坐标为中间值
-  //   Armor armor_modified = armor;
-  //   armor_modified.xyz_in_world[2] = z_values[1];
-    
-  //   update_ypda(armor_modified, id);
-  //   return;
-  // }
   update_ypda(armor, id);
 }
 
@@ -268,45 +222,9 @@ void Target::update_ypda(const Armor & armor, int id)
 
   const Eigen::VectorXd & ypd = armor.ypd_in_world;
   const Eigen::VectorXd & ypr = armor.ypr_in_world;
-  // 观测量只传入中间装甲板的高度数据
   Eigen::VectorXd z{{ypd[0], ypd[1], ypd[2], ypr[0]}};  //获得观测量
 
   ekf_.update(z, H, R, h, z_subtract);
-  
-  // // 保存更新前角速度
-  // double last_w = ekf_.x[7];
-
-  // // EKF更新
-  // ekf_.update(z, H, R, h, z_subtract);
-
-  // // 更新后角速度
-  // double new_w = ekf_.x[7];
-
-  // // 防止观测误差导致反向旋转
-  // if (last_w * new_w < 0) {
-  //   ekf_.x[7] = last_w;
-  // }
-  // 预测观测
-  Eigen::VectorXd z_pred = h(ekf_.x);
-
-  // innovation
-    // innovation
-  Eigen::VectorXd nu = z - z_pred;
-
-  // 处理角度 wrap
-  nu = z_subtract(z, z_pred);
-
-  // 打印
-  tools::logger()->debug("nu norm = {}", nu.norm());
-
-  nu_ = nu.norm();
-  
-  Eigen::MatrixXd P = ekf_.P;
-  Eigen::MatrixXd S = H * P * H.transpose() + R;
-
-  nis = nu.transpose() * S.inverse() * nu;
-
-  tools::logger()->debug("NIS = {}", nis);
 }
 
 Eigen::VectorXd Target::ekf_x() const { return ekf_.x; }
@@ -359,13 +277,14 @@ Eigen::Vector3d Target::h_armor_xyz(const Eigen::VectorXd & x, int id) const
   auto r = (use_l_h) ? x[8] + x[9] : x[8];
   auto armor_x = x[0] - r * std::cos(angle);
   auto armor_y = x[2] - r * std::sin(angle);
-  auto armor_z = (use_l_h) ? x[4] + x[10] : x[4]; // 考虑高度差，新版前哨站应该改这部分
-  // //新版前哨站机制
-  // if(armor_num_ == 3) { // 三装甲板高度特判
-  //   if(id == 0) armor_z = x[4] - 0.1;
-  //   if(id == 1) armor_z = x[4];
-  //   if(id == 2) armor_z = x[4] + 0.2; 
-  // }
+  auto armor_z = (use_l_h) ? x[4] + x[10] : x[4];
+  // 前哨站特殊计算z坐标
+  if(armor_num_ == 3){
+    armor_z = id == 0 ? x[4] 
+      : id == 1 ? x[4] + x[9]
+      : id == 2 ? x[4] + x[10]
+      : x[4];
+  }
 
   return {armor_x, armor_y, armor_z};
 }
@@ -384,13 +303,20 @@ Eigen::MatrixXd Target::h_jacobian(const Eigen::VectorXd & x, int id) const
   auto dx_dl = (use_l_h) ? -std::cos(angle) : 0.0;
   auto dy_dl = (use_l_h) ? -std::sin(angle) : 0.0;
 
-  auto dz_dh = (use_l_h) ? 1.0 : 0.0;
-
+  auto outpost_z01 = 0.0; //复用
+  auto outpost_z02 = (use_l_h) ? 1.0 : 0.0; //复用 原本为dz_dh
+  // 前哨站特殊计算z坐标导数
+  if(armor_num_ == 3){
+    dx_dl = 0;
+    dy_dl = 0;
+    outpost_z01 = (id==1) ? 1 : 0;
+    outpost_z02 = (id==2) ? 1 : 0;
+  }
   // clang-format off
   Eigen::MatrixXd H_armor_xyza{
     {1, 0, 0, 0, 0, 0, dx_da, 0, dx_dr, dx_dl,     0},
     {0, 0, 1, 0, 0, 0, dy_da, 0, dy_dr, dy_dl,     0},
-    {0, 0, 0, 0, 1, 0,     0, 0,     0,     0, dz_dh},
+    {0, 0, 0, 0, 1, 0,     0, 0,     0,     outpost_z01, outpost_z02},
     {0, 0, 0, 0, 0, 0,     1, 0,     0,     0,     0}
   };
   // clang-format on

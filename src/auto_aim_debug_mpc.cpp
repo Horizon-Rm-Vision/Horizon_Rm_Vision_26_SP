@@ -80,10 +80,10 @@ int main(int argc, char * argv[])
       // plotter.drawData({gs.yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
       // plotter.drawData({gs.yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
       // plotter.drawData({gs.pitch * 180/M_PI, plan.pitch * 180/M_PI}, {"gimbal_yaw", "plann_yaw"});
-      // 低转速时更严格的发射条件，防止过早发射导致子弹落点过远
-      if(std::abs(target->ekf_x()[7]) < 3){
-        if(std::abs(std::abs(gs.yaw * 180/M_PI) - std::abs(plan.yaw * 180/M_PI)) > 0.2) plan.fire = false;
-      }
+      // 低转速时更严格的发射条件，防止过早发射导致子弹落点过远 （直接用这个if判断会有段错误，看全向小电脑上怎么处理来着）
+      // if(std::abs(target->ekf_x()[7]) < 3){
+      //   if(std::abs(std::abs(gs.yaw * 180/M_PI) - std::abs(plan.yaw * 180/M_PI)) > 0.2) plan.fire = false;
+      // }
 
       std::cout<<plan.control<<std::endl;
       gimbal.send(
@@ -170,8 +170,8 @@ int main(int argc, char * argv[])
     std::optional<auto_aim::Target> target_opt = target_queue.front();
     //bool has_target = target_opt.has_value();
     has_target = target_opt.has_value();
-    nu = target_opt.has_value() ? target_opt->nu_ : 0.0;
-    nis = target_opt.has_value() ? target_opt->nis : 0.0;
+    // nu = target_opt.has_value() ? target_opt->nu_ : 0.0;
+    // nis = target_opt.has_value() ? target_opt->nis : 0.0;
     auto plan = planner.plan(target_opt, gs.bullet_speed);
     
     // 计算FPS
@@ -292,8 +292,8 @@ int main(int argc, char * argv[])
     y_offset += line_height;
 
     //cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
-    // cv::namedWindow("reprojection", 0);
-    // cv::imshow("reprojection", img);
+    cv::namedWindow("reprojection", 0);
+    cv::imshow("reprojection", img);
     auto key = cv::waitKey(1);
     if (key == 'q') break;
   }
