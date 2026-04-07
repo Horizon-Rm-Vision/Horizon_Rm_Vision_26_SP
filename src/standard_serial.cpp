@@ -14,11 +14,18 @@
 #include "tasks/auto_aim/tracker.hpp"
 #include "tasks/auto_aim/yolo.hpp"
 #include "tools/exiter.hpp"
-#include "tools/img_tools.hpp"
+#include "tools/ui_manager.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
 #include "tools/plotter.hpp"
 #include "tools/recorder.hpp"
+#include "tools/ui_manager.hpp"
+#include "tools/yaml.hpp"
+
+#ifdef SENTRY_SR
+#include "io/ros2/publish2nav.hpp"
+#include "io/ros2/ros2.hpp"
+#endif
 
 using namespace std::chrono;
 
@@ -35,6 +42,26 @@ int main(int argc, char * argv[])
     return 0;
   }
 
+  // 终端 FPS 显示变量
+  auto last_fps_time = std::chrono::steady_clock::now();
+  int frame_count = 0;
+  float terminal_fps = 0.0f;
+
+  #ifdef SENTRY_SR
+  auto yaml = YAML::LoadFile(config_path);
+  auto velocity_n = yaml["velocity_n"].as<int>();
+  io::ROS2 ros2;
+  #endif
+
+  #ifdef FIRE_CONSTRAINT
+  // 读取开火约束配置
+  #ifndef SENTRY_SR
+  auto yaml = YAML::LoadFile(config_path);
+  #endif
+  double gimbal_yaw_threshold = yaml["gimbal_yaw_threshold"].as<double>() / 180.0 * M_PI; // degree to rad
+  double target_distance_threshold = yaml["target_distance_threshold"].as<double>();
+  #endif
+
   tools::Exiter exiter;
   tools::Plotter plotter;
   tools::Recorder recorder;
@@ -48,21 +75,42 @@ int main(int argc, char * argv[])
   auto_aim::Aimer aimer(config_path);
   auto_aim::Shooter shooter(config_path);
 
+  tools::UIManager ui_manager(config_path);
+  ui_manager.setProgramMode("AutoAim AIMER");
+
   cv::Mat img;
   Eigen::Quaterniond q;
   std::chrono::steady_clock::time_point t;
 
+  #ifdef FIRE_CONSTRAINT
+  // 记录初始云台yaw
+  auto initial_gimbal_state = gimbal.state();
+  double initial_yaw = initial_gimbal_state.yaw;
+  #endif
+
   auto mode = io::Mode::idle;
   auto last_mode = io::Mode::idle;
 
-  // UI显示相关变量
-  int frame_count = 0;
-  float fps = 0.0f;
-  auto last_fps_time = std::chrono::steady_clock::now();
-
   while (!exiter.exit()) {
+    // UI FPS更新
+    ui_manager.updateFPS();
+    
+    // 终端 FPS 计算和显示
+    frame_count++;
+    auto current_time = std::chrono::steady_clock::now();
+    auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_fps_time).count();
+    
+    if (elapsed_time >= 1000) {
+      terminal_fps = static_cast<float>(frame_count) * 1000.0f / static_cast<float>(elapsed_time);
+      frame_count = 0;
+      last_fps_time = current_time;
+      
+      // 输出 FPS 到终端
+      fmt::print("[FPS] {:.1f}\n", terminal_fps);
+    }
+    
     camera.read(img, t);
-    q = gimbal.q(t - 1ms);
+    q = gimbal.q(t);
     auto gimbal_mode = gimbal.mode();
     // Map GimbalMode to Mode
     if (gimbal_mode == io::GimbalMode::IDLE) mode = io::Mode::idle;
@@ -90,12 +138,23 @@ int main(int argc, char * argv[])
 
     auto command = aimer.aim(targets, t, bullet_speed);
 
-    // 在图像上绘制检测结果（合并原 detection 窗口信息）
+    // 使用Shooter决定开火
+    Eigen::Vector3d gimbal_pos = ypr;
+    command.shoot = shooter.shoot(command, aimer, targets, gimbal_pos);
+
+    //#ifdef SHOW_UI
     for (const auto & armor : armors) {
       // 画装甲四点与标签
       tools::draw_points(img, armor.points, {0, 255, 0});
       auto info = fmt::format("{:.2f} {} {} {}", armor.confidence, auto_aim::COLORS[armor.color], auto_aim::ARMOR_NAMES[armor.name], auto_aim::ARMOR_TYPES[armor.type]);
       tools::draw_text(img, info, armor.center, {0, 255, 0});
+      // 绘制世界坐标系数值
+      tools::draw_text(img, fmt::format("armor_x: {:.2f}", armor.xyz_in_world[0]), {10, 600}, {0, 255, 0});
+      tools::draw_text(img, fmt::format("armor_y: {:.2f}", armor.xyz_in_world[1]), {10, 630}, {0, 255, 0});
+      tools::draw_text(img, fmt::format("armor_z: {:.2f}", armor.xyz_in_world[2]), {10, 660}, {0, 255, 0});
+      #ifdef NOVA_Q
+      tools::draw_text(img, fmt::format("queue_size: {}", gimbal.q_size()), {10, 720}, {0, 255, 0});
+      #endif
     }
 
     if (!targets.empty()) {
@@ -114,79 +173,95 @@ int main(int argc, char * argv[])
       if (aim_point.valid) tools::draw_points(img, image_points, {0, 0, 255});
     }
 
-    // 计算FPS
-    frame_count++;
-    auto current_time = std::chrono::steady_clock::now();
-    auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_fps_time).count();
-    if (elapsed_time >= 1000) {
-      fps = static_cast<float>(frame_count) * 1000.0f / static_cast<float>(elapsed_time);
-      frame_count = 0;
-      last_fps_time = current_time;
-    }
-
-    // 绘制UI信息
-    int y_offset = 30;
-    int line_height = 25;
-    cv::Scalar text_color(0, 255, 0);
-    int font_face = cv::FONT_HERSHEY_SIMPLEX;
-    double font_scale = 0.6;
-    int thickness = 2;
-
-    // FPS
-    std::string fps_text = fmt::format("FPS: {:.1f}", fps);
-    cv::putText(img, fps_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-
-    // 运行模式
-    std::string mode_text = fmt::format("Mode: {}", io::MODES[mode]);
-    cv::putText(img, mode_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-
-    // 目标检测状态
+    // UI初始化
+    ui_manager.initialize(img);
+    
+    // 添加左侧UI元素
     bool has_target = !targets.empty();
-    std::string detect_text = fmt::format("Detect: {}", has_target ? "YES" : "NO");
-    cv::putText(img, detect_text, cv::Point(10, y_offset), font_face, font_scale, 
-                has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), thickness);
-    y_offset += line_height;
-
-    // // 开火状态
-    // std::string fire_text = fmt::format("Fire: {}", plan.fire ? "YES" : "NO");
-    // cv::putText(img, fire_text, cv::Point(10, y_offset), font_face, font_scale, 
-    //             plan.fire ? cv::Scalar(0, 0, 255) : text_color, thickness);
-    // y_offset += line_height;
-
-    // 云台状态
+    ui_manager.addLeftText("detect", fmt::format("Detect: {}", has_target ? "YES" : "NO"), 
+                          has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
+    ui_manager.addLeftText("fire", fmt::format("Fire: {}", command.shoot ? "YES" : "NO"), 
+                          command.shoot ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+    
+    // 云台状态 - 接收到的数据
     auto gs = gimbal.state();
-    std::string gimbal_status = fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", gs.yaw * 180.0 / std::acos(-1.0), gs.pitch * 180.0 / std::acos(-1.0));
-    cv::putText(img, gimbal_status, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-
-    // 子弹速度
-    std::string bullet_speed_text = fmt::format("Bullet Speed: {:.1f}", bullet_speed);
-    cv::putText(img, bullet_speed_text, cv::Point(10, y_offset), font_face, font_scale, text_color, thickness);
-    y_offset += line_height;
-
-    // 目标数量
-    std::string target_count_text = fmt::format("Targets: {}", targets.size());
-    cv::putText(img, target_count_text, cv::Point(10, y_offset), font_face, font_scale, 
-                targets.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0), thickness);
-    y_offset += line_height;
-
-    // 装甲板数量
-    std::string armor_count_text = fmt::format("Armors: {}", armors.size());
-    cv::putText(img, armor_count_text, cv::Point(10, y_offset), font_face, font_scale, 
-                armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0), thickness);
+    #ifdef SENTRY_SR
+    auto velocity = ros2.get_nav_velocity();
+    auto form = ros2.subscribe_form();
+    //发布导航的信息
+    ros2.publish_status(gs.game_status, gs.blood, gs.bullet);
+    #endif
+    ui_manager.addLeftText("gimbal_status", fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", -gs.yaw * 180.0 / M_PI, -gs.pitch * 180.0 / M_PI));
+    
+    //发送的数据
+    ui_manager.addLeftText("command_status", fmt::format("Command Yaw: {:.2f}  Pitch: {:.2f}", -command.yaw * 180.0 / M_PI, -command.pitch * 180.0 / M_PI), cv::Scalar(0, 165, 255));
+    
+    #ifdef SENTRY_SR
+    // Sentry SR特有的导航相关数据
+    ui_manager.addLeftText("game_status", fmt::format("Game Status: {} ", (int)gs.game_status));
+    ui_manager.addLeftText("blood", fmt::format("Blood: {} ", (int)gs.blood));
+    ui_manager.addLeftText("bullet", fmt::format("Bullet: {} ", (int)gs.bullet));
+    #endif
+    
+    // 添加右侧UI元素
+    ui_manager.addRightText("bullet_speed", fmt::format("Bullet Speed: {:.1f}", gs.bullet_speed));
+    ui_manager.addRightText("target_count", fmt::format("Targets: {}", targets.size()), 
+                           targets.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+    ui_manager.addRightText("armor_count", fmt::format("Armors: {}", armors.size()), 
+                           armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+    
+    #ifdef FIRE_CONSTRAINT
+    // 添加is gyro状态到右侧UI
+    if (!targets.empty()) {
+      auto target = targets.front();
+      Eigen::VectorXd x = target.ekf_x();
+      bool is_gyro = std::abs(x[8]) > aimer.get_gyro_speed_threshold();
+      ui_manager.addRightText("is_gyro", fmt::format("Is Gyro: {}", is_gyro ? "TRUE" : "FALSE"), 
+                             is_gyro ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+    }
+    #endif
+    
+    // 应用UI绘制
+    ui_manager.render(img);
 
     // 显示图像
-    cv::namedWindow("Vision System", cv::WINDOW_NORMAL);
-    cv::imshow("Vision System", img);
-    int key = cv::waitKey(1);
-    if (key == 'q' || key == 27) {  // q 或 ESC 退出
-      break;
+    if (ui_manager.isImshowEnabled()) {
+      cv::namedWindow("Vision System", cv::WINDOW_NORMAL);
+      cv::imshow("Vision System", img);
+      int key = cv::waitKey(1);
+      if (key == 'q' || key == 27) {  // q 或 ESC 退出
+        break;
+      }
     }
+    //#endif
 
     plotter.drawData({gs.yaw * 180/M_PI, command.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw"});
-    gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0);
+    
+    #ifdef FIRE_CONSTRAINT
+    // 开火约束检查
+    bool allow_fire = command.shoot;
+    // 云台角度约束
+    if (std::abs(command.yaw - initial_yaw) > gimbal_yaw_threshold) {
+      allow_fire = false;
+    }
+    // 目标距离约束
+    if (!targets.empty()) {
+      auto target = targets.front();
+      Eigen::VectorXd x = target.ekf_x();
+      double distance = std::sqrt(x[0]*x[0] + x[2]*x[2]); // x[0] is x, x[2] is z
+      if (distance > target_distance_threshold) {
+        allow_fire = false;
+      }
+    }
+    command.shoot = allow_fire;
+    #endif
+    
+    #ifndef SENTRY_SR
+    gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, 0);
+    #endif
+    #ifdef SENTRY_SR
+    gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z, form.data);
+    #endif
   }
 
   return 0;

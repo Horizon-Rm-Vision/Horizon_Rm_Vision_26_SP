@@ -8,7 +8,6 @@
 #include <string>
 #include <thread>
 #include <tuple>
-#include <unordered_map>
 #include <iomanip>
 #include <sstream>
 
@@ -26,13 +25,19 @@ struct __attribute__((packed)) GimbalToVision
   float pitch;                // 四字节 pitch
   float yaw;                  // 四字节 yaw
   uint8_t mode;               // 一字节 mode
-  // uint32_t timestamp;         // 四字节时间戳
-  // uint32_t seq_num;           // 四字节序列号，用于延迟测量
+  #ifndef SENTRY_SR
+  uint32_t timestamp;         // 四字节时间戳
+  uint8_t bullet_speed;       // 一字节弹速
+  #endif
+  #ifdef SENTRY_SR
   float bullet_speed;       // 四字节弹速
   uint8_t time;       // 一字节弹速
+  #endif
   #ifdef SR_VEL // 添加云台前馈角速度数据收发
-    // float yaw_vel;
-    // float pitch_vel;
+    #ifndef SENTRY_SR
+    float yaw_vel;
+    float pitch_vel;
+    #endif
   #endif
   #ifdef SENTRY_SR
   uint8_t game_status;           // 比赛阶段
@@ -50,12 +55,11 @@ struct __attribute__((packed)) VisionToGimbal
   float yaw;                  // 四字节 yaw
   uint8_t mode;               // 一字节 mode
   uint32_t timestamp;         // 四字节时间戳
-  // uint32_t seq_num;           // 四字节序列号，用于延迟测量
   #ifdef SR_VEL // 添加云台前馈角速度数据收发
-  float pitch_vel;
-  float yaw_vel;
-  // float pitch_acc;
-  // float yaw_acc;
+    float yaw_vel;
+    float pitch_vel;
+    // float yaw_acc;
+    // float pitch_acc;
   #endif
   #ifdef SENTRY_SR
   float vx;                   // x方向速度
@@ -147,11 +151,6 @@ private:
   GimbalState state_;
   tools::ThreadSafeQueue<std::tuple<Eigen::Quaterniond, std::chrono::steady_clock::time_point>>
     queue_{1000};
-
-  // 通信延迟测量相关
-  std::atomic<uint32_t> seq_counter_{0};
-  std::unordered_map<uint32_t, std::chrono::steady_clock::time_point> send_times_;
-  std::mutex send_times_mutex_;
 
   bool open_serial();
   void configure_serial();

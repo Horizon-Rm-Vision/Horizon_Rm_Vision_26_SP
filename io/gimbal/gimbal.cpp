@@ -229,13 +229,6 @@ std::string Gimbal::packet_to_hex(const void* data, size_t size) const
 //仅用于fire_test.cpp
 void Gimbal::send(io::VisionToGimbal VisionToGimbal)
 {
-  // 生成序列号并记录发送时间
-  // uint32_t seq = ++seq_counter_;
-  // {
-  //   std::lock_guard<std::mutex> lock(send_times_mutex_);
-  //   send_times_[seq] = std::chrono::steady_clock::now();
-  // }
-
   // 复制数据到局部变量以避免packed结构体引用问题
   uint8_t mode = VisionToGimbal.mode;
   float yaw = VisionToGimbal.yaw;
@@ -251,8 +244,7 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
   tx_data_.mode = mode;
   tx_data_.yaw = yaw;
   tx_data_.pitch = pitch;
-  // tx_data_.timestamp = 0;  // 时间戳暂时填0
-  // tx_data_.seq_num = seq;  // 设置序列号
+  tx_data_.timestamp = 0;  // 时间戳暂时填0
   #ifdef SR_VEL
     tx_data_.yaw_vel = yaw_vel;
     //tx_data_.yaw_acc = yaw_acc;
@@ -266,7 +258,7 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
   }
   
   // 使用局部变量记录发送的数据内容
-  tools::logger()->debug("[Gimbal] Sendin - Mode: {}, Pitch: {:.3f}, Yaw: {:.3f}",
+  tools::logger()->debug("[Gimbal] Sending data - Mode: {}, Pitch: {:.3f}, Yaw: {:.3f}",
                         mode, pitch, yaw);
   
   ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
@@ -281,16 +273,9 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
 #ifndef SENTRY_SR
 // 自瞄向电控发送数据(普通模式)
 void Gimbal::send(
-  bool control, bool fire, float yaw, float yaw_veg datal, float yaw_acc, float pitch, float pitch_vel,
+  bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
   float pitch_acc)
 {
-  // // 生成序列号并记录发送时间
-  // uint32_t seq = ++seq_counter_;
-  // {
-  //   std::lock_guard<std::mutex> lock(send_times_mutex_);
-  //   send_times_[seq] = std::chrono::steady_clock::now();
-  // }
-
   uint8_t mode;
   if (control) 
   {
@@ -312,9 +297,9 @@ void Gimbal::send(
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
-  auto t = std::chrono::steady_clock::now();
-  // tx_data_.timestamp = 0;  // 时间戳暂时填0
-  tx_data_.seq_num = seq;  // 设置序列号
+  #ifndef SENTRY_SR
+  tx_data_.timestamp = 0;  // 时间戳暂时填0
+  #endif
   #ifdef SR_VEL
     tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
@@ -352,13 +337,6 @@ void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
   float pitch_acc,float vx, float vy, float wz,int form)
 {
-  // // 生成序列号并记录发送时间
-  // uint32_t seq = ++seq_counter_;
-  // {
-  //   std::lock_guard<std::mutex> lock(send_times_mutex_);
-  //   send_times_[seq] = std::chrono::steady_clock::now();
-  // }
-
   uint8_t mode;
   if (control) 
   {
@@ -380,20 +358,20 @@ void Gimbal::send(
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
-  // tx_data_.timestamp = 0;  // 时间戳暂时填0
-  // tx_data_.seq_num = 0;  // 设置序列号
+  //tx_data_.timestamp = 0;  // 时间戳暂时填0
   #ifdef SR_VEL
     tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     //tx_data_.yaw_acc = -yaw_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
     //tx_data_.pitch_acc = -pitch_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
   #endif
+  
   //哨兵导航
   tx_data_.vx = vx;
   tx_data_.vy = vy;
   tx_data_.wz = wz;
   tx_data_.form = form;
-  
+
   if (fd_ < 0) {
     tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
     return;
@@ -501,26 +479,21 @@ void Gimbal::read_thread()
       tools::logger()->debug("[Gimbal] Found complete packet at offset {}, raw: {}",
                             i, packet_to_hex(buffer + i, packet_size));
       
-      // // 计算通信延迟
-      // uint32_t received_seq = rx_data_.seq_num;
-      // {
-      //   std::lock_guard<std::mutex> lock(send_times_mutex_);
-      //   auto it = send_times_.find(received_seq);
-      //   if (it != send_times_.end()) {
-      //     auto delay = std::chrono::duration<double, std::milli>(t - it->second).count();
-      //     tools::logger()->info("Communication delay for seq {}: {:.3f} ms", received_seq, delay);
-      //     send_times_.erase(it);
-      //   }
-      // }
-      
       // 复制到局部变量以避免packed结构体引用问题
       uint8_t mode = rx_data_.mode;
       float yaw   = -rx_data_.yaw   * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       float pitch = -rx_data_.pitch * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
+      #ifndef SENTRY_SR
+      float bullet_speed = rx_data_.bullet_speed/10.0f; //弹速除10从整数转换为浮点数，单位为m/s
+      #endif
+      #ifdef SENTRY_SR
       float bullet_speed = rx_data_.bullet_speed;
+      #endif
       #ifdef SR_VEL
-        // float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
-        // float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
+        #ifndef SENTRY_SR
+        float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
+        float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
+        #endif
         //float yaw_acc = -rx_data_.yaw_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
         //float pitch_acc = -rx_data_.pitch_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
       #endif
@@ -558,10 +531,17 @@ void Gimbal::read_thread()
             std::lock_guard<std::mutex> lock(mutex_);
             state_.yaw = yaw;
             state_.pitch = pitch;
+            #ifndef SENTRY_SR
+            state_.bullet_speed = bullet_speed;
+            #endif
+            #ifdef SENTRY_SR
             state_.bullet_speed = static_cast<float>(bullet_speed);
+            #endif
             #ifdef SR_VEL
-              // state_.yaw_vel = yaw_vel;
-              // state_.pitch_vel = pitch_vel;
+              #ifndef SENTRY_SR
+              state_.yaw_vel = yaw_vel;
+              state_.pitch_vel = pitch_vel;
+              #endif
               //state_.yaw_acc = yaw_acc;
               //state_.pitch_acc = pitch_acc;
             #endif
@@ -599,7 +579,7 @@ void Gimbal::read_thread()
         
             // 使用局部变量记录解析后的数据内容
             tools::logger()->info("[Gimbal] Parsed read data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
-                                 "BulletSpeed: {:.3f}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
+                                 "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
                                  str(old_mode), str(mode_), -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI), bullet_speed, 
                                  q.w(), q.x(), q.y(), q.z());
         

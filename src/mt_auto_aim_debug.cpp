@@ -14,7 +14,7 @@
 #include "tasks/auto_aim/tracker.hpp"
 #include "tasks/auto_aim/yolo.hpp"
 #include "tools/exiter.hpp"
-#include "tools/img_tools.hpp"
+#include "tools/ui_manager.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
 #include "tools/plotter.hpp"
@@ -138,9 +138,13 @@ int main(int argc, char * argv[])
       data["a"] = x[6] * 57.3;
       data["w"] = x[7];
       data["r"] = x[8];
+      data["is_gyro"] = std::abs(x[8]) > aimer.get_gyro_speed_threshold();
       data["l"] = x[9];
       data["h"] = x[10];
       data["last_id"] = target.last_id;
+
+      // 在图像右边显示is gyro状态
+      tools::draw_text(img, fmt::format("is gyro: {}", std::abs(x[8]) > aimer.get_gyro_speed_threshold() ? "true" : "false"), {1000, 30}, {255, 255, 255});
 
       // 卡方检验数据
       data["residual_yaw"] = target.ekf().data.at("residual_yaw");

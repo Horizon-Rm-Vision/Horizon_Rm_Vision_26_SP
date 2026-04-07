@@ -16,7 +16,7 @@ int main(int argc, char ** argv)
     int i = 0;
     while (!exiter.exit()) {
       sp_msgs::msg::EnemyStatusMsg msg;
-      msg.invincible_enemy_ids = {1, 2, 3,4};
+      msg.invincible_enemy_ids = {1, 2, 3};
       msg.timestamp = clock.now();
       string_publisher->publish(msg);
       ros2.publish_status(1, 100, 30);

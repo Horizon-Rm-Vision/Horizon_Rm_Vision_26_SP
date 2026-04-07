@@ -1,13 +1,13 @@
 #!/bin/bash 
 #V1版自启动脚本
 #部署程序自启动方法：在“启动应用程序”中添加启动项，名字随便
-#启动项命令为：gnome-terminal  --  bash    /home/robo/Horizon_Rm_Vision_26_SP/autostart_v1.sh
-#NX风扇满速一直转
-# echo '1' | sudo -S jetson_clocks --fan
+#启动项命令为：gnome-terminal  --  bash    /home/horizon/Horizon_Rm_Vision_26_SP/autostart_V1.sh
+#NX风扇满速一直转,其他类型的设备不受影响
+echo '1' | sudo -S jetson_clocks --fan
 sec=2
 cnt=0
-name=horizon/code/Horizon_Rm_Vision_26_SP
-program_name=auto_aim_debug_mpc_sentry
+name=horizon/Horizon_Rm_Vision_26_SP
+program_name=auto_aim_debug_mpc
 cd /home/$name/build/
 
 while [ 1 ]
@@ -39,8 +39,6 @@ do
             echo '1' | sudo -S chmod 666 /dev/ttyCH341USB0
             echo '1' | sudo -S chmod 666 /dev/ttyCH341USB1
 
-            source /opt/ros/humble/setup.bash
-            source ./local_setup.sh
             ./$program_name
            
             rm /tmp/$program_name.lock

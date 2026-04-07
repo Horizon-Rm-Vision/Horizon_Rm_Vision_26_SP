@@ -32,6 +32,9 @@ public:
     std::list<Target> targets, std::chrono::steady_clock::time_point timestamp, double bullet_speed,
     io::ShootMode shoot_mode, bool to_now = true);
 
+  double get_gyro_speed_threshold() const { return gyro_speed_threshold_; }
+  double get_gyro_angle_threshold() const { return gyro_angle_threshold_; }
+
 private:
   double yaw_offset_;
   std::optional<double> left_yaw_offset_, right_yaw_offset_;
@@ -43,6 +46,8 @@ private:
   double low_speed_delay_time_;
   double decision_speed_;
   tools::Trajectory::Model ballistic_model_ = tools::Trajectory::Model::kNoDrag;
+  double gyro_angle_threshold_;
+  double gyro_speed_threshold_;
 
   AimPoint choose_aim_point(const Target & target);
 };
