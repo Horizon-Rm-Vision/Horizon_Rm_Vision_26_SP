@@ -265,7 +265,7 @@ int main(int argc, char * argv[])
     
     #ifdef SENTRY_SR
     //发布导航的信息
-    ros2.publish_status(gs.game_status,gs.blood,gs.bullet);
+    ros2.publish_status(gs.game_progress,gs.stage_remain_time,gs.current_hp,gs.ally_outpost_hp,gs.x,gs.y,gs.angle,gs.state,gs.energy_state);
     #endif
 
     // UI初始化和配置
@@ -284,9 +284,13 @@ int main(int argc, char * argv[])
     
     #ifdef SENTRY_SR
     // Sentry SR特有的导航相关数据
-    ui_manager.addLeftText("game_status", fmt::format("Game Status: {} ", (int)gs.game_status));
-    ui_manager.addLeftText("blood", fmt::format("Blood: {} ", (int)gs.blood));
-    ui_manager.addLeftText("bullet", fmt::format("Bullet: {} ", (int)gs.bullet));
+    ui_manager.addLeftText("game_progress", fmt::format("Game Status: {} ", (int)gs.game_progress));
+    ui_manager.addLeftText("current_hp", fmt::format("Blood: {} ", (int)gs.current_hp));
+    ui_manager.addLeftText("ally_outpost_hp", fmt::format("Bullet: {} ", (int)gs.ally_outpost_hp));
+    ui_manager.addLeftText("position", fmt::format("Position X: {:.2f}  Y: {:.2f}", gs.x, gs.y));
+    ui_manager.addLeftText("angle", fmt::format("Angle: {:.2f}", gs.angle));
+    ui_manager.addLeftText("state", fmt::format("State: {} ", (int)gs.state));
+    ui_manager.addLeftText("energy_state", fmt::format("  Energy State: {} ", (int)gs.energy_state));
     #endif
     
     // 目标信息
