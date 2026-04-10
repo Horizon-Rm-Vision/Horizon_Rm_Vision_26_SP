@@ -40,10 +40,15 @@ struct __attribute__((packed)) GimbalToVision
     #endif
   #endif
   #ifdef SENTRY_SR
-  uint8_t game_status;           // 比赛阶段
-  uint16_t blood;                 // 血量
-  uint16_t bullet;                // 弹量
-  // bool superpower;             // 超电开关
+  uint8_t game_progress;           // 比赛阶段
+  uint16_t stage_remain_time;                 // 剩余时间
+  uint16_t current_hp;                // 当前血量
+  uint16_t ally_outpost_hp;                // 己方基地血量
+  float x;                   // x方向位置
+  float y;                   // y方向位置
+  float angle;                   // 朝向
+  uint8_t state;                // 姿态
+  uint8_t energy_state;             // 能量机关状态
   #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
 };
@@ -97,9 +102,15 @@ struct GimbalState
   float bullet_speed;
   uint16_t bullet_count;
   #ifdef SENTRY_SR
-  uint8_t game_status;           // 比赛阶段
-  uint16_t blood;                 // 血量
-  uint16_t bullet;                // 弹量
+  uint8_t game_progress;           // 比赛阶段
+  uint16_t stage_remain_time;                 // 剩余时间
+  uint16_t current_hp;                 // 血量
+  uint16_t ally_outpost_hp;                // 己方基地血量
+  float x;                   // x方向位置
+  float y;                   // y方向位置
+  float angle;                   // 朝向    
+  uint8_t state;                // 姿态
+  uint8_t energy_state;             // 能量机关状态
   #endif
 };
 

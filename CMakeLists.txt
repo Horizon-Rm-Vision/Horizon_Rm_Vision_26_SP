@@ -10,7 +10,7 @@ set(CMAKE_BUILD_TYPE Release)
 message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}--------------------")
 
 # 编译模式选项：控制是否使用CUDA/TensorRT和OpenVINO
-option(USE_CUDA "Enable CUDA/TensorRT support" ON)
+option(USE_CUDA "Enable CUDA/TensorRT support" OFF)
 option(USE_OPENVINO "Enable OpenVINO support" ON)
 
 if(NOT USE_CUDA AND NOT USE_OPENVINO)
