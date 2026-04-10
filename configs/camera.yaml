@@ -4,7 +4,7 @@
 
 # camera_name: "mindvision"
 # exposure_ms: 5
-# # gamma: 3 #已经废弃
+# gamma: 3 #已经废弃
 # vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
@@ -16,3 +16,4 @@ camera_name: "daheng"
 exposure_ms: 2
 gamma: 2.85
 vid_pid: "KE0200010097"
+frame_rate: 200.0

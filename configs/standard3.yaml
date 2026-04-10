@@ -89,9 +89,10 @@ com_port: /dev/pts/4
 # vid_pid: "2bdf:0001"
 
 camera_name: "daheng"
-exposure_ms: 5
+exposure_ms: 6
 gamma: 2.85
 vid_pid: "KE0200010097"
+frame_rate: 200.0
 
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 #  1  0  0
@@ -190,6 +191,6 @@ armor_yaw_threshold: 10 # 锁车时装甲板yaw角度阈值，degree
 
 #####-----UI显示配置-----#####
 ui:
-  enabled: false  # 是否绘制UI
+  enabled: true  # 是否绘制UI
   imshow: true   # 是否使用imshow显示图像
   

@@ -47,7 +47,7 @@ private:
   bool quit_, ok_;
   std::thread capture_thread_;
   std::thread daemon_thread_;
-  tools::ThreadSafeQueue<CameraData> queue_;
+  tools::ThreadSafeQueue<CameraData, true> queue_;  // 启用PopWhenFull，队列满时丢弃旧图像
   int vid_, pid_;
   
   // 大恒相机特定参数
