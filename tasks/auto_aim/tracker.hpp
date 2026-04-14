@@ -35,6 +35,7 @@ public:
 private:
   Solver & solver_;
   Color enemy_color_;
+  bool enemy_color_auto_;
   int min_detect_count_;
   int max_temp_lost_count_;
   int detect_count_;
@@ -55,6 +56,8 @@ private:
   bool set_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t);
 
   bool update_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t);
+
+  void refresh_enemy_color_from_serial();
 };
 
 }  // namespace auto_aim

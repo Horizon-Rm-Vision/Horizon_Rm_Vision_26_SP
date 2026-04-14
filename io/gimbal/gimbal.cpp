@@ -14,6 +14,13 @@
 
 namespace io
 {
+namespace
+{
+std::atomic<int8_t> g_last_self_color{-1};
+}
+
+int8_t latest_self_color() { return g_last_self_color.load(std::memory_order_relaxed); }
+
 Gimbal::Gimbal(const std::string & config_path)
 {
   auto yaml = tools::load(config_path);
@@ -481,6 +488,7 @@ void Gimbal::read_thread()
       
       // 复制到局部变量以避免packed结构体引用问题
       uint8_t mode = rx_data_.mode;
+      uint8_t self_color_raw = rx_data_.self_color;
       float yaw   = -rx_data_.yaw   * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       float pitch = -rx_data_.pitch * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       #ifndef SENTRY_SR
@@ -512,6 +520,10 @@ void Gimbal::read_thread()
       
       Eigen::Quaterniond q = yaw_angle * pitch_angle * roll_angle;
       q.normalize();
+
+      if (self_color_raw <= 1) {
+        g_last_self_color.store(static_cast<int8_t>(self_color_raw), std::memory_order_relaxed);
+      }
       
       if (mode <= 3) {
         queue_.push({q, t});
@@ -537,6 +549,7 @@ void Gimbal::read_thread()
             #ifdef SENTRY_SR
             state_.bullet_speed = static_cast<float>(bullet_speed);
             #endif
+            state_.self_color = g_last_self_color.load(std::memory_order_relaxed);
             #ifdef SR_VEL
               #ifndef SENTRY_SR
               state_.yaw_vel = yaw_vel;
@@ -579,8 +592,9 @@ void Gimbal::read_thread()
         
             // 使用局部变量记录解析后的数据内容
             tools::logger()->info("[Gimbal] Parsed read data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
-                                 "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
+                                 "BulletSpeed: {}, SelfColor: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
                                  str(old_mode), str(mode_), -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI), bullet_speed, 
+                                 static_cast<int>(g_last_self_color.load(std::memory_order_relaxed)),
                                  q.w(), q.x(), q.y(), q.z());
         
         error_count = 0;
@@ -623,6 +637,7 @@ void Gimbal::reconnect()
     std::lock_guard<std::mutex> lock(mutex_);
     mode_ = GimbalMode::IDLE;
     state_ = GimbalState{};
+    state_.self_color = g_last_self_color.load(std::memory_order_relaxed);
   }
 }
 

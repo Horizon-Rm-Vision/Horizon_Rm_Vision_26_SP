@@ -4,6 +4,7 @@
 #include <Eigen/Geometry>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -25,6 +26,7 @@ struct __attribute__((packed)) GimbalToVision
   float pitch;                // 四字节 pitch
   float yaw;                  // 四字节 yaw
   uint8_t mode;               // 一字节 mode
+  uint8_t self_color;         // 一字节己方颜色: 0-red, 1-blue
   #ifndef SENTRY_SR
   uint32_t timestamp;         // 四字节时间戳
   uint8_t bullet_speed;       // 一字节弹速
@@ -96,12 +98,15 @@ struct GimbalState
   float pitch_vel;
   float bullet_speed;
   uint16_t bullet_count;
+  int8_t self_color = -1;
   #ifdef SENTRY_SR
   uint8_t game_status;           // 比赛阶段
   uint16_t blood;                 // 血量
   uint16_t bullet;                // 弹量
   #endif
 };
+
+int8_t latest_self_color();
 
 class Gimbal
 {

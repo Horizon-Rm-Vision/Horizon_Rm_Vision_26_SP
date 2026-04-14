@@ -4,6 +4,7 @@
 
 #include <tuple>
 
+#include "io/gimbal/gimbal.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
 
@@ -11,6 +12,8 @@ namespace auto_aim
 {
 Tracker::Tracker(const std::string & config_path, Solver & solver)
 : solver_{solver},
+  enemy_color_{Color::blue},
+  enemy_color_auto_{false},
   detect_count_(0),
   temp_lost_count_(0),
   state_{"lost"},
@@ -19,7 +22,13 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   omni_target_priority_{ArmorPriority::fifth}
 {
   auto yaml = YAML::LoadFile(config_path);
-  enemy_color_ = (yaml["enemy_color"].as<std::string>() == "red") ? Color::red : Color::blue;
+  const auto enemy_color_cfg = yaml["enemy_color"].as<std::string>();
+  if (enemy_color_cfg == "auto") {
+    enemy_color_auto_ = true;
+    refresh_enemy_color_from_serial();
+  } else {
+    enemy_color_ = (enemy_color_cfg == "red") ? Color::red : Color::blue;
+  }
   min_detect_count_ = yaml["min_detect_count"].as<int>();
   max_temp_lost_count_ = yaml["max_temp_lost_count"].as<int>();
   outpost_max_temp_lost_count_ = yaml["outpost_max_temp_lost_count"].as<int>();
@@ -31,9 +40,23 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
 
 std::string Tracker::state() const { return state_; }
 
+void Tracker::refresh_enemy_color_from_serial()
+{
+  if (!enemy_color_auto_) return;
+
+  const auto self_color = io::latest_self_color();
+  if (self_color == 0) {
+    enemy_color_ = Color::blue;
+  } else if (self_color == 1) {
+    enemy_color_ = Color::red;
+  }
+}
+
 std::list<Target> Tracker::track(
   std::list<Armor> & armors, std::chrono::steady_clock::time_point t, bool use_enemy_color)
 {
+  refresh_enemy_color_from_serial();
+
   auto dt = tools::delta_time(t, last_timestamp_);
   last_timestamp_ = t;
 
@@ -102,6 +125,8 @@ std::tuple<omniperception::DetectionResult, std::list<Target>> Tracker::track(
   const std::vector<omniperception::DetectionResult> & detection_queue, std::list<Armor> & armors,
   std::chrono::steady_clock::time_point t, bool use_enemy_color)
 {
+  refresh_enemy_color_from_serial();
+
   omniperception::DetectionResult switch_target{std::list<Armor>(), t, 0, 0};
   omniperception::DetectionResult temp_target{std::list<Armor>(), t, 0, 0};
   if (!detection_queue.empty()) {

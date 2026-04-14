@@ -63,7 +63,7 @@
   1.基于peek2的四元数取数方式,待多几个版本测试以验证可靠性(from infantry)
 ## 
 
-#### MileStone 7 STABLE：
+#### MileStone 7：
 
 - **功能更新:**
   1.统一UI架构,统一standard_serial和auto_aim_debug_mpc的ui显示,合并img_tools和新增UI绘制的全部内容,支持现有src和test调用,支持使用yaml控制UI绘制与否和imshow启用与否
@@ -86,6 +86,14 @@
   1.基于peek2的四元数取数方式,经测试已验证其可靠(from infantry)
 - **待验证:**
   1.aimer模式下英雄弹道解算可能存在问题,待测试验证
+## 
+
+#### Release Candidate 1 DEV2：
+
+- **功能更新:**
+  1.串口收己方颜色设置敌方颜色功能,当yaml里的enemy_color为auto时,使用颜色位收到自身颜色从而设置敌方颜色,如果收发中间有中断,则使用中断前的最后收到的颜色,若非auto则仍然按原来的处理逻辑
+- **待验证:**
+  1.疑似daheng相机帧率不稳定引起云台不稳定,暂时修复待验证
 ## 
 待开发任务：
 1.TRT推理性能进一步优化
