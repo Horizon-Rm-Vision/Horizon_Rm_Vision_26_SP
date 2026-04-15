@@ -25,8 +25,7 @@ struct __attribute__((packed)) GimbalToVision
   uint8_t head = 0xCD;        // 包头 0xCD
   float pitch;                // 四字节 pitch
   float yaw;                  // 四字节 yaw
-  uint8_t mode;               // 一字节 mode
-  uint8_t self_color;         // 一字节己方颜色: 0-red, 1-blue
+  uint8_t mode;               // 一字节 mode(高位携带己方颜色: mode/4, 低2位为原模式: mode%4)
   #ifndef SENTRY_SR
   uint32_t timestamp;         // 四字节时间戳
   uint8_t bullet_speed;       // 一字节弹速

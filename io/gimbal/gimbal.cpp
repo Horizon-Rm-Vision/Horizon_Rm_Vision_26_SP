@@ -487,8 +487,10 @@ void Gimbal::read_thread()
                             i, packet_to_hex(buffer + i, packet_size));
       
       // 复制到局部变量以避免packed结构体引用问题
-      uint8_t mode = rx_data_.mode;
-      uint8_t self_color_raw = rx_data_.self_color;
+      uint8_t mode_raw = rx_data_.mode;
+      uint8_t self_color_raw = mode_raw / 4;
+      uint8_t mode = mode_raw % 4;
+
       float yaw   = -rx_data_.yaw   * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       float pitch = -rx_data_.pitch * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       #ifndef SENTRY_SR
@@ -599,8 +601,8 @@ void Gimbal::read_thread()
         
         error_count = 0;
       } else {
-        tools::logger()->warn("[Gimbal] Skipping packet with invalid mode: {}, raw data: {}",
-                             mode, packet_to_hex(buffer + i, packet_size));
+        tools::logger()->warn("[Gimbal] Skipping packet with invalid encoded mode: {} (color_group={}), raw data: {}",
+                             mode_raw, self_color_raw, packet_to_hex(buffer + i, packet_size));
       }
       
       i += packet_size;  // 无论 mode 是否有效，跳过这个包
