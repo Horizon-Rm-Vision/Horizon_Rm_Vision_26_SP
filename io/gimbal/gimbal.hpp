@@ -26,19 +26,10 @@ struct __attribute__((packed)) GimbalToVision
   float pitch;                // 四字节 pitch
   float yaw;                  // 四字节 yaw
   uint8_t mode;               // 一字节 mode(高位携带己方颜色: mode/4, 低2位为原模式: mode%4)
-  #ifndef SENTRY_SR
-  uint32_t timestamp;         // 四字节时间戳
-  uint8_t bullet_speed;       // 一字节弹速
-  #endif
-  #ifdef SENTRY_SR
-  float bullet_speed;       // 四字节弹速
-  uint8_t time;       // 一字节弹速
-  #endif
+  uint8_t bullet_speed;       // 一字节弹速，单位为0.1m/s，接收时乘10转换为整数发送
   #ifdef SR_VEL // 添加云台前馈角速度数据收发
-    #ifndef SENTRY_SR
-    float yaw_vel;
     float pitch_vel;
-    #endif
+    float yaw_vel;
   #endif
   #ifdef SENTRY_SR
   uint8_t game_status;           // 比赛阶段
@@ -55,12 +46,11 @@ struct __attribute__((packed)) VisionToGimbal
   float pitch;                // 四字节 pitch
   float yaw;                  // 四字节 yaw
   uint8_t mode;               // 一字节 mode
-  uint32_t timestamp;         // 四字节时间戳
   #ifdef SR_VEL // 添加云台前馈角速度数据收发
-    float yaw_vel;
     float pitch_vel;
-    // float yaw_acc;
+    float yaw_vel;
     // float pitch_acc;
+    // float yaw_acc;
   #endif
   #ifdef SENTRY_SR
   float vx;                   // x方向速度
@@ -72,14 +62,6 @@ struct __attribute__((packed)) VisionToGimbal
 };
 
 static_assert(sizeof(VisionToGimbal) <= 64);
-
-// enum class GimbalMode
-// {
-//   IDLE,        // 空闲
-//   AUTO_AIM,    // 自瞄
-//   SMALL_BUFF,  // 小符
-//   BIG_BUFF     // 大符
-// };
 
 enum class GimbalMode
 {

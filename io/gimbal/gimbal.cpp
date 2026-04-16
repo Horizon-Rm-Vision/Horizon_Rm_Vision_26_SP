@@ -141,22 +141,6 @@ GimbalState Gimbal::state() const
   return state_;
 }
 
-// std::string Gimbal::str(GimbalMode mode) const
-// {
-//   switch (mode) {
-//     case GimbalMode::IDLE:
-//       return "IDLE";
-//     case GimbalMode::AUTO_AIM:
-//       return "AUTO_AIM";
-//     case GimbalMode::SMALL_BUFF:
-//       return "SMALL_BUFF";
-//     case GimbalMode::BIG_BUFF:
-//       return "BIG_BUFF";
-//     default:
-//       return "INVALID";
-//   }
-// }
-
 //转换GimbalMode数值为对应的字符串
 std::string Gimbal::str(GimbalMode mode) const
 {
@@ -251,7 +235,6 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
   tx_data_.mode = mode;
   tx_data_.yaw = yaw;
   tx_data_.pitch = pitch;
-  tx_data_.timestamp = 0;  // 时间戳暂时填0
   #ifdef SR_VEL
     tx_data_.yaw_vel = yaw_vel;
     //tx_data_.yaw_acc = yaw_acc;
@@ -304,9 +287,6 @@ void Gimbal::send(
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
-  #ifndef SENTRY_SR
-  tx_data_.timestamp = 0;  // 时间戳暂时填0
-  #endif
   #ifdef SR_VEL
     tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
@@ -365,7 +345,6 @@ void Gimbal::send(
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
-  //tx_data_.timestamp = 0;  // 时间戳暂时填0
   #ifdef SR_VEL
     tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
@@ -493,17 +472,10 @@ void Gimbal::read_thread()
 
       float yaw   = -rx_data_.yaw   * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       float pitch = -rx_data_.pitch * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
-      #ifndef SENTRY_SR
       float bullet_speed = rx_data_.bullet_speed/10.0f; //弹速除10从整数转换为浮点数，单位为m/s
-      #endif
-      #ifdef SENTRY_SR
-      float bullet_speed = rx_data_.bullet_speed;
-      #endif
       #ifdef SR_VEL
-        #ifndef SENTRY_SR
         float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
         float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
-        #endif
         //float yaw_acc = -rx_data_.yaw_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
         //float pitch_acc = -rx_data_.pitch_acc * (M_PI / 180.0);  // 接收时从角度每秒平方转换为弧度每秒平方并取负
       #endif
@@ -545,18 +517,11 @@ void Gimbal::read_thread()
             std::lock_guard<std::mutex> lock(mutex_);
             state_.yaw = yaw;
             state_.pitch = pitch;
-            #ifndef SENTRY_SR
             state_.bullet_speed = bullet_speed;
-            #endif
-            #ifdef SENTRY_SR
-            state_.bullet_speed = static_cast<float>(bullet_speed);
-            #endif
             state_.self_color = g_last_self_color.load(std::memory_order_relaxed);
             #ifdef SR_VEL
-              #ifndef SENTRY_SR
               state_.yaw_vel = yaw_vel;
               state_.pitch_vel = pitch_vel;
-              #endif
               //state_.yaw_acc = yaw_acc;
               //state_.pitch_acc = pitch_acc;
             #endif

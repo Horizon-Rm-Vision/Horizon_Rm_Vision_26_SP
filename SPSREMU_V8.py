@@ -4,38 +4,37 @@
 
 通信模式说明：
 - 普通模式 (NORMAL=0): 基础通信，不包含扩展数据
-  VisionToGimbal: head(1) + pitch(4) + yaw(4) + mode(1) + timestamp(4) + tail(1) = 15字节
-  GimbalToVision: head(1) + pitch(4) + yaw(4) + mode(1) + timestamp(4) + bullet_speed(1) + tail(1) = 16字节
+    VisionToGimbal: head(1) + pitch(4) + yaw(4) + mode(1) + tail(1) = 11字节
+    GimbalToVision: head(1) + pitch(4) + yaw(4) + mode(1) + bullet_speed(1) + tail(1) = 12字节
 
 - 只启用SR_VEL (SR_VEL_ONLY=1): 包含云台前馈角速度数据
-  VisionToGimbal: 基础 + yaw_vel(4) + pitch_vel(4) = 23字节
-  GimbalToVision: 基础 + yaw_vel(4) + pitch_vel(4) = 24字节
+    VisionToGimbal: 基础 + pitch_vel(4) + yaw_vel(4) = 19字节
+    GimbalToVision: 基础 + pitch_vel(4) + yaw_vel(4) = 20字节
   扩展数据填0
 
 - 只启用SENTRY_SR (SENTRY_SR_ONLY=2): 包含哨兵相关数据
-  VisionToGimbal: 基础 + vx(4) + vy(4) + wz(4) = 27字节
-  GimbalToVision: 基础 + game_status(1) + blood(1) + bullet(1) = 19字节
+    VisionToGimbal: 基础 + vx(4) + vy(4) + wz(4) + form(1) = 24字节
+    GimbalToVision: 基础 + game_status(1) + blood(2) + bullet(2) = 17字节
   扩展数据填0
 
 - 同时启用两者 (BOTH_ENABLED=3): 包含所有扩展数据
-  VisionToGimbal: 基础 + yaw_vel(4) + pitch_vel(4) + vx(4) + vy(4) + wz(4) = 35字节
-  GimbalToVision: 基础 + yaw_vel(4) + pitch_vel(4) + game_status(1) + blood(1) + bullet(1) = 27字节
+    VisionToGimbal: 基础 + pitch_vel(4) + yaw_vel(4) + vx(4) + vy(4) + wz(4) + form(1) = 32字节
+    GimbalToVision: 基础 + pitch_vel(4) + yaw_vel(4) + game_status(1) + blood(2) + bullet(2) = 25字节
   扩展数据填0
 
 新的使用方法：
-python3 SPSREMU_V7.py --mode 0  # 普通模式
-python3 SPSREMU_V7.py --mode 1  # 只启用SR_VEL
-python3 SPSREMU_V7.py --mode 2  # 只启用SENTRY_SR
-python3 SPSREMU_V7.py --mode 3  # 同时启用两者
+python3 SPSREMU_V8.py --mode 0  # 普通模式
+python3 SPSREMU_V8.py --mode 1  # 只启用SR_VEL
+python3 SPSREMU_V8.py --mode 2  # 只启用SENTRY_SR
+python3 SPSREMU_V8.py --mode 3  # 同时启用两者
 """
 #除了可以两个实体串口自收自发，也可以用虚拟串口 socat -d -d pty,b115200 pty,b115200
 
 import serial
 import struct
-import time
 import threading
 import logging
-from typing import Optional, Tuple
+from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
 
@@ -60,14 +59,14 @@ class VisionToGimbal:
     pitch: float = 0.0
     yaw: float = 0.0
     mode: int = 0
-    timestamp: int = 0
     # SR_VEL扩展字段
-    yaw_vel: float = 0.0
     pitch_vel: float = 0.0
+    yaw_vel: float = 0.0
     # SENTRY_SR扩展字段
     vx: float = 0.0
     vy: float = 0.0
     wz: float = 0.0
+    form: int = 0
     tail: int = 0xDC
 
 @dataclass
@@ -77,11 +76,10 @@ class GimbalToVision:
     pitch: float = 0.0
     yaw: float = 0.0
     mode: int = 1  # 固定为自瞄模式
-    timestamp: int = 0
     bullet_speed: int = 10  # 模拟弹速
     # SR_VEL扩展字段
-    yaw_vel: float = 0.0
     pitch_vel: float = 0.0
+    yaw_vel: float = 0.0
     # SENTRY_SR扩展字段
     game_status: int = 0
     blood: int = 0
@@ -116,25 +114,25 @@ class GimbalSimulator:
     
     def _calculate_rx_packet_size(self) -> int:
         """计算接收数据包大小（VisionToGimbal）"""
-        base_size = 15  # CD(1) + pitch(4) + yaw(4) + mode(1) + timestamp(4) + DC(1)
+        base_size = 11  # CD(1) + pitch(4) + yaw(4) + mode(1) + DC(1)
         
         if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
-            base_size += 8  # yaw_vel(4) + pitch_vel(4)
+            base_size += 8  # pitch_vel(4) + yaw_vel(4)
         
         if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
-            base_size += 12  # vx(4) + vy(4) + wz(4)
+            base_size += 13  # vx(4) + vy(4) + wz(4) + form(1)
         
         return base_size
     
     def _calculate_tx_packet_size(self) -> int:
         """计算发送数据包大小（GimbalToVision）"""
-        base_size = 16  # CD(1) + pitch(4) + yaw(4) + mode(1) + timestamp(4) + bullet_speed(1) + DC(1)
+        base_size = 12  # CD(1) + pitch(4) + yaw(4) + mode(1) + bullet_speed(1) + DC(1)
         
         if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
-            base_size += 8  # yaw_vel(4) + pitch_vel(4)
+            base_size += 8  # pitch_vel(4) + yaw_vel(4)
         
         if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
-            base_size += 3  # game_status(1) + blood(1) + bullet(1)
+            base_size += 5  # game_status(1) + blood(2) + bullet(2)
         
         return base_size
     
@@ -169,18 +167,17 @@ class GimbalSimulator:
             return None
         
         try:
-            # 基础格式: CD + pitch(4) + yaw(4) + mode(1) + timestamp(4)
-            base_format = '<BffBI'
-            base_size = 14  # CD(1) + pitch(4) + yaw(4) + mode(1) + timestamp(4)
+            # 基础格式: CD + pitch(4) + yaw(4) + mode(1)
+            base_format = '<BffB'
             
             # 根据通信模式构建格式字符串
             format_str = base_format
             
             if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
-                format_str += 'ff'  # yaw_vel(4) + pitch_vel(4)
+                format_str += 'ff'  # pitch_vel(4) + yaw_vel(4)
             
             if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
-                format_str += 'fff'  # vx(4) + vy(4) + wz(4)
+                format_str += 'fffb'  # vx(4) + vy(4) + wz(4) + form(1)
             
             format_str += 'B'  # tail(1)
             
@@ -197,19 +194,19 @@ class GimbalSimulator:
             packet.pitch = unpacked[1]
             packet.yaw = unpacked[2]
             packet.mode = unpacked[3]
-            packet.timestamp = unpacked[4]
             
-            index = 5
+            index = 4
             if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
-                packet.yaw_vel = unpacked[index]
-                packet.pitch_vel = unpacked[index + 1]
+                packet.pitch_vel = unpacked[index]
+                packet.yaw_vel = unpacked[index + 1]
                 index += 2
             
             if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
                 packet.vx = unpacked[index]
                 packet.vy = unpacked[index + 1]
                 packet.wz = unpacked[index + 2]
-                index += 3
+                packet.form = unpacked[index + 3]
+                index += 4
             
             packet.tail = unpacked[-1]
             
@@ -222,30 +219,26 @@ class GimbalSimulator:
     def create_gimbal_packet(self) -> bytes:
         """创建云台数据包"""
         try:
-            # 使用当前时间戳
-            timestamp = int(time.time() * 1000) & 0xFFFFFFFF
-            
             # 基础数据
             data_list = [
                 0xCD,  # head
                 self.current_pitch,
                 self.current_yaw,
                 self.mode,  # 固定为自瞄模式
-                timestamp,
                 10,  # bullet_speed
             ]
             
             # 基础格式
-            format_str = '<BffBIB'
+            format_str = '<BffBB'
             
             # 根据通信模式添加扩展数据
             if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
-                data_list.extend([0.0, 0.0])  # yaw_vel, pitch_vel (填0)
+                data_list.extend([0.0, 0.0])  # pitch_vel, yaw_vel (填0)
                 format_str += 'ff'
             
             if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
                 data_list.extend([0, 0, 0])  # game_status, blood, bullet (填0)
-                format_str += 'BBB'
+                format_str += 'BHH'
             
             data_list.append(0xDC)  # tail
             format_str += 'B'
@@ -263,10 +256,10 @@ class GimbalSimulator:
         log_msg = f"收到视觉数据 - 模式: {vision_data.mode}, Pitch: {vision_data.pitch:.3f}, Yaw: {vision_data.yaw:.3f}"
         
         if self.comm_mode in [CommunicationMode.SR_VEL_ONLY, CommunicationMode.BOTH_ENABLED]:
-            log_msg += f", YawVel: {vision_data.yaw_vel:.3f}, PitchVel: {vision_data.pitch_vel:.3f}"
+            log_msg += f", PitchVel: {vision_data.pitch_vel:.3f}, YawVel: {vision_data.yaw_vel:.3f}"
         
         if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
-            log_msg += f", Vx: {vision_data.vx:.3f}, Vy: {vision_data.vy:.3f}, Wz: {vision_data.wz:.3f}"
+            log_msg += f", Vx: {vision_data.vx:.3f}, Vy: {vision_data.vy:.3f}, Wz: {vision_data.wz:.3f}, Form: {vision_data.form}"
         
         logger.info(log_msg)
         
