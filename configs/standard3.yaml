@@ -2,7 +2,7 @@ enemy_color: "red"
 #enemy_color: "blue"
 
 #####-----神经网络参数-----#####
-yolo_name: yolov5_trt
+yolo_name: yolov5_ov
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
@@ -75,7 +75,7 @@ Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----gimbal参数-----#####
-com_port: /dev/pts/4
+com_port: /dev/ttyACM0
 
 # #####-----相机参数-----#####
 # camera_name: "mindvision"
@@ -83,15 +83,15 @@ com_port: /dev/pts/4
 # gamma: 3 #已经废弃
 # vid_pid: "f622:d13a"
 
-# camera_name: "hikrobot"
-# exposure_ms: 3
-# gain: 10.0
-# vid_pid: "2bdf:0001"
+camera_name: "hikrobot"
+exposure_ms: 3
+gain: 10.0
+vid_pid: "2bdf:0001"
 
-camera_name: "daheng"
-exposure_ms: 5
-gamma: 2.85
-vid_pid: "KE0200010097"
+# camera_name: "daheng"
+# exposure_ms: 5
+# gamma: 2.85
+# vid_pid: "KE0200010097"
 
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 #  1  0  0
@@ -190,6 +190,6 @@ armor_yaw_threshold: 10 # 锁车时装甲板yaw角度阈值，degree
 
 #####-----UI显示配置-----#####
 ui:
-  enabled: false  # 是否绘制UI
+  enabled: true  # 是否绘制UI
   imshow: true   # 是否使用imshow显示图像
   

@@ -22,6 +22,8 @@ public:
   std::vector<int8_t> subscribe_autoaim_target();
 
   std::optional<geometry_msgs::msg::Twist> get_nav_velocity();
+  
+  std::optional<std_msgs::msg::Int8> get_gimbal_form();
 
   std_msgs::msg::Int8 subscribe_form();
 

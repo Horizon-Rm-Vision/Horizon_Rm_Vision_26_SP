@@ -187,7 +187,9 @@ int main(int argc, char * argv[])
     auto gs = gimbal.state();
     #ifdef SENTRY_SR
     auto velocity = ros2.get_nav_velocity();
+    auto gimbal_form = ros2.get_gimbal_form();
     auto form = ros2.subscribe_form();
+    int8_t gimbal_form_value = gimbal_form ? gimbal_form->data : 0;
     //发布导航的信息
     ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.x, gs.y, gs.angle, gs.state, gs.energy_state);
     #endif
@@ -265,7 +267,7 @@ int main(int argc, char * argv[])
     gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, 0);
     #endif
     #ifdef SENTRY_SR
-    gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z, form.data);
+    gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z, form.data,gimbal_form_value);
     #endif
   }
 

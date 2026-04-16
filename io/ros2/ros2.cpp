@@ -31,6 +31,11 @@ std::optional<geometry_msgs::msg::Twist> ROS2::get_nav_velocity()
     return subscribe2nav_->get_nav_velocity();
 }
 
+std::optional<std_msgs::msg::Int8> ROS2::get_gimbal_form()
+{
+    return subscribe2nav_->get_gimbal_form();
+}
+
 std_msgs::msg::Int8 ROS2::subscribe_form()
 {
     return subscribe2nav_->subscribe_form();
