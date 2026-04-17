@@ -11,6 +11,10 @@
 #include "armor.hpp"
 #include "tools/extended_kalman_filter.hpp"
 
+#ifdef NOVA_OUTPOST_V2
+#include <set>
+#endif
+
 namespace auto_aim
 {
 
@@ -24,6 +28,9 @@ public:
   int last_id;  // debug only
   #ifdef AIM_CENTER
   double v1, v2;
+  #endif
+  #ifdef NOVA_OUTPOST_V1
+  int ID;       // debug only
   #endif
 
   Target() = default;
@@ -49,6 +56,7 @@ public:
   bool checkinit();
 
 private:
+#ifndef NOVA_OUTPOST_V2
   int armor_num_;
   int switch_count_;
   int update_count_;
@@ -59,7 +67,31 @@ private:
   std::chrono::steady_clock::time_point t_;
 
   void update_ypda(const Armor & armor, int id);  // yaw pitch distance angle
+#endif
+#ifdef NOVA_OUTPOST_V2
+  static constexpr int OUTPOST_ARMOR_NUM = 3;
+  static constexpr double OUTPOST_H_MAX_REASONABLE = 0.25;
+  static constexpr double OUTPOST_MATCH_GATE = 10.0;
 
+  int armor_num_ = 0;
+  int switch_count_ = 0;
+  int update_count_ = 0;
+  int current_id_ = 0;
+
+  bool is_switch_ = false, is_converged_ = false, is_h_converged_ = false;
+
+  std::set<int> observed_ids_;
+
+  tools::ExtendedKalmanFilter ekf_;
+  std::chrono::steady_clock::time_point t_;
+
+  void update_ypda(const Armor & armor, int id);  // yaw pitch distance angle
+
+  int outpost_match_by_mahalanobis(const Armor & armor);
+  Eigen::VectorXd outpost_predict_observation(const Eigen::VectorXd & x, int id) const;
+  Eigen::MatrixXd outpost_compute_R_from_prediction(const Eigen::VectorXd & z_pred) const;
+  bool outpost_h_converged() const;
+#endif
   Eigen::Vector3d h_armor_xyz(const Eigen::VectorXd & x, int id) const;
   Eigen::MatrixXd h_jacobian(const Eigen::VectorXd & x, int id) const;
 };

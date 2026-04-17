@@ -23,15 +23,16 @@
   扩展数据填0
 
 新的使用方法：
-python3 SPSREMU_V8.py --mode 0  # 普通模式
-python3 SPSREMU_V8.py --mode 1  # 只启用SR_VEL
-python3 SPSREMU_V8.py --mode 2  # 只启用SENTRY_SR
-python3 SPSREMU_V8.py --mode 3  # 同时启用两者
+python3 SPSREMU_V9.py --mode 0  --p=/dev/ttyUSB0 # 普通模式
+python3 SPSREMU_V9.py --mode 1  --p=/dev/ttyUSB0 # 只启用SR_VEL
+python3 SPSREMU_V9.py --mode 2  --p=/dev/ttyUSB0 # 只启用SENTRY_SR
+python3 SPSREMU_V9.py --mode 3  --p=/dev/ttyUSB0 # 同时启用两者
 """
 #除了可以两个实体串口自收自发，也可以用虚拟串口 socat -d -d pty,b115200 pty,b115200
 
 import serial
 import struct
+import time
 import threading
 import logging
 from typing import Optional

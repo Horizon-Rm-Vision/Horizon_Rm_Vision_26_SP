@@ -51,6 +51,12 @@ private:
   float aim_center_min_distance_;
   #endif
 
+  #ifdef NOVA_OUTPOST_V2
+  int outpost_min_detect_count_;
+  int outpost_detect_fail_tolerance_;
+  int detect_fail_count_;
+  #endif
+
   void state_machine(bool found);
 
   bool set_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t);

@@ -1,5 +1,5 @@
-enemy_color: auto #auto表示根据gimbal发送的模式自动判断敌我颜色，非auto表示固定敌我颜色
-#enemy_color: "red"
+#enemy_color: auto #auto表示根据gimbal发送的模式自动判断敌我颜色，非auto表示固定敌我颜色
+enemy_color: "red"
 #enemy_color: "blue"
 
 #####-----神经网络参数-----#####

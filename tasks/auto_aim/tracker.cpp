@@ -15,6 +15,9 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   enemy_color_{Color::blue},
   enemy_color_auto_{false},
   detect_count_(0),
+  #ifdef NOVA_OUTPOST_V2
+  detect_fail_count_(0),
+  #endif
   temp_lost_count_(0),
   state_{"lost"},
   pre_state_{"lost"},
@@ -32,6 +35,12 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   min_detect_count_ = yaml["min_detect_count"].as<int>();
   max_temp_lost_count_ = yaml["max_temp_lost_count"].as<int>();
   outpost_max_temp_lost_count_ = yaml["outpost_max_temp_lost_count"].as<int>();
+#ifdef NOVA_OUTPOST_V2
+  outpost_min_detect_count_ =
+    yaml["outpost_min_detect_count"] ? yaml["outpost_min_detect_count"].as<int>() : 3;
+  outpost_detect_fail_tolerance_ =
+    yaml["outpost_detect_fail_tolerance"] ? yaml["outpost_detect_fail_tolerance"].as<int>() : 8;
+#endif
   normal_temp_lost_count_ = max_temp_lost_count_;
   #ifdef AIM_CENTER
   aim_center_min_distance_ = yaml["aim_center_min_distance"].as<float>();
@@ -212,8 +221,12 @@ void Tracker::state_machine(bool found)
 
     state_ = "detecting";
     detect_count_ = 1;
+    #ifdef NOVA_OUTPOST_V2
+    detect_fail_count_ = 0;
+    #endif
   }
 
+  #ifndef NOVA_OUTPOST_V2
   else if (state_ == "detecting") {
     if (found) {
       detect_count_++;
@@ -232,6 +245,41 @@ void Tracker::state_machine(bool found)
       state_ = "lost";
     }
   }
+  #endif
+  #ifdef NOVA_OUTPOST_V2
+    else if (state_ == "detecting") {
+    if (found) {
+      detect_count_++;
+      detect_fail_count_ = 0;
+      #ifdef AIM_CENTER
+      auto required_count =
+        (target_.name == ArmorName::outpost) ? outpost_min_detect_count_ : min_detect_count_;
+      if (detect_count_ >= required_count){
+        state_ = "tracking";
+        if(target_.ekf_x()[0] <= aim_center_min_distance_) aim_strategy_ = "follow";
+        else aim_strategy_ = "center";
+      }
+      #endif
+      #ifndef AIM_CENTER
+      auto required_count =
+        (target_.name == ArmorName::outpost) ? outpost_min_detect_count_ : min_detect_count_;
+      if (detect_count_ >= required_count) state_ = "tracking";
+      #endif
+    } else {
+      if (target_.name == ArmorName::outpost) {
+        detect_fail_count_++;
+        if (detect_fail_count_ > outpost_detect_fail_tolerance_) {
+          detect_count_ = 0;
+          detect_fail_count_ = 0;
+          state_ = "lost";
+        }
+      } else {
+        detect_count_ = 0;
+        state_ = "lost";
+      }
+    }
+  }
+  #endif
 
   else if (state_ == "tracking") {
     if (found) return;
@@ -283,7 +331,11 @@ bool Tracker::set_target(std::list<Armor> & armors, std::chrono::steady_clock::t
   }
 
   else if (armor.name == ArmorName::outpost) {
+    #ifdef NOVA_OUTPOST_V1
+    Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 81, 0.4, 100, 1, 1, 1}};
+    #else
     Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 81, 0.4, 100, 1e-4, 0, 0}};
+    #endif
     target_ = Target(armor, t, 0.2765, 3, P0_dig);
   }
 
