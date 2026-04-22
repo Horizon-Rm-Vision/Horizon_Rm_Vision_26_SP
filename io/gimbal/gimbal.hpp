@@ -32,10 +32,15 @@ struct __attribute__((packed)) GimbalToVision
     float yaw_vel;
   #endif
   #ifdef SENTRY_SR
-  uint8_t game_status;           // 比赛阶段
-  uint16_t blood;                 // 血量
-  uint16_t bullet;                // 弹量
-  // bool superpower;             // 超电开关
+  uint8_t game_progress;           // 比赛阶段
+  uint16_t stage_remain_time;                 // 剩余时间
+  uint16_t current_hp;                // 当前血量
+  uint16_t ally_outpost_hp;                // 己方基地血量
+  float x;                   // x方向位置
+  float y;                   // y方向位置
+  float angle;                   // 朝向
+  uint8_t state;                // 姿态
+  uint8_t energy_state;             // 能量机关状态
   #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
 };
@@ -57,6 +62,7 @@ struct __attribute__((packed)) VisionToGimbal
   float vy;                   // y方向速度
   float wz;                   // 角速度
   int8_t form;                // 哨兵姿态
+  int8_t gimbal;               // 云台编号，预留字段，暂时填0
   #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
 };
@@ -81,9 +87,15 @@ struct GimbalState
   uint16_t bullet_count;
   int8_t self_color = -1;
   #ifdef SENTRY_SR
-  uint8_t game_status;           // 比赛阶段
-  uint16_t blood;                 // 血量
-  uint16_t bullet;                // 弹量
+  uint8_t game_progress;           // 比赛阶段
+  uint16_t stage_remain_time;                 // 剩余时间
+  uint16_t current_hp;                 // 血量
+  uint16_t ally_outpost_hp;                // 己方基地血量
+  float x;                   // x方向位置
+  float y;                   // y方向位置
+  float angle;                   // 朝向    
+  uint8_t state;                // 姿态
+  uint8_t energy_state;             // 能量机关状态
   #endif
 };
 
@@ -113,7 +125,7 @@ public:
   #ifdef SENTRY_SR
   void send(
     bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-    float pitch_acc, float vx, float vy, float wz,int form);
+    float pitch_acc, float vx, float vy, float wz,int form,int gimbal);
   #endif
 
   void send(io::VisionToGimbal VisionToGimbal);

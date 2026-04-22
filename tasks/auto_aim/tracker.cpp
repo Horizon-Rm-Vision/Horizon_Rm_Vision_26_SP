@@ -40,6 +40,24 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
     yaml["outpost_min_detect_count"] ? yaml["outpost_min_detect_count"].as<int>() : 3;
   outpost_detect_fail_tolerance_ =
     yaml["outpost_detect_fail_tolerance"] ? yaml["outpost_detect_fail_tolerance"].as<int>() : 8;
+
+  Target::OutpostV2Params outpost_v2_params;
+  outpost_v2_params.h_max_reasonable =
+    yaml["outpost_h_max_reasonable"] ? yaml["outpost_h_max_reasonable"].as<double>() : 0.25;
+  outpost_v2_params.match_gate =
+    yaml["outpost_match_gate"] ? yaml["outpost_match_gate"].as<double>() : 10.0;
+  outpost_v2_params.q_h =
+    yaml["outpost_q_h"] ? yaml["outpost_q_h"].as<double>() : 0.0006;
+  outpost_v2_params.h_converged_variance = yaml["outpost_h_converged_variance"] ?
+      yaml["outpost_h_converged_variance"].as<double>() :
+      0.05;
+  outpost_v2_params.converged_pos_p_max = yaml["outpost_converged_pos_p_max"] ?
+      yaml["outpost_converged_pos_p_max"].as<double>() :
+      0.5;
+  outpost_v2_params.converged_vel_p_max = yaml["outpost_converged_vel_p_max"] ?
+      yaml["outpost_converged_vel_p_max"].as<double>() :
+      10.0;
+  Target::set_outpost_v2_params(outpost_v2_params);
 #endif
   normal_temp_lost_count_ = max_temp_lost_count_;
   #ifdef AIM_CENTER

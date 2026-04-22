@@ -21,6 +21,20 @@ namespace auto_aim
 class Target
 {
 public:
+#ifdef NOVA_OUTPOST_V2
+  struct OutpostV2Params
+  {
+    double h_max_reasonable = 0.25;
+    double match_gate = 10.0;
+    double q_h = 0.0006;
+    double h_converged_variance = 0.05;
+    double converged_pos_p_max = 0.5;
+    double converged_vel_p_max = 10.0;
+  };
+
+  static void set_outpost_v2_params(const OutpostV2Params & params);
+#endif
+
   ArmorName name;
   ArmorType armor_type;
   ArmorPriority priority;
@@ -70,8 +84,7 @@ private:
 #endif
 #ifdef NOVA_OUTPOST_V2
   static constexpr int OUTPOST_ARMOR_NUM = 3;
-  static constexpr double OUTPOST_H_MAX_REASONABLE = 0.25;
-  static constexpr double OUTPOST_MATCH_GATE = 10.0;
+  static OutpostV2Params outpost_v2_params_;
 
   int armor_num_ = 0;
   int switch_count_ = 0;

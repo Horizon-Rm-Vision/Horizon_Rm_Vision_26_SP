@@ -15,6 +15,12 @@ namespace auto_aim
 {
 
 #ifdef NOVA_OUTPOST_V2
+Target::OutpostV2Params Target::outpost_v2_params_{};
+
+void Target::set_outpost_v2_params(const OutpostV2Params & params) { outpost_v2_params_ = params; }
+#endif
+
+#ifdef NOVA_OUTPOST_V2
 namespace
 {
 double sin_interp(double x, double x0, double x1, double y0, double y1)
@@ -137,7 +143,7 @@ void Target::predict(double dt)
     v1 = 10;   // 前哨站加速度方差
     v2 = 0.1;  // 前哨站角加速度方差
     #ifdef NOVA_OUTPOST_V2
-        v_h = 0.0006;  // 前哨站高度差过程噪声
+      v_h = outpost_v2_params_.q_h;  // 前哨站高度差过程噪声
     #endif
   } else {
     v1 = 100;  // 加速度方差
@@ -421,7 +427,7 @@ int Target::outpost_match_by_mahalanobis(const Armor & armor)
     double d2 = (nu.transpose() * R_inv * nu)(0, 0);
     d2_list[id] = d2;
 
-    if (std::isfinite(d2) && d2 < OUTPOST_MATCH_GATE) {
+    if (std::isfinite(d2) && d2 < outpost_v2_params_.match_gate) {
       if (d2 < min_d2) {
         min_d2 = d2;
         best_id = id;
@@ -448,7 +454,9 @@ bool Target::outpost_h_converged() const
 {
   double p_h1 = ekf_.P(9, 9);
   double p_h2 = ekf_.P(10, 10);
-  bool variance_ok = (p_h1 < 0.05) && (p_h2 < 0.05);
+  bool variance_ok =
+    (p_h1 < outpost_v2_params_.h_converged_variance) &&
+    (p_h2 < outpost_v2_params_.h_converged_variance);
   bool enough_ids = observed_ids_.size() >= 2;
   return variance_ok && enough_ids;
 }
@@ -475,8 +483,8 @@ bool Target::diverged() const
   #ifdef NOVA_OUTPOST_V2
     if (name == ArmorName::outpost && armor_num_ == OUTPOST_ARMOR_NUM) {
     if (
-      std::abs(ekf_.x[9]) > OUTPOST_H_MAX_REASONABLE ||
-      std::abs(ekf_.x[10]) > OUTPOST_H_MAX_REASONABLE)
+      std::abs(ekf_.x[9]) > outpost_v2_params_.h_max_reasonable ||
+      std::abs(ekf_.x[10]) > outpost_v2_params_.h_max_reasonable)
       return true;
 
     if (ekf_.x.hasNaN() || ekf_.P.hasNaN()) return true;
@@ -520,7 +528,10 @@ bool Target::convergened()
     double p_pos_max = std::max({ekf_.P(0, 0), ekf_.P(2, 2), ekf_.P(4, 4)});
     double p_vel_max = std::max({ekf_.P(1, 1), ekf_.P(3, 3), ekf_.P(5, 5)});
 
-    if (p_pos_max > 0.5 || p_vel_max > 10.0) return false;
+    if (
+      p_pos_max > outpost_v2_params_.converged_pos_p_max ||
+      p_vel_max > outpost_v2_params_.converged_vel_p_max)
+      return false;
 
     is_converged_ = true;
     is_h_converged_ = true;

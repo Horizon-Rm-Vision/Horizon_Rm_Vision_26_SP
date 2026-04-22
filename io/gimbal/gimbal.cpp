@@ -322,7 +322,7 @@ void Gimbal::send(
 // 自瞄向电控发送数据(哨兵模式，带导航通信内容)
 void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-  float pitch_acc,float vx, float vy, float wz,int form)
+  float pitch_acc,float vx, float vy, float wz,int form,int gimbal)
 {
   uint8_t mode;
   if (control) 
@@ -357,6 +357,7 @@ void Gimbal::send(
   tx_data_.vy = vy;
   tx_data_.wz = wz;
   tx_data_.form = form;
+  tx_data_.gimbal = gimbal; //预留字段，暂时填0
 
   if (fd_ < 0) {
     tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
@@ -481,9 +482,15 @@ void Gimbal::read_thread()
       #endif
       #ifdef SENTRY_SR
       //哨兵导航相关数据
-      uint8_t game_status = rx_data_.game_status;
-      uint16_t blood = rx_data_.blood;
-      uint16_t bullet = rx_data_.bullet;
+      uint8_t game_progress = rx_data_.game_progress;
+      uint16_t stage_remain_time = rx_data_.stage_remain_time;
+      uint16_t current_hp = rx_data_.current_hp;
+      uint16_t ally_outpost_hp = rx_data_.ally_outpost_hp;
+      float x = rx_data_.x;
+      float y = rx_data_.y;
+      float angle = rx_data_.angle;
+      uint8_t state = rx_data_.state;
+      uint8_t energy_state = rx_data_.energy_state;
       #endif
       // 使用yaw和pitch计算四元数（roll设为0）
       //单位转换
@@ -532,9 +539,15 @@ void Gimbal::read_thread()
             state_.bullet_count = 0;  // 子弹计数暂时填0
             #ifdef SENTRY_SR
             //哨兵导航相关数据
-            state_.game_status = game_status;
-            state_.blood = blood;
-            state_.bullet = bullet;
+            state_.game_progress = game_progress;
+            state_.stage_remain_time = stage_remain_time;
+            state_.current_hp = current_hp;
+            state_.ally_outpost_hp = ally_outpost_hp;
+            state_.x = x;
+            state_.y = y;
+            state_.angle = angle;
+            state_.state = state;
+            state_.energy_state = energy_state;
             #endif
         }
             //本次接收前后模式变化记录日志

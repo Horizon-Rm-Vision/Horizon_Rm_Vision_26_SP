@@ -14,12 +14,15 @@
 
 - 只启用SENTRY_SR (SENTRY_SR_ONLY=2): 包含哨兵相关数据
     VisionToGimbal: 基础 + vx(4) + vy(4) + wz(4) + form(1) = 24字节
-    GimbalToVision: 基础 + game_status(1) + blood(2) + bullet(2) = 17字节
+    GimbalToVision: 基础 + game_progress(1) + stage_remain_time(2) + current_hp(2) + ally_outpost_hp(2)
+                  + x(4) + y(4) + angle(4) + state(1) + energy_state(1) = 33字节
   扩展数据填0
 
 - 同时启用两者 (BOTH_ENABLED=3): 包含所有扩展数据
     VisionToGimbal: 基础 + pitch_vel(4) + yaw_vel(4) + vx(4) + vy(4) + wz(4) + form(1) = 32字节
-    GimbalToVision: 基础 + pitch_vel(4) + yaw_vel(4) + game_status(1) + blood(2) + bullet(2) = 25字节
+    GimbalToVision: 基础 + pitch_vel(4) + yaw_vel(4) + game_progress(1) + stage_remain_time(2)
+                  + current_hp(2) + ally_outpost_hp(2) + x(4) + y(4) + angle(4) + state(1)
+                  + energy_state(1) = 41字节
   扩展数据填0
 
 新的使用方法：
@@ -77,14 +80,20 @@ class GimbalToVision:
     pitch: float = 0.0
     yaw: float = 0.0
     mode: int = 1  # 固定为自瞄模式
-    bullet_speed: int = 10  # 模拟弹速
+    bullet_speed: int = 150  # 模拟弹速
     # SR_VEL扩展字段
     pitch_vel: float = 0.0
     yaw_vel: float = 0.0
-    # SENTRY_SR扩展字段
-    game_status: int = 0
-    blood: int = 0
-    bullet: int = 0
+    # SENTRY_SR扩展字段（适配最新gimbal协议）
+    game_progress: int = 0
+    stage_remain_time: int = 0
+    current_hp: int = 0
+    ally_outpost_hp: int = 0
+    x: float = 0.0
+    y: float = 0.0
+    angle: float = 0.0
+    state: int = 0
+    energy_state: int = 0
     tail: int = 0xDC
 
 class GimbalSimulator:
@@ -133,7 +142,8 @@ class GimbalSimulator:
             base_size += 8  # pitch_vel(4) + yaw_vel(4)
         
         if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
-            base_size += 5  # game_status(1) + blood(2) + bullet(2)
+            base_size += 21  # game_progress(1) + stage_remain_time(2) + current_hp(2) + ally_outpost_hp(2)
+                            # + x(4) + y(4) + angle(4) + state(1) + energy_state(1)
         
         return base_size
     
@@ -226,7 +236,7 @@ class GimbalSimulator:
                 self.current_pitch,
                 self.current_yaw,
                 self.mode,  # 固定为自瞄模式
-                10,  # bullet_speed
+                150,  # bullet_speed
             ]
             
             # 基础格式
@@ -238,8 +248,10 @@ class GimbalSimulator:
                 format_str += 'ff'
             
             if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
-                data_list.extend([0, 0, 0])  # game_status, blood, bullet (填0)
-                format_str += 'BHH'
+                # game_progress, stage_remain_time, current_hp, ally_outpost_hp,
+                # x, y, angle, state, energy_state (填0)
+                data_list.extend([0, 0, 0, 0, 0.0, 0.0, 0.0, 0, 0])
+                format_str += 'BHHHfffBB'
             
             data_list.append(0xDC)  # tail
             format_str += 'B'
@@ -266,8 +278,10 @@ class GimbalSimulator:
         
         # 如果模式是57（控制且开火），更新云台位置
         if vision_data.mode == 57:
-            self.current_pitch = vision_data.pitch
-            self.current_yaw = vision_data.yaw
+            #self.current_pitch = vision_data.pitch
+            #self.current_yaw = vision_data.yaw
+            self.current_pitch = 0
+            self.current_yaw = 0
             logger.info(f"更新云台位置 - Pitch: {self.current_pitch:.3f}, Yaw: {self.current_yaw:.3f}")
         else:
             # 其他模式保持当前位置不变
