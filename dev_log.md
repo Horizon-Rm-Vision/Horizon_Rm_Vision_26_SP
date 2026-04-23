@@ -63,7 +63,7 @@
   1.基于peek2的四元数取数方式,待多几个版本测试以验证可靠性(from infantry)
 ## 
 
-#### MileStone 7 STABLE：
+#### MileStone 7：
 
 - **功能更新:**
   1.统一UI架构,统一standard_serial和auto_aim_debug_mpc的ui显示,合并img_tools和新增UI绘制的全部内容,支持现有src和test调用,支持使用yaml控制UI绘制与否和imshow启用与否
@@ -86,6 +86,17 @@
   1.基于peek2的四元数取数方式,经测试已验证其可靠(from infantry)
 - **待验证:**
   1.aimer模式下英雄弹道解算可能存在问题,待测试验证
+## 
+
+#### Release Candidate 1 DEV6：
+
+- **功能更新:**
+  1.更新视觉导航通信内容
+  2.UI增加导航相关内容
+  3.NOVA_OUTPOST_V2调试参数引出,可用yaml控制
+  4.SPSREMU_V9升级,支持新版哨兵通信,修复弹速问题
+- **已验证:**
+  1.已确认daheng相机帧率不稳定引起云台不稳定的问题并不存在
 ## 
 待开发任务：
 1.TRT推理性能进一步优化

@@ -38,7 +38,17 @@ min_confidence: 0.8
 #####-----tracker参数-----#####
 min_detect_count: 5
 max_temp_lost_count: 15
+
+#####-----outpost参数-----#####
 outpost_max_temp_lost_count: 75
+outpost_min_detect_count: 3
+outpost_detect_fail_tolerance: 8
+outpost_h_max_reasonable: 0.25
+outpost_match_gate: 10.0
+outpost_q_h: 0.0006
+outpost_h_converged_variance: 0.05
+outpost_converged_pos_p_max: 0.5
+outpost_converged_vel_p_max: 10.0
 
 #####-----aimer参数-----#####
 yaw_offset: -1 # degree -2.5

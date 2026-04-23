@@ -133,11 +133,17 @@ void DaHengCamera::open()
   // 取图线程
   capture_thread_ = std::thread{[this] {
     ok_ = true;
+    
+    // 预分配缓冲区以避免每次循环分配内存
+    uint8_t *pRGB24Buf = nullptr;
+    uint8_t *pRaw8Image = nullptr;
+    size_t buffer_size = 0;
+    
     while (!quit_) {
       std::this_thread::sleep_for(1ms);
 
-      // 调用GXDQBuf取一帧图像
-      status_ = GXDQBuf(hDevice_, &pFrameBuffer_, 1000);
+      // 调用GXDQBuf取一帧图像，减少超时时间到100ms以获取最新图像
+      status_ = GXDQBuf(hDevice_, &pFrameBuffer_, 100);
       auto timestamp = std::chrono::steady_clock::now();
 
       if (status_ != GX_STATUS_SUCCESS || pFrameBuffer_->nStatus != GX_FRAME_STATUS_SUCCESS) {
@@ -150,8 +156,15 @@ void DaHengCamera::open()
       int64_t g_i64ColorFilter = GX_COLOR_FILTER_NONE;
       GXGetEnum(hDevice_, GX_ENUM_PIXEL_COLOR_FILTER, &g_i64ColorFilter);
       
-      uint8_t *pRGB24Buf = new uint8_t[pFrameBuffer_->nWidth * pFrameBuffer_->nHeight * 3];
-      uint8_t *pRaw8Image = new uint8_t[pFrameBuffer_->nWidth * pFrameBuffer_->nHeight];
+      // 检查是否需要重新分配缓冲区（分辨率变化时）
+      size_t current_size = pFrameBuffer_->nWidth * pFrameBuffer_->nHeight;
+      if (buffer_size != current_size) {
+        buffer_size = current_size;
+        delete [] pRGB24Buf;
+        delete [] pRaw8Image;
+        pRGB24Buf = new uint8_t[buffer_size * 3];
+        pRaw8Image = new uint8_t[buffer_size];
+      }
 
       // 图像格式转换
       switch (pFrameBuffer_->nPixelFormat) {
@@ -159,7 +172,7 @@ void DaHengCamera::open()
         case GX_PIXEL_FORMAT_BAYER_RG8:
         case GX_PIXEL_FORMAT_BAYER_GB8:
         case GX_PIXEL_FORMAT_BAYER_BG8: {
-          DxRaw8toRGB24((unsigned char*)pFrameBuffer_->pImgBuf, pRGB24Buf, 
+          DxRaw8toRGB24((unsigned char*)pFrameBuffer_->pImgBuf, pRGB24Buf,
                        pFrameBuffer_->nWidth, pFrameBuffer_->nHeight,
                        RAW2RGB_NEIGHBOUR, DX_PIXEL_COLOR_FILTER(g_i64ColorFilter), false);
           break;
@@ -172,9 +185,9 @@ void DaHengCamera::open()
         case GX_PIXEL_FORMAT_BAYER_RG12:
         case GX_PIXEL_FORMAT_BAYER_GB12:
         case GX_PIXEL_FORMAT_BAYER_BG12: {
-          DxRaw16toRaw8((unsigned char*)pFrameBuffer_->pImgBuf, pRaw8Image, 
+          DxRaw16toRaw8((unsigned char*)pFrameBuffer_->pImgBuf, pRaw8Image,
                        pFrameBuffer_->nWidth, pFrameBuffer_->nHeight, DX_BIT_2_9);
-          DxRaw8toRGB24((unsigned char*)pRaw8Image, pRGB24Buf, 
+          DxRaw8toRGB24((unsigned char*)pRaw8Image, pRGB24Buf,
                        pFrameBuffer_->nWidth, pFrameBuffer_->nHeight,
                        RAW2RGB_NEIGHBOUR, DX_PIXEL_COLOR_FILTER(g_i64ColorFilter), false);
           break;
@@ -190,13 +203,14 @@ void DaHengCamera::open()
       // 将图像buf放回库中继续采图
       status_ = GXQBuf(hDevice_, pFrameBuffer_);
 
-      delete [] pRGB24Buf;
-      delete [] pRaw8Image;
-
       if (!img.empty()) {
         queue_.push({img.clone(), timestamp});
       }
     }
+    
+    // 清理缓冲区
+    delete [] pRGB24Buf;
+    delete [] pRaw8Image;
   }};
 
   tools::logger()->info("DaHeng camera opened.");

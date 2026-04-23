@@ -4,6 +4,7 @@
 
 #include <tuple>
 
+#include "io/gimbal/gimbal.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
 
@@ -11,7 +12,12 @@ namespace auto_aim
 {
 Tracker::Tracker(const std::string & config_path, Solver & solver)
 : solver_{solver},
+  enemy_color_{Color::blue},
+  enemy_color_auto_{false},
   detect_count_(0),
+  #ifdef NOVA_OUTPOST_V2
+  detect_fail_count_(0),
+  #endif
   temp_lost_count_(0),
   state_{"lost"},
   pre_state_{"lost"},
@@ -19,10 +25,40 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   omni_target_priority_{ArmorPriority::fifth}
 {
   auto yaml = YAML::LoadFile(config_path);
-  enemy_color_ = (yaml["enemy_color"].as<std::string>() == "red") ? Color::red : Color::blue;
+  const auto enemy_color_cfg = yaml["enemy_color"].as<std::string>();
+  if (enemy_color_cfg == "auto") {
+    enemy_color_auto_ = true;
+    refresh_enemy_color_from_serial();
+  } else {
+    enemy_color_ = (enemy_color_cfg == "red") ? Color::red : Color::blue;
+  }
   min_detect_count_ = yaml["min_detect_count"].as<int>();
   max_temp_lost_count_ = yaml["max_temp_lost_count"].as<int>();
   outpost_max_temp_lost_count_ = yaml["outpost_max_temp_lost_count"].as<int>();
+#ifdef NOVA_OUTPOST_V2
+  outpost_min_detect_count_ =
+    yaml["outpost_min_detect_count"] ? yaml["outpost_min_detect_count"].as<int>() : 3;
+  outpost_detect_fail_tolerance_ =
+    yaml["outpost_detect_fail_tolerance"] ? yaml["outpost_detect_fail_tolerance"].as<int>() : 8;
+
+  Target::OutpostV2Params outpost_v2_params;
+  outpost_v2_params.h_max_reasonable =
+    yaml["outpost_h_max_reasonable"] ? yaml["outpost_h_max_reasonable"].as<double>() : 0.25;
+  outpost_v2_params.match_gate =
+    yaml["outpost_match_gate"] ? yaml["outpost_match_gate"].as<double>() : 10.0;
+  outpost_v2_params.q_h =
+    yaml["outpost_q_h"] ? yaml["outpost_q_h"].as<double>() : 0.0006;
+  outpost_v2_params.h_converged_variance = yaml["outpost_h_converged_variance"] ?
+      yaml["outpost_h_converged_variance"].as<double>() :
+      0.05;
+  outpost_v2_params.converged_pos_p_max = yaml["outpost_converged_pos_p_max"] ?
+      yaml["outpost_converged_pos_p_max"].as<double>() :
+      0.5;
+  outpost_v2_params.converged_vel_p_max = yaml["outpost_converged_vel_p_max"] ?
+      yaml["outpost_converged_vel_p_max"].as<double>() :
+      10.0;
+  Target::set_outpost_v2_params(outpost_v2_params);
+#endif
   normal_temp_lost_count_ = max_temp_lost_count_;
   #ifdef AIM_CENTER
   aim_center_min_distance_ = yaml["aim_center_min_distance"].as<float>();
@@ -31,9 +67,23 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
 
 std::string Tracker::state() const { return state_; }
 
+void Tracker::refresh_enemy_color_from_serial()
+{
+  if (!enemy_color_auto_) return;
+
+  const auto self_color = io::latest_self_color();
+  if (self_color == 0) {
+    enemy_color_ = Color::blue;
+  } else if (self_color == 1) {
+    enemy_color_ = Color::red;
+  }
+}
+
 std::list<Target> Tracker::track(
   std::list<Armor> & armors, std::chrono::steady_clock::time_point t, bool use_enemy_color)
 {
+  refresh_enemy_color_from_serial();
+
   auto dt = tools::delta_time(t, last_timestamp_);
   last_timestamp_ = t;
 
@@ -102,6 +152,8 @@ std::tuple<omniperception::DetectionResult, std::list<Target>> Tracker::track(
   const std::vector<omniperception::DetectionResult> & detection_queue, std::list<Armor> & armors,
   std::chrono::steady_clock::time_point t, bool use_enemy_color)
 {
+  refresh_enemy_color_from_serial();
+
   omniperception::DetectionResult switch_target{std::list<Armor>(), t, 0, 0};
   omniperception::DetectionResult temp_target{std::list<Armor>(), t, 0, 0};
   if (!detection_queue.empty()) {
@@ -187,8 +239,12 @@ void Tracker::state_machine(bool found)
 
     state_ = "detecting";
     detect_count_ = 1;
+    #ifdef NOVA_OUTPOST_V2
+    detect_fail_count_ = 0;
+    #endif
   }
 
+  #ifndef NOVA_OUTPOST_V2
   else if (state_ == "detecting") {
     if (found) {
       detect_count_++;
@@ -207,6 +263,41 @@ void Tracker::state_machine(bool found)
       state_ = "lost";
     }
   }
+  #endif
+  #ifdef NOVA_OUTPOST_V2
+    else if (state_ == "detecting") {
+    if (found) {
+      detect_count_++;
+      detect_fail_count_ = 0;
+      #ifdef AIM_CENTER
+      auto required_count =
+        (target_.name == ArmorName::outpost) ? outpost_min_detect_count_ : min_detect_count_;
+      if (detect_count_ >= required_count){
+        state_ = "tracking";
+        if(target_.ekf_x()[0] <= aim_center_min_distance_) aim_strategy_ = "follow";
+        else aim_strategy_ = "center";
+      }
+      #endif
+      #ifndef AIM_CENTER
+      auto required_count =
+        (target_.name == ArmorName::outpost) ? outpost_min_detect_count_ : min_detect_count_;
+      if (detect_count_ >= required_count) state_ = "tracking";
+      #endif
+    } else {
+      if (target_.name == ArmorName::outpost) {
+        detect_fail_count_++;
+        if (detect_fail_count_ > outpost_detect_fail_tolerance_) {
+          detect_count_ = 0;
+          detect_fail_count_ = 0;
+          state_ = "lost";
+        }
+      } else {
+        detect_count_ = 0;
+        state_ = "lost";
+      }
+    }
+  }
+  #endif
 
   else if (state_ == "tracking") {
     if (found) return;
@@ -258,7 +349,11 @@ bool Tracker::set_target(std::list<Armor> & armors, std::chrono::steady_clock::t
   }
 
   else if (armor.name == ArmorName::outpost) {
+    #ifdef NOVA_OUTPOST_V1
+    Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 81, 0.4, 100, 1, 1, 1}};
+    #else
     Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 81, 0.4, 100, 1e-4, 0, 0}};
+    #endif
     target_ = Target(armor, t, 0.2765, 3, P0_dig);
   }
 

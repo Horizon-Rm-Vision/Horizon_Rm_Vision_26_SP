@@ -342,7 +342,7 @@ int main(int argc, char * argv[])
   gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
   #endif
   #ifdef SENTRY_SR
-  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0);
+  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   #endif
 
   return 0;
