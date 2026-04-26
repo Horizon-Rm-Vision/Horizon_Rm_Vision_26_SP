@@ -41,7 +41,7 @@ void Publish2Nav::send_data(const Eigen::Vector4d & target_pos)
   //   message->data.c_str());
 }
 
-void Publish2Nav::send_status(uint8_t game_progress,uint16_t stage_remain_time,uint16_t current_hp,uint16_t ally_outpost_hp,float x,float y,float angle,uint8_t state,uint8_t energy_state)
+void Publish2Nav::send_status(uint8_t game_progress,uint16_t stage_remain_time,uint16_t current_hp,uint16_t ally_outpost_hp,float x,float y,float angle,uint8_t state,uint8_t energy_state,uint16_t bullets)
 {
     auto message = sp_msgs::msg::NavStatusMsg();
     message.game_progress = game_progress;
@@ -53,6 +53,7 @@ void Publish2Nav::send_status(uint8_t game_progress,uint16_t stage_remain_time,u
     message.angle = angle;
     message.state = state;
     message.energy_state = energy_state;
+    message.bullets = bullets;
     status_publisher_->publish(message);
 }
 

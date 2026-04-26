@@ -41,6 +41,7 @@ struct __attribute__((packed)) GimbalToVision
   float angle;                   // 朝向
   uint8_t state;                // 姿态
   uint8_t energy_state;             // 能量机关状态
+  uint16_t bullets;                // 子弹数量
   #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
 };
@@ -96,7 +97,8 @@ struct GimbalState
   float angle;                   // 朝向    
   uint8_t state;                // 姿态
   uint8_t energy_state;             // 能量机关状态
-  #endif
+  uint16_t bullets;                // 子弹数量
+   #endif
 };
 
 int8_t latest_self_color();

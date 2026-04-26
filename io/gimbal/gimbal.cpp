@@ -491,6 +491,7 @@ void Gimbal::read_thread()
       float angle = rx_data_.angle;
       uint8_t state = rx_data_.state;
       uint8_t energy_state = rx_data_.energy_state;
+      uint16_t bullets = rx_data_.bullets;
       #endif
       // 使用yaw和pitch计算四元数（roll设为0）
       //单位转换
@@ -548,6 +549,7 @@ void Gimbal::read_thread()
             state_.angle = angle;
             state_.state = state;
             state_.energy_state = energy_state;
+            state_.bullets = bullets;
             #endif
         }
             //本次接收前后模式变化记录日志
