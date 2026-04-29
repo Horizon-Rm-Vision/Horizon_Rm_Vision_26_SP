@@ -688,4 +688,36 @@ Eigen::MatrixXd Target::h_jacobian(const Eigen::VectorXd & x, int id) const
 
 bool Target::checkinit() { return isinit; }
 
+bool Target::is_outpost_predicted_bottom_armor() const
+{
+  if (name != ArmorName::outpost) return true;
+
+  const auto xyza_list = armor_xyza_list();
+  if (xyza_list.empty()) return false;
+
+  // 下面装甲板：z 最小
+  int bottom_id = 0;
+  double min_z = std::numeric_limits<double>::infinity();
+  for (int i = 0; i < static_cast<int>(xyza_list.size()); i++) {
+    if (xyza_list[i][2] < min_z) {
+      min_z = xyza_list[i][2];
+      bottom_id = i;
+    }
+  }
+
+  // 当前“预测最可能命中的装甲板”：与云台最正对（|armor_yaw - center_yaw| 最小）
+  const double center_yaw = std::atan2(ekf_.x[2], ekf_.x[0]);
+  int best_id = 0;
+  double best_diff = std::numeric_limits<double>::infinity();
+  for (int i = 0; i < static_cast<int>(xyza_list.size()); i++) {
+    const double diff = std::abs(tools::limit_rad(xyza_list[i][3] - center_yaw));
+    if (diff < best_diff) {
+      best_diff = diff;
+      best_id = i;
+    }
+  }
+
+  return best_id == bottom_id;
+}
+
 }  // namespace auto_aim

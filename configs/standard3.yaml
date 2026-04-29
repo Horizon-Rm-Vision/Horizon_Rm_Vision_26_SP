@@ -192,7 +192,7 @@ fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
 
 # 弹道解算模式，可选 "no_drag" (默认抛物线) 或 "hero" (带空气阻力迭代)
-ballistic_model: "hero"
+ballistic_model: "khero"
 
 #####-----nav速度倍数（仅用于哨兵模式，导航相关）-----#####
 velocity_n: 30

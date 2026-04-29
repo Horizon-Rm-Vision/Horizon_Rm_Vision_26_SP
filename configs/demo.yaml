@@ -1,5 +1,5 @@
-# enemy_color: "red"
-enemy_color: "blue"
+enemy_color: "red"
+# enemy_color: "blue"
 
 #####-----神经网络参数-----#####
 yolo_name: yolov5_trt
@@ -140,7 +140,7 @@ command_fire_gap: 0.080 # s
 predict_time: 0.150     # s
 
 # 弹道模型: "no_drag" 或 "hero"（可选）
-ballistic_model: "no_drag"
+ballistic_model: "khero"
 
 #####-----锁车中心参数-----#####
 aim_center: false # 锁车中心

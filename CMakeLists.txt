@@ -30,7 +30,7 @@ add_compile_definitions(AIM_CENTER) # 锁车中心模式，启用后会增加一
 add_compile_definitions(NOVA_Q) #基于peek2的四元数取数方式,待多几个版本测试以验证可靠性
 add_compile_definitions(FIRE_CONSTRAINT) # 开火约束
 #add_compile_definitions(NOVA_OUTPOST_V1) # 新版前哨站识别方案1
-#add_compile_definitions(NOVA_OUTPOST_V2) # 新版前哨站识别方案2,二者不能同时启用
+add_compile_definitions(NOVA_OUTPOST_V2) # 新版前哨站识别方案2,二者不能同时启用
 
 if(BUILD_SENTRY)
 add_compile_definitions(SENTRY_SR) # 串口通信编译为哨兵导航联合通信版本

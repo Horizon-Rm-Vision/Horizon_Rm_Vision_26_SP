@@ -313,6 +313,13 @@ Plan Planner::aim_at_center(Target target, double bullet_speed)
     if (best_diff < armor_yaw_threshold) {
       plan.control = true;
       plan.fire = true;
+
+      // hero 模式下：前哨站重投影完成后，仅当预测到“下面装甲板”才开火
+      if (ballistic_model_ == BallisticModel::kHero && target.name == ArmorName::outpost) {
+        if (!target.is_outpost_predicted_bottom_armor()) {
+          plan.fire = false;
+        }
+      }
     } else {
       plan.control = false;
       plan.fire = false;
