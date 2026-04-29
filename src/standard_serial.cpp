@@ -15,6 +15,7 @@
 #include "tasks/auto_aim/yolo.hpp"
 #include "tools/exiter.hpp"
 #include "tools/ui_manager.hpp"
+#include "tools/ui_web_stream.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
 #include "tools/plotter.hpp"
@@ -76,6 +77,7 @@ int main(int argc, char * argv[])
   auto_aim::Shooter shooter(config_path);
 
   tools::UIManager ui_manager(config_path);
+  tools::UIWebStream ui_web_stream(config_path);
   ui_manager.setProgramMode("AutoAim AIMER");
 
   cv::Mat img;
@@ -110,6 +112,7 @@ int main(int argc, char * argv[])
     }
     
     camera.read(img, t);
+    ui_web_stream.beginFrame(img.cols, img.rows);
     q = gimbal.q(t);
     auto gimbal_mode = gimbal.mode();
     // Map GimbalMode to Mode
@@ -230,6 +233,8 @@ int main(int argc, char * argv[])
     
     // 应用UI绘制
     ui_manager.render(img);
+    ui_web_stream.capturePanels(ui_manager);
+    ui_web_stream.sendFrame();
 
     // 显示图像
     if (ui_manager.isImshowEnabled()) {

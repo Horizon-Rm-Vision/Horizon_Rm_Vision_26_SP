@@ -89,23 +89,23 @@ Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----gimbal参数-----#####
-com_port: /dev/pts/4
+com_port: /dev/pts/7
 
 # #####-----相机参数-----#####
-camera_name: "mindvision"
-exposure_ms: 3
-gamma: 3 #已经废弃
-vid_pid: "f622:d13a"
+#camera_name: "mindvision"
+#exposure_ms: 3
+#gamma: 3 #已经废弃
+#vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
 # vid_pid: "2bdf:0001"
 
-# camera_name: "daheng"
-# exposure_ms: 6
-# gamma: 2.85
-# vid_pid: "KE0200010097"
+camera_name: "daheng"
+exposure_ms: 6
+gamma: 2.85
+vid_pid: "KE0200010097"
 
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 #  1  0  0
@@ -202,8 +202,17 @@ aim_center: false # 锁车中心
 aim_center_min_distance: 100 # 触发锁车中心机制的最小距离，单位m，当装甲板距离车中心大于该值时优先锁定车中心点
 armor_yaw_threshold: 10 # 锁车时装甲板yaw角度阈值，degree
 
-#####-----UI显示配置-----#####
+# #####-----UI显示配置-----#####
 ui:
-  enabled: true  # 是否绘制UI
-  imshow: true   # 是否使用imshow显示图像
-  
+  enabled: false
+  imshow: false
+  web:
+    enabled: true
+    host: "192.168.1.75"
+    port: 9876
+
+plotter:
+  web:
+    enabled: true
+    host: "192.168.1.75"
+    port: 9876

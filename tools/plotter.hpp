@@ -25,6 +25,8 @@ class Plotter
 {
 public:
   Plotter(std::string host = "127.0.0.1", uint16_t port = 9870);
+  void configureWebStreamFromConfig(const std::string & config_path);
+  void setWebStream(const std::string & host, uint16_t port, bool enabled);
 
   ~Plotter();
 
@@ -44,6 +46,12 @@ private:
   sockaddr_in destination_;
   std::mutex mutex_;
 
+  int web_socket_{-1};
+  sockaddr_in web_destination_{};
+  bool web_enabled_{false};
+  std::string web_host_{"127.0.0.1"};
+  uint16_t web_port_{9876};
+
   // 曲线绘制相关函数和变量
   void drawGrid(cv::Mat& img, int plot_width, int plot_height, double min_val, double max_val);
   void drawCurve(cv::Mat& img, const CurveData& curve, int plot_width, int plot_height, 
@@ -59,6 +67,10 @@ private:
   int margin_top_{40};
   int margin_bottom_{40};
   int frame_count_{0};
+
+  void initWebSocket();
+  void closeWebSocket();
+  void sendWebSnapshot(const std::vector<double> & values);
 };
 
 }  // namespace tools

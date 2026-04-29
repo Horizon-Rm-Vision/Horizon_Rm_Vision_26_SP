@@ -14,6 +14,7 @@
 #include "tasks/auto_aim/yolo.hpp"
 #include "tools/exiter.hpp"
 #include "tools/ui_manager.hpp"
+#include "tools/ui_web_stream.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
 #include "tools/plotter.hpp"
@@ -64,6 +65,8 @@ int main(int argc, char * argv[])
   #endif
 
   tools::UIManager ui_manager(config_path);
+  tools::UIWebStream ui_web_stream(config_path);
+  plotter.configureWebStreamFromConfig(config_path);
   ui_manager.setProgramMode("AutoAim MPC");
 
   io::Gimbal gimbal(config_path);
@@ -196,6 +199,8 @@ int main(int argc, char * argv[])
     }
     
     camera.read(img, t);
+    ui_web_stream.beginFrame(img.cols, img.rows);
+    ui_web_stream.beginFrame(img.cols, img.rows);
     auto q = gimbal.q(t);
 
     solver.set_R_gimbal2world(q);
@@ -325,6 +330,10 @@ int main(int argc, char * argv[])
     
     // 应用UI绘制
     ui_manager.render(img);
+    ui_web_stream.capturePanels(ui_manager);
+    ui_web_stream.sendFrame();
+    ui_web_stream.capturePanels(ui_manager);
+    ui_web_stream.sendFrame();
 
     // cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
     if (ui_manager.isImshowEnabled()) {

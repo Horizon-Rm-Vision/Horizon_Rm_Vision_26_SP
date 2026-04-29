@@ -50,6 +50,31 @@ https://github.com/user-attachments/assets/606c2907-2f11-4392-b3fe-7ee4b7b6fd29
 支持通信方式：USB2CAN（即将被删除支持）\USB串口\
 辅助工具：NoMachine（远程桌面）、PlotJuggler（绘制曲线图）
 
+### 3.2.1 Web UI 转发（Jetson 无 GUI）
+为避免 Jetson 图形界面影响帧率，可启用 Web UI 数据转发，在调试电脑上重绘 UI（不传输图像）。
+
+发送端配置（以 `configs/*.yaml` 为例）：
+
+```yaml
+ui:
+    enabled: false
+    imshow: false
+    web:
+        enabled: true
+        host: "<接收端电脑IP>" #在接收端使用命令:ip -4 addr 获得接收端ip,示例:"192.168.1.75"
+        port: 9876
+```
+
+调试端启动接收程序：
+
+```bash
+cd web_ui_receiver
+pip install -r requirements.txt
+python receiver.py --host 0.0.0.0 --port 9876
+```
+
+Plotter 曲线也会通过同一端口发送并在调试端额外打开 `Plotter` 窗口。
+
 ### 3.2 软件与库依赖
 
 迈德/大恒/海康相机SDK

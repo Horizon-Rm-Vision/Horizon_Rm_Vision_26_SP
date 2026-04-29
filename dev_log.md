@@ -88,12 +88,10 @@
   1.aimer模式下英雄弹道解算可能存在问题,待测试验证
 ## 
 
-#### Release Candidate 1 DEV7：
+#### Release Candidate 1 DEV8：
 
 - **功能更新:**
-  1.模型前哨站误识别修正机制
-  2.更新readme,新增配置文档
-  3.TensorRT支持自动寻找而不用指定用户名
+  1.新增WEB调试接收器,支持将ui_manager和plotter的所有数据通过web发出,在接收端利用收到的数据重绘,具体使用方法见web_ui_receiver的readme.md
 - **已验证:**
   1.已确认daheng相机帧率不稳定引起云台不稳定的问题并不存在
 ## 
