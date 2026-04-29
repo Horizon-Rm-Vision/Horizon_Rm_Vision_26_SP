@@ -43,6 +43,9 @@ max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 outpost_min_detect_count: 3
 outpost_detect_fail_tolerance: 8
+outpost_correction_enable: true
+outpost_correction_min_detect_count: 3
+outpost_correction_cancel_count: 5
 outpost_h_max_reasonable: 0.25
 outpost_match_gate: 10.0
 outpost_q_h: 0.0006

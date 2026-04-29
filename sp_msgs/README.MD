@@ -8,17 +8,17 @@ by ZYL
 
 ### 安装到系统
 
-**方法1：CMAKE编译安装 sp_msgs 包：**
+**方法1(推荐)：CMAKE编译安装 sp_msgs 包,在sp_msgs文件夹下打开终端,执行以下命令：**
 
 ```bash
-cd sp_msgs
+cd src
 mkdir -p build && cd build
 cmake ..
 make
 sudo make install
 ```
 
-然后在该目录下搜索：“local_setup.sh”，找到这个文件，复制到主目录的build下，编译主程序
+然后在该目录下搜索：“local_setup.sh”，找到这个文件，复制到主目录的build文件夹下，再编译主程序
 
 ```
 cmake ..

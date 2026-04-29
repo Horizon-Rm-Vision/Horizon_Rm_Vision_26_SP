@@ -1,12 +1,13 @@
-# Horizon战队26赛季自瞄算法
+# Horizon_Rm_Vision_26_SP
 
 ## 本项目亮点
-- 无ROS依赖*，新同学无需学习ROS相关知识就能上手自瞄。
+- ROS依赖可选，新同学无需学习ROS相关知识就能上手自瞄。
 - 完整工作流，包含开发、编译、调试、部署全流程。
 - 模块化架构，包含各模块的功能说明、代码实现、以及独立的测试程序。
 - 提出了“轨迹视角下的自瞄理论”，并据此设计了“自瞄轨迹规划算法”。相比传统自瞄决策算法，该算法实现更简洁、调试更方便、效果更好，击杀时间仅需10s（300HP，14rad/s，2m）。该理论也为后续自瞄技术的改进提供了方向。
-
-*为实现哨兵“追击”功能，本项目预留了与导航通信的ROS接口。
+- 支持多种工业相机,集成迈德/大恒/海康相机驱动,支持USB相机辅助哨兵进行全向感知
+- 支持TensorRT10/OpenVINO双推理框架,支持arm64开发板
+- 支持接入ROS2程序,原生支持PB哨兵导航联合通信
 
 
 ## 1 功能介绍
@@ -20,9 +21,9 @@
 
 本项目包含了本队自瞄相关的视觉组部分的全部代码，包括但不限于：多线程相机驱动程序、电控通信协议和具体实现、图像-四元数对齐算法、相机内参标定和手眼标定程序、装甲板识别算法（含传统、神经网络多种实现）、装甲板位姿解算、坐标变换和yaw优化算法、基于拓展卡尔曼的整车估计器、瞄准位置和开火决策逻辑、以及各模块独立测试程序等。
 
-本项目建立在往年[sp_vision_23](https://github.com/TongjiSuperPower/sp_vision_23)、[sp_vision_24](https://github.com/TongjiSuperPower/sp_vision_24)项目的基础之上。其中，sp_vision_23完全基于Python开发，跑通了自瞄从识别到射击的完整流程，因其运行效率不佳（在导航运行时，帧率仅60FPS），sp_vision_24采用C++重写（帧率约100FPS），并且具备参数文件加载、日志记录、离线检测与重启、类似rosbag（时间戳+视频+四元数）录制等辅助功能，以及各个模块的独立测试程序，实现“赛前问题排查、赛后问题重现”的能力，保证了自瞄的可靠性和稳定性。
+本项目基于同济大学的[sp_vision_23](https://github.com/TongjiSuperPower/sp_vision_23)、[sp_vision_24](https://github.com/TongjiSuperPower/sp_vision_24)、[sp_vision_25](https://github.com/TongjiSuperPower/sp_vision_25)项目的基础之上。其中，sp_vision_23完全基于Python开发，跑通了自瞄从识别到射击的完整流程，因其运行效率不佳（在导航运行时，帧率仅60FPS），sp_vision_24采用C++重写（帧率约100FPS），并且具备参数文件加载、日志记录、离线检测与重启、类似rosbag（时间戳+视频+四元数）录制等辅助功能，以及各个模块的独立测试程序，实现“赛前问题排查、赛后问题重现”的能力，保证了自瞄的可靠性和稳定性。sp_vision_25则在上述基础上改进了识别器和决策器。其中，识别器由传统的图像处理方案更换为其它战队开源的基于神经网络的四点检测模型[1,2]，以期提高识别器的召回能力。而决策器则由基于经验主义的分段决策逻辑改为基于轨迹优化的规划器，简化代码的同时，实现了更优的云台控制效果和开火决策逻辑，其思路会在后文详细介绍。
 
-本项目在上述基础上改进了识别器和决策器。其中，识别器由传统的图像处理方案更换为其它战队开源的基于神经网络的四点检测模型[1,2]，以期提高识别器的召回能力。而决策器则由基于经验主义的分段决策逻辑改为基于轨迹优化的规划器，简化代码的同时，实现了更优的云台控制效果和开火决策逻辑，其思路会在后文详细介绍。
+Horizon_Rm_Vision_26_SP在25的基础上添加了适用于TensorRT10的模型推理支持,大恒工业相机支持,通信修改为Horizon格式,移植了华科的英雄弹道解算,添加了UI显示调试相关数据,补全了sp_msg并实现了导航通过自瞄串口节点实现联合通信,引入了基于武科和民航的新版前哨站识别策略,引入了自适应串口名和自适应敌方颜色判断机制,编写了一个简易的云台模拟器。
 
 
 ## 2 效果展示
@@ -42,15 +43,31 @@ https://github.com/user-attachments/assets/606c2907-2f11-4392-b3fe-7ee4b7b6fd29
 
 
 ## 3 详细信息
-### 3.1 项目环境依赖
+### 3.1 项目硬件与系统依赖
 支持操作系统：Ubuntu 22.04\20.04(理论上支持,未实际验证)
 支持运算平台：x86 MiniPC（支持纯OpenVINO部署或全量部署,暂不支持纯TensorRT部署）\ Jetson Orin Nano 8GB(目前仅支持全量部署)
 支持相机品牌：海康\迈德\大恒
 支持通信方式：USB2CAN（即将被删除支持）\USB串口\
 辅助工具：NoMachine（远程桌面）、PlotJuggler（绘制曲线图）
 
-### 3.2 编译方式
+### 3.2 软件与库依赖
+
+迈德/大恒/海康相机SDK
+OpenVINO 2024或更高版本(全量部署&OpenVINO部署)
+CUDA 11/12 + CUDNN 8/9 +TensorRT 10 (全量部署)
+Ceres 2.2.0
+CMake 3.16或更高版本
+g++ 11/12
+OpenCV 4 with CUDA (全量部署)
+fmt 8.1.1
+eigen 3.4.0
+yaml-cpp
+spdlog
+nlohmann-json3
+具体编译环境配置方法见根目录下的"install.md"
+
 1. 安装依赖项：
+   
    - [MindVision SDK](https://mindvision.com.cn/category/software/sdk-installation-package/)或[HikRobot SDK](https://www.hikrobotics.com/cn2/source/support/software/MVS_STD_GML_V2.1.2_231116.zip)
    - [OpenVINO](https://docs.openvino.ai/2024/get-started/install-openvino/install-openvino-archive-linux.html)
    - [Ceres](http://ceres-solver.org/installation.html)
@@ -71,7 +88,7 @@ https://github.com/user-attachments/assets/606c2907-2f11-4392-b3fe-7ee4b7b6fd29
         openssh-server \
         screen
     ```
-
+   
 2. 编译：
     ```bash
     cmake -B build
@@ -179,29 +196,65 @@ https://github.com/user-attachments/assets/606c2907-2f11-4392-b3fe-7ee4b7b6fd29
 
 ### 3.5 文件结构
 ```
-sp_vision_25
-├── assets         // 包含demo素材、网络权重等
-│   └── ...
-├── calibration    // 标定相关程序
-│   ├── calibrate_camera.cpp             // 相机内参标定程序
-│   ├── calibrate_handeye.cpp            // 手眼标定程序
+Horizon_Rm_Vision_26_SP
+├── assets             // 包含demo素材、网络权重等
+│   ├── ...
+├── autostart_V1.sh    // 自启脚本V1
+├── autostart_V2.sh    // 自启脚本V2
+├── buff_layout.xml    // 打符布局文件
+├── build              // 编译输出目录
+├── calibration        // 标定相关程序
+│   ├── SP标定手册V2.md                // 标定手册
+│   ├── calibrate_camera.cpp           // 相机内参标定程序
+│   ├── calibrate_handeye.cpp          // 手眼标定程序
 │   ├── calibrate_robotworld_handeye.cpp // 手眼标定程序（同时计算标定板位置）
-│   └── capture.cpp                      // 相机标定数据采集程序
-├── CMakeLists.txt // CMake配置文件
-├── configs        // 每台机器人的YAML配置文件
+│   ├── capture.cpp                    // 相机标定数据采集程序
+│   └── split_video.cpp                // 视频分割程序
+├── CMakeLists.txt     // CMake配置文件
+├── cmake              // CMake辅助模块
+│   └── FindTensorRT.cmake             // TensorRT查找脚本
+├── configs            // 每台机器人的YAML配置文件
 │   └── ...
-├── io             // 硬件抽象层，见3.4软件架构
+├── dev_log.md         // 开发日志
+├── io                 // 硬件抽象层，见3.4软件架构
+│   ├── camera.cpp
+│   ├── camera.hpp
+│   ├── cboard.cpp
+│   ├── cboard.hpp
+│   ├── command.hpp
+│   ├── socketcan.hpp
 │   └── ...
-├── src            // 应用层，见3.4软件架构
-│   └── ...
-├── tasks          // 功能层，见3.4软件架构
+├── local_setup.sh     // 本地环境初始化脚本
+├── logs               // 运行日志目录
+├── mpc_layout.xml     // MPC布局文件
+├── readme.md          // 项目说明文档
+├── SPSREMU_V9.py      // 仿真辅助脚本
+├── sp_msgs            // ROS消息包
+│   ├── README.MD      // 消息包说明
+│   ├── src            // 消息包源码
+│   └── uninstall_sp_msgs.sh // 卸载脚本
+├── src                // 应用层，见3.4软件架构
+│   ├── auto_aim_debug_mpc.cpp
+│   ├── auto_buff_debug.cpp
+│   ├── auto_buff_debug_mpc.cpp
+│   ├── auto_buff_debug_serial.cpp
+│   ├── mt_auto_aim_debug.cpp
+│   ├── mt_standard.cpp
+│   ├── sentry.cpp
+│   ├── sentry_bp.cpp
+│   ├── sentry_debug.cpp
+│   ├── sentry_multithread.cpp
+│   ├── standard.cpp
+│   ├── standard_mpc.cpp
+│   ├── standard_serial.cpp
+│   ├── uav.cpp
+│   └── uav_debug.cpp
+├── tasks              // 功能层，见3.4软件架构
 │   ├── auto_aim       // 自瞄相关算法实现
-│   │   └── ...
 │   ├── auto_buff      // 打符相关算法实现
-│   │   └── ...
 │   └── omniperception // 全向感知相关算法实现
-│   │   └── ...
-├── tests
+├── test_gpu_performance.sh // GPU性能测试脚本
+├── tests              // 测试程序
 │   ├── auto_aim_test.cpp         // 自瞄录制视频测试程序
 │   ├── auto_buff_test.cpp        // 打符录制视频测试程序
 │   ├── camera_detect_test.cpp    // 识别器测试程序（工业相机）
@@ -216,25 +269,40 @@ sp_vision_25
 │   ├── handeye_test.cpp          // 手眼标定测试程序
 │   ├── minimum_vision_system.cpp // 最小视觉系统测试程序
 │   ├── multi_usbcamera_test.cpp  // 多USB摄像头测试程序
-│   ├── planner_test_offline.cpp  // 规划器测试程序（离线）
 │   ├── planner_test.cpp          // 规划器测试程序（实车）
+│   ├── planner_test_offline.cpp  // 规划器测试程序（离线）
 │   ├── publish_test.cpp          // ROS发送测试程序
 │   ├── subscribe_test.cpp        // ROS接收测试程序
 │   ├── topic_loop_test.cpp       // ROS话题循环测试程序
 │   ├── usbcamera_detect_test.cpp // 识别器测试程序（USB相机）
 │   ├── usbcamera_test.cpp        // USB相机测试程序
 │   └── ...
-└── tools          // 工具层，见3.4软件架构
+└── tools              // 工具层，见3.4软件架构
+    ├── CMakeLists.txt             // 工具层CMake配置文件
+    ├── crc.cpp                    // CRC校验实现
     ├── crc.hpp                    // CRC校验
+    ├── exiter.cpp                 // 退出检测实现
     ├── exiter.hpp                 // 退出检测
+    ├── extended_kalman_filter.cpp // 扩展卡尔曼滤波器实现
     ├── extended_kalman_filter.hpp // 扩展卡尔曼滤波器
-    ├── img_tools.hpp              // 图像处理工具
+    ├── logger.cpp                 // 日志记录器实现
     ├── logger.hpp                 // 日志记录器
+    ├── math_tools.cpp             // 数学工具实现
     ├── math_tools.hpp             // 数学工具
+    ├── pid.cpp                    // PID控制器实现
+    ├── pid.hpp                    // PID控制器
+    ├── plotter.cpp                // 曲线图绘制工具实现
     ├── plotter.hpp                // 曲线图绘制工具
+    ├── ransac_sine_fitter.cpp     // RANSAC正弦拟合实现
+    ├── ransac_sine_fitter.hpp     // RANSAC正弦拟合
+    ├── recorder.cpp               // 视频录制器实现
     ├── recorder.hpp               // 视频录制器
+    ├── thread_pool.hpp            // 线程池
     ├── thread_safe_queue.hpp      // 线程安全队列
+    ├── trajectory.cpp             // 弹道解算实现
     ├── trajectory.hpp             // 弹道解算
+    ├── ui_manager.cpp             // 界面管理器实现
+    ├── ui_manager.hpp             // 界面管理器
     ├── yaml.hpp                   // YAML配置文件解析器
     └── ...
 ```

@@ -2,6 +2,7 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <algorithm>
 #include <tuple>
 
 #include "io/gimbal/gimbal.hpp"
@@ -22,7 +23,13 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   state_{"lost"},
   pre_state_{"lost"},
   last_timestamp_(std::chrono::steady_clock::now()),
-  omni_target_priority_{ArmorPriority::fifth}
+  omni_target_priority_{ArmorPriority::fifth},
+  outpost_correction_enable_{false},
+  outpost_correction_active_{false},
+  outpost_correction_min_detect_count_{3},
+  outpost_correction_cancel_count_{5},
+  outpost_seen_streak_{0},
+  non_outpost_seen_streak_{0}
 {
   auto yaml = YAML::LoadFile(config_path);
   const auto enemy_color_cfg = yaml["enemy_color"].as<std::string>();
@@ -59,6 +66,16 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
       10.0;
   Target::set_outpost_v2_params(outpost_v2_params);
 #endif
+
+  outpost_correction_enable_ =
+    yaml["outpost_correction_enable"] ? yaml["outpost_correction_enable"].as<bool>() : false;
+  outpost_correction_min_detect_count_ = yaml["outpost_correction_min_detect_count"] ?
+    yaml["outpost_correction_min_detect_count"].as<int>() :
+    outpost_correction_min_detect_count_;
+  outpost_correction_cancel_count_ = yaml["outpost_correction_cancel_count"] ?
+    yaml["outpost_correction_cancel_count"].as<int>() :
+    outpost_correction_cancel_count_;
+
   normal_temp_lost_count_ = max_temp_lost_count_;
   #ifdef AIM_CENTER
   aim_center_min_distance_ = yaml["aim_center_min_distance"].as<float>();
@@ -79,6 +96,39 @@ void Tracker::refresh_enemy_color_from_serial()
   }
 }
 
+void Tracker::apply_outpost_correction(std::list<Armor> & armors)
+{
+  if (!outpost_correction_enable_ || armors.empty()) return;
+
+  const bool has_outpost =
+    std::any_of(armors.begin(), armors.end(), [](const Armor & a) {
+      return a.name == ArmorName::outpost;
+    });
+
+  if (has_outpost) {
+    outpost_seen_streak_++;
+    non_outpost_seen_streak_ = 0;
+  } else {
+    non_outpost_seen_streak_++;
+    outpost_seen_streak_ = 0;
+  }
+
+  if (!outpost_correction_active_ && outpost_seen_streak_ >= outpost_correction_min_detect_count_) {
+    outpost_correction_active_ = true;
+  }
+
+  if (outpost_correction_active_ &&
+      non_outpost_seen_streak_ >= outpost_correction_cancel_count_) {
+    outpost_correction_active_ = false;
+  }
+
+  if (outpost_correction_active_ && !has_outpost) {
+    for (auto & armor : armors) {
+      armor.name = ArmorName::outpost;
+    }
+  }
+}
+
 std::list<Target> Tracker::track(
   std::list<Armor> & armors, std::chrono::steady_clock::time_point t, bool use_enemy_color)
 {
@@ -94,6 +144,8 @@ std::list<Target> Tracker::track(
   }
   // 过滤掉非我方装甲板
   armors.remove_if([&](const auto_aim::Armor & a) { return a.color != enemy_color_; });
+
+  apply_outpost_correction(armors);
 
   // 过滤前哨站顶部装甲板
   // armors.remove_if([this](const auto_aim::Armor & a) {
@@ -168,6 +220,8 @@ std::tuple<omniperception::DetectionResult, std::list<Target>> Tracker::track(
     tools::logger()->warn("[Tracker] Large dt: {:.3f}s", dt);
     state_ = "lost";
   }
+
+  apply_outpost_correction(armors);
 
   // 优先选择靠近图像中心的装甲板
   armors.sort([](const Armor & a, const Armor & b) {
