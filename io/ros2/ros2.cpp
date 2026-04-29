@@ -21,14 +21,24 @@ ROS2::~ROS2()
   subscribe_spin_thread_->join();
 }
 
-void ROS2::publish_status(uint8_t game_status, uint8_t blood, uint8_t bullet)
+void ROS2::publish_status(uint8_t game_progress,uint16_t stage_remain_time,uint16_t current_hp,uint16_t ally_outpost_hp,float x,float y,float angle,uint8_t state,uint8_t energy_state)
 {
-    publish2nav_->send_status(game_status, blood, bullet);
+    publish2nav_->send_status(game_progress, stage_remain_time, current_hp, ally_outpost_hp, x, y, angle, state, energy_state);
 }
 
 std::optional<geometry_msgs::msg::Twist> ROS2::get_nav_velocity()
 {
     return subscribe2nav_->get_nav_velocity();
+}
+
+std::optional<std_msgs::msg::Int8> ROS2::get_gimbal_form()
+{
+    return subscribe2nav_->get_gimbal_form();
+}
+
+std_msgs::msg::Int8 ROS2::subscribe_form()
+{
+    return subscribe2nav_->subscribe_form();
 }
 
 void ROS2::publish(const Eigen::Vector4d & target_pos) { publish2nav_->send_data(target_pos); }

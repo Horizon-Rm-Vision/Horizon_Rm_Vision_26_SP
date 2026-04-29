@@ -35,6 +35,7 @@ public:
 private:
   Solver & solver_;
   Color enemy_color_;
+  bool enemy_color_auto_;
   int min_detect_count_;
   int max_temp_lost_count_;
   int detect_count_;
@@ -46,8 +47,21 @@ private:
   std::chrono::steady_clock::time_point last_timestamp_;
   ArmorPriority omni_target_priority_;
 
+  bool outpost_correction_enable_;
+  bool outpost_correction_active_;
+  int outpost_correction_min_detect_count_;
+  int outpost_correction_cancel_count_;
+  int outpost_seen_streak_;
+  int non_outpost_seen_streak_;
+
   #ifdef AIM_CENTER
   float aim_center_min_distance_;
+  #endif
+
+  #ifdef NOVA_OUTPOST_V2
+  int outpost_min_detect_count_;
+  int outpost_detect_fail_tolerance_;
+  int detect_fail_count_;
   #endif
 
   void state_machine(bool found);
@@ -55,6 +69,10 @@ private:
   bool set_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t);
 
   bool update_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t);
+
+  void refresh_enemy_color_from_serial();
+
+  void apply_outpost_correction(std::list<Armor> & armors);
 };
 
 }  // namespace auto_aim

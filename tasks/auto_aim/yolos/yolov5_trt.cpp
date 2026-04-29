@@ -8,7 +8,7 @@
 #include <device_launch_parameters.h>
 #include <atomic>
 
-#include "tools/img_tools.hpp"
+#include "tools/ui_manager.hpp"
 #include "tools/logger.hpp"
 
 namespace auto_aim

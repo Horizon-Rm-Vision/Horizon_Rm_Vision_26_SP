@@ -26,7 +26,7 @@ public:
 
   void send_data(const Eigen::Vector4d & data);
 
-  void send_status(uint8_t game_status, uint8_t blood, uint8_t bullet);
+  void send_status(uint8_t game_progress,uint16_t stage_remain_time,uint16_t current_hp,uint16_t ally_outpost_hp,float x,float y,float angle,uint8_t state,uint8_t energy_state);
 
 private:
   // ROS2 发布者

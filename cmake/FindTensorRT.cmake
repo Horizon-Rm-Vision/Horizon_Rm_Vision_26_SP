@@ -28,7 +28,7 @@ endif()
 
 # appends some common paths
 set(_TensorRT_SEARCH_NORMAL
-  PATHS "/home/robot/TensorRT-10.7.0.23"
+  PATHS "$ENV{HOME}/TensorRT-10.7.0.23" #$ENV{HOME}即为用户根目录,相当于"/home/用户名"
 )
 list(APPEND _TensorRT_SEARCHES _TensorRT_SEARCH_NORMAL)
 

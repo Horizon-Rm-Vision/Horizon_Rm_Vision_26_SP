@@ -1,3 +1,9 @@
-uint8 game_status
-uint8 blood
-uint8 bullet
+uint8 game_progress
+uint16 stage_remain_time
+uint16 current_hp
+uint16 ally_outpost_hp
+float32 x
+float32 y
+float32 angle
+uint8 state
+uint8 energy_state

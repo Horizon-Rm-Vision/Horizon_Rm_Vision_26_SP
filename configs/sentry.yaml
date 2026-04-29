@@ -61,6 +61,9 @@ can_interface: "can0"
 min_detect_count: 5
 max_temp_lost_count: 25
 outpost_max_temp_lost_count: 75
+outpost_correction_enable: true
+outpost_correction_min_detect_count: 3
+outpost_correction_cancel_count: 5
 
 #####-----aimer参数-----#####
 yaw_offset: -0.8 # degree -2.5
@@ -72,6 +75,8 @@ right_yaw_offset: -0.6
 decision_speed: 10 # rad/s
 high_speed_delay_time: 0.026 # s
 low_speed_delay_time: 0.010 # s
+gyro_angle_threshold: 60 # degree
+gyro_speed_threshold: 2 # rad/s
 
 #####-----shooter参数-----#####
 first_tolerance: 5 # 近距离射击容差，degree

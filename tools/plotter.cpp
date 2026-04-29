@@ -4,6 +4,8 @@
 #include <sys/socket.h>  // socket, sendto
 #include <unistd.h>      // close
 
+#include "yaml.hpp"
+
 namespace tools
 {
 Plotter::Plotter(std::string host, uint16_t port)
@@ -20,7 +22,89 @@ Plotter::Plotter(std::string host, uint16_t port)
   setPlotSize(1400, 300, 500);  // 宽度、高度、最大点数
 }
 
-Plotter::~Plotter() { ::close(socket_); }
+Plotter::~Plotter()
+{
+  ::close(socket_);
+  closeWebSocket();
+}
+
+void Plotter::configureWebStreamFromConfig(const std::string & config_path)
+{
+  try {
+    YAML::Node config = YAML::LoadFile(config_path);
+    bool enabled = false;
+    std::string host = web_host_;
+    uint16_t port = web_port_;
+
+    if (config["ui"] && config["ui"]["web"]) {
+      auto ui_web = config["ui"]["web"];
+      if (ui_web["enabled"]) {
+        enabled = ui_web["enabled"].as<bool>();
+      }
+      if (ui_web["host"]) {
+        host = ui_web["host"].as<std::string>();
+      }
+      if (ui_web["port"]) {
+        port = static_cast<uint16_t>(ui_web["port"].as<int>());
+      }
+    }
+
+    if (config["plotter"] && config["plotter"]["web"]) {
+      auto plot_web = config["plotter"]["web"];
+      if (plot_web["enabled"]) {
+        enabled = plot_web["enabled"].as<bool>();
+      }
+      if (plot_web["host"]) {
+        host = plot_web["host"].as<std::string>();
+      }
+      if (plot_web["port"]) {
+        port = static_cast<uint16_t>(plot_web["port"].as<int>());
+      }
+      if (plot_web["width"]) {
+        width_ = plot_web["width"].as<int>();
+      }
+      if (plot_web["height"]) {
+        height_ = plot_web["height"].as<int>();
+      }
+      if (plot_web["max_points"]) {
+        max_points_ = plot_web["max_points"].as<int>();
+      }
+    }
+
+    setWebStream(host, port, enabled);
+  } catch (const std::exception &) {
+    setWebStream(web_host_, web_port_, false);
+  }
+}
+
+void Plotter::setWebStream(const std::string & host, uint16_t port, bool enabled)
+{
+  web_host_ = host;
+  web_port_ = port;
+  web_enabled_ = enabled;
+  if (web_enabled_) {
+    initWebSocket();
+  } else {
+    closeWebSocket();
+  }
+}
+
+void Plotter::initWebSocket()
+{
+  if (web_socket_ >= 0) return;
+  web_socket_ = ::socket(AF_INET, SOCK_DGRAM, 0);
+  web_destination_.sin_family = AF_INET;
+  web_destination_.sin_port = ::htons(web_port_);
+  web_destination_.sin_addr.s_addr = ::inet_addr(web_host_.c_str());
+}
+
+void Plotter::closeWebSocket()
+{
+  if (web_socket_ >= 0) {
+    ::close(web_socket_);
+    web_socket_ = -1;
+  }
+}
 
 void Plotter::plot(const nlohmann::json & json)
 {
@@ -76,6 +160,7 @@ void Plotter::addData(const std::vector<double>& values)
     }
   }
   frame_count_++;
+  sendWebSnapshot(values);
 }
 
 void Plotter::addData(const std::vector<double>& values, const std::vector<std::string>& names)
@@ -113,6 +198,41 @@ void Plotter::addData(const std::vector<double>& values, const std::vector<std::
     }
   }
   frame_count_++;
+  sendWebSnapshot(values);
+}
+
+void Plotter::sendWebSnapshot(const std::vector<double> & values)
+{
+  if (!web_enabled_ || web_socket_ < 0) return;
+  if (values.empty() || curves_.empty()) return;
+
+  nlohmann::json payload;
+  payload["type"] = "plotter";
+  payload["width"] = width_;
+  payload["height"] = height_;
+  payload["max_points"] = max_points_;
+  payload["margin_left"] = margin_left_;
+  payload["margin_right"] = margin_right_;
+  payload["margin_top"] = margin_top_;
+  payload["margin_bottom"] = margin_bottom_;
+  payload["frame_count"] = frame_count_;
+
+  payload["names"] = nlohmann::json::array();
+  payload["colors"] = nlohmann::json::array();
+  for (const auto & curve : curves_) {
+    payload["names"].push_back(curve.name);
+    payload["colors"].push_back({curve.color[0], curve.color[1], curve.color[2]});
+  }
+
+  payload["values"] = nlohmann::json::array();
+  for (auto value : values) {
+    payload["values"].push_back(value);
+  }
+
+  auto data = payload.dump();
+  ::sendto(
+    web_socket_, data.c_str(), data.length(), 0,
+    reinterpret_cast<sockaddr *>(&web_destination_), sizeof(web_destination_));
 }
 
 //新增：本地plot数据绘制（from infantryA by WCY）

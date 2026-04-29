@@ -4,6 +4,7 @@
 #include <Eigen/Geometry>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -24,18 +25,22 @@ struct __attribute__((packed)) GimbalToVision
   uint8_t head = 0xCD;        // 包头 0xCD
   float pitch;                // 四字节 pitch
   float yaw;                  // 四字节 yaw
-  uint8_t mode;               // 一字节 mode
-  uint32_t timestamp;         // 四字节时间戳
-  uint8_t bullet_speed;       // 一字节弹速
+  uint8_t mode;               // 一字节 mode(高位携带己方颜色: mode/4, 低2位为原模式: mode%4)
+  uint8_t bullet_speed;       // 一字节弹速，单位为0.1m/s，接收时乘10转换为整数发送
   #ifdef SR_VEL // 添加云台前馈角速度数据收发
-    float yaw_vel;
     float pitch_vel;
+    float yaw_vel;
   #endif
   #ifdef SENTRY_SR
-  uint8_t game_status;           // 比赛阶段
-  uint8_t blood;                 // 血量
-  uint8_t bullet;                // 弹量
-  // bool superpower;             // 超电开关
+  uint8_t game_progress;           // 比赛阶段
+  uint16_t stage_remain_time;                 // 剩余时间
+  uint16_t current_hp;                // 当前血量
+  uint16_t ally_outpost_hp;                // 己方基地血量
+  float x;                   // x方向位置
+  float y;                   // y方向位置
+  float angle;                   // 朝向
+  uint8_t state;                // 姿态
+  uint8_t energy_state;             // 能量机关状态
   #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
 };
@@ -46,30 +51,23 @@ struct __attribute__((packed)) VisionToGimbal
   float pitch;                // 四字节 pitch
   float yaw;                  // 四字节 yaw
   uint8_t mode;               // 一字节 mode
-  uint32_t timestamp;         // 四字节时间戳
+  #ifdef SR_VEL // 添加云台前馈角速度数据收发
+    float pitch_vel;
+    float yaw_vel;
+    // float pitch_acc;
+    // float yaw_acc;
+  #endif
   #ifdef SENTRY_SR
   float vx;                   // x方向速度
   float vy;                   // y方向速度
   float wz;                   // 角速度
-  #endif
-  #ifdef SR_VEL // 添加云台前馈角速度数据收发
-    float yaw_vel;
-    float pitch_vel;
-    // float yaw_acc;
-    // float pitch_acc;
+  int8_t form;                // 哨兵姿态
+  int8_t gimbal;               // 云台编号，预留字段，暂时填0
   #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
 };
 
 static_assert(sizeof(VisionToGimbal) <= 64);
-
-// enum class GimbalMode
-// {
-//   IDLE,        // 空闲
-//   AUTO_AIM,    // 自瞄
-//   SMALL_BUFF,  // 小符
-//   BIG_BUFF     // 大符
-// };
 
 enum class GimbalMode
 {
@@ -87,12 +85,21 @@ struct GimbalState
   float pitch_vel;
   float bullet_speed;
   uint16_t bullet_count;
+  int8_t self_color = -1;
   #ifdef SENTRY_SR
-  uint8_t game_status;           // 比赛阶段
-  uint8_t blood;                 // 血量
-  uint8_t bullet;                // 弹量
+  uint8_t game_progress;           // 比赛阶段
+  uint16_t stage_remain_time;                 // 剩余时间
+  uint16_t current_hp;                 // 血量
+  uint16_t ally_outpost_hp;                // 己方基地血量
+  float x;                   // x方向位置
+  float y;                   // y方向位置
+  float angle;                   // 朝向    
+  uint8_t state;                // 姿态
+  uint8_t energy_state;             // 能量机关状态
   #endif
 };
+
+int8_t latest_self_color();
 
 class Gimbal
 {
@@ -118,7 +125,7 @@ public:
   #ifdef SENTRY_SR
   void send(
     bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-    float pitch_acc, float vx, float vy, float wz);
+    float pitch_acc, float vx, float vy, float wz,int form,int gimbal);
   #endif
 
   void send(io::VisionToGimbal VisionToGimbal);

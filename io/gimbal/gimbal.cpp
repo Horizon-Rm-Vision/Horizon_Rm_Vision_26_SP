@@ -14,6 +14,13 @@
 
 namespace io
 {
+namespace
+{
+std::atomic<int8_t> g_last_self_color{-1};
+}
+
+int8_t latest_self_color() { return g_last_self_color.load(std::memory_order_relaxed); }
+
 Gimbal::Gimbal(const std::string & config_path)
 {
   auto yaml = tools::load(config_path);
@@ -134,22 +141,6 @@ GimbalState Gimbal::state() const
   return state_;
 }
 
-// std::string Gimbal::str(GimbalMode mode) const
-// {
-//   switch (mode) {
-//     case GimbalMode::IDLE:
-//       return "IDLE";
-//     case GimbalMode::AUTO_AIM:
-//       return "AUTO_AIM";
-//     case GimbalMode::SMALL_BUFF:
-//       return "SMALL_BUFF";
-//     case GimbalMode::BIG_BUFF:
-//       return "BIG_BUFF";
-//     default:
-//       return "INVALID";
-//   }
-// }
-
 //转换GimbalMode数值为对应的字符串
 std::string Gimbal::str(GimbalMode mode) const
 {
@@ -244,7 +235,6 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
   tx_data_.mode = mode;
   tx_data_.yaw = yaw;
   tx_data_.pitch = pitch;
-  // tx_data_.timestamp = 0;  // 时间戳暂时填0
   #ifdef SR_VEL
     tx_data_.yaw_vel = yaw_vel;
     //tx_data_.yaw_acc = yaw_acc;
@@ -297,7 +287,6 @@ void Gimbal::send(
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
-  // tx_data_.timestamp = 0;  // 时间戳暂时填0
   #ifdef SR_VEL
     tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
@@ -333,7 +322,7 @@ void Gimbal::send(
 // 自瞄向电控发送数据(哨兵模式，带导航通信内容)
 void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-  float pitch_acc,float vx, float vy, float wz)
+  float pitch_acc,float vx, float vy, float wz,int form,int gimbal)
 {
   uint8_t mode;
   if (control) 
@@ -356,12 +345,6 @@ void Gimbal::send(
   // p/y值赋给tx_data_，自瞄原始数据是弧度制，需要转换为角度制发送
   tx_data_.yaw = -yaw * (180.0 / M_PI);  // 弧度转换为角度并取负
   tx_data_.pitch = -pitch * (180.0 / M_PI);  // 弧度转换为角度并取负
-  tx_data_.timestamp = 0;  // 时间戳暂时填0
-  tx_data_.vx = vx;
-  tx_data_.vy = vy;
-  tx_data_.wz = wz;
-  //哨兵导航
-  
   #ifdef SR_VEL
     tx_data_.yaw_vel = -yaw_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
     tx_data_.pitch_vel = -pitch_vel* (180.0 / M_PI);  // 角速度转换为角度每秒并取负
@@ -369,6 +352,13 @@ void Gimbal::send(
     //tx_data_.pitch_acc = -pitch_acc* (180.0 / M_PI);  // 角加速度转换为角度每秒平方并取负
   #endif
   
+  //哨兵导航
+  tx_data_.vx = vx;
+  tx_data_.vy = vy;
+  tx_data_.wz = wz;
+  tx_data_.form = form;
+  tx_data_.gimbal = gimbal; //预留字段，暂时填0
+
   if (fd_ < 0) {
     tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
     return;
@@ -477,10 +467,13 @@ void Gimbal::read_thread()
                             i, packet_to_hex(buffer + i, packet_size));
       
       // 复制到局部变量以避免packed结构体引用问题
-      uint8_t mode = rx_data_.mode;
+      uint8_t mode_raw = rx_data_.mode;
+      uint8_t self_color_raw = mode_raw / 4;
+      uint8_t mode = mode_raw % 4;
+
       float yaw   = -rx_data_.yaw   * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       float pitch = -rx_data_.pitch * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
-      uint8_t bullet_speed = rx_data_.bullet_speed;
+      float bullet_speed = rx_data_.bullet_speed/10.0f; //弹速除10从整数转换为浮点数，单位为m/s
       #ifdef SR_VEL
         float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
         float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
@@ -489,9 +482,15 @@ void Gimbal::read_thread()
       #endif
       #ifdef SENTRY_SR
       //哨兵导航相关数据
-      uint8_t game_status = rx_data_.game_status;
-      uint8_t blood = rx_data_.blood;
-      uint8_t bullet = rx_data_.bullet;
+      uint8_t game_progress = rx_data_.game_progress;
+      uint16_t stage_remain_time = rx_data_.stage_remain_time;
+      uint16_t current_hp = rx_data_.current_hp;
+      uint16_t ally_outpost_hp = rx_data_.ally_outpost_hp;
+      float x = rx_data_.x;
+      float y = rx_data_.y;
+      float angle = rx_data_.angle;
+      uint8_t state = rx_data_.state;
+      uint8_t energy_state = rx_data_.energy_state;
       #endif
       // 使用yaw和pitch计算四元数（roll设为0）
       //单位转换
@@ -502,6 +501,10 @@ void Gimbal::read_thread()
       
       Eigen::Quaterniond q = yaw_angle * pitch_angle * roll_angle;
       q.normalize();
+
+      if (self_color_raw <= 1) {
+        g_last_self_color.store(static_cast<int8_t>(self_color_raw), std::memory_order_relaxed);
+      }
       
       if (mode <= 3) {
         queue_.push({q, t});
@@ -521,7 +524,8 @@ void Gimbal::read_thread()
             std::lock_guard<std::mutex> lock(mutex_);
             state_.yaw = yaw;
             state_.pitch = pitch;
-            state_.bullet_speed = static_cast<float>(bullet_speed);
+            state_.bullet_speed = bullet_speed;
+            state_.self_color = g_last_self_color.load(std::memory_order_relaxed);
             #ifdef SR_VEL
               state_.yaw_vel = yaw_vel;
               state_.pitch_vel = pitch_vel;
@@ -535,9 +539,15 @@ void Gimbal::read_thread()
             state_.bullet_count = 0;  // 子弹计数暂时填0
             #ifdef SENTRY_SR
             //哨兵导航相关数据
-            state_.game_status = game_status;
-            state_.blood = blood;
-            state_.bullet = bullet;
+            state_.game_progress = game_progress;
+            state_.stage_remain_time = stage_remain_time;
+            state_.current_hp = current_hp;
+            state_.ally_outpost_hp = ally_outpost_hp;
+            state_.x = x;
+            state_.y = y;
+            state_.angle = angle;
+            state_.state = state;
+            state_.energy_state = energy_state;
             #endif
         }
             //本次接收前后模式变化记录日志
@@ -562,14 +572,15 @@ void Gimbal::read_thread()
         
             // 使用局部变量记录解析后的数据内容
             tools::logger()->info("[Gimbal] Parsed read data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
-                                 "BulletSpeed: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
+                                 "BulletSpeed: {}, SelfColor: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
                                  str(old_mode), str(mode_), -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI), bullet_speed, 
+                                 static_cast<int>(g_last_self_color.load(std::memory_order_relaxed)),
                                  q.w(), q.x(), q.y(), q.z());
         
         error_count = 0;
       } else {
-        tools::logger()->warn("[Gimbal] Skipping packet with invalid mode: {}, raw data: {}",
-                             mode, packet_to_hex(buffer + i, packet_size));
+        tools::logger()->warn("[Gimbal] Skipping packet with invalid encoded mode: {} (color_group={}), raw data: {}",
+                             mode_raw, self_color_raw, packet_to_hex(buffer + i, packet_size));
       }
       
       i += packet_size;  // 无论 mode 是否有效，跳过这个包
@@ -606,6 +617,7 @@ void Gimbal::reconnect()
     std::lock_guard<std::mutex> lock(mutex_);
     mode_ = GimbalMode::IDLE;
     state_ = GimbalState{};
+    state_.self_color = g_last_self_color.load(std::memory_order_relaxed);
   }
 }
 

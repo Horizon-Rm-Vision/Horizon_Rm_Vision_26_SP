@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <opencv2/opencv.hpp>
 
+#include "io/gimbal/gimbal.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
 
@@ -19,9 +20,27 @@ Decider::Decider(const std::string & config_path) : detector_(config_path), coun
   fov_v_ = yaml["fov_v"].as<double>();
   new_fov_h_ = yaml["new_fov_h"].as<double>();
   new_fov_v_ = yaml["new_fov_v"].as<double>();
-  enemy_color_ =
-    (yaml["enemy_color"].as<std::string>() == "red") ? auto_aim::Color::red : auto_aim::Color::blue;
+  enemy_color_auto_ = false;
+  const auto enemy_color_cfg = yaml["enemy_color"].as<std::string>();
+  if (enemy_color_cfg == "auto") {
+    enemy_color_auto_ = true;
+    refresh_enemy_color_from_serial();
+  } else {
+    enemy_color_ = (enemy_color_cfg == "red") ? auto_aim::Color::red : auto_aim::Color::blue;
+  }
   mode_ = yaml["mode"].as<double>();
+}
+
+void Decider::refresh_enemy_color_from_serial()
+{
+  if (!enemy_color_auto_) return;
+
+  const auto self_color = io::latest_self_color();
+  if (self_color == 0) {
+    enemy_color_ = auto_aim::Color::blue;
+  } else if (self_color == 1) {
+    enemy_color_ = auto_aim::Color::red;
+  }
 }
 
 io::Command Decider::decide(
@@ -132,6 +151,7 @@ Eigen::Vector2d Decider::delta_angle(
 bool Decider::armor_filter(std::list<auto_aim::Armor> & armors)
 {
   if (armors.empty()) return true;
+  refresh_enemy_color_from_serial();
   // 过滤非敌方装甲板
   armors.remove_if([&](const auto_aim::Armor & a) { return a.color != enemy_color_; });
 

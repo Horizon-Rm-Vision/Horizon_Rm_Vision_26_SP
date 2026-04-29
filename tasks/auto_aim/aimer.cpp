@@ -22,6 +22,8 @@ Aimer::Aimer(const std::string & config_path)
   high_speed_delay_time_ = yaml["high_speed_delay_time"].as<double>();
   low_speed_delay_time_ = yaml["low_speed_delay_time"].as<double>();
   decision_speed_ = yaml["decision_speed"].as<double>();
+  gyro_angle_threshold_ = yaml["gyro_angle_threshold"].as<double>() / 57.3;  // degree to rad
+  gyro_speed_threshold_ = yaml["gyro_speed_threshold"].as<double>();
   // 弹道模型配置，可选 "hero" 使用带阻力迭代解算
   if (yaml["ballistic_model"].IsDefined()) {
     auto str = yaml["ballistic_model"].as<std::string>();
@@ -169,11 +171,11 @@ AimPoint Aimer::choose_aim_point(const Target & target)
   }
 
   // 不考虑小陀螺
-  if (std::abs(target.ekf_x()[8]) <= 2 && target.name != ArmorName::outpost) {
+  if (std::abs(target.ekf_x()[8]) <= gyro_speed_threshold_ && target.name != ArmorName::outpost) {
     // 选择在可射击范围内的装甲板
     std::vector<int> id_list;
     for (int i = 0; i < armor_num; i++) {
-      if (std::abs(delta_angle_list[i]) > 60 / 57.3) continue;
+      if (std::abs(delta_angle_list[i]) > gyro_angle_threshold_) continue; //60为最大delta_angle,可测试修改
       id_list.push_back(i);
     }
     // 绝无可能

@@ -64,6 +64,9 @@ can_interface: "can0"
 min_detect_count: 5
 max_temp_lost_count: 15
 outpost_max_temp_lost_count: 150
+outpost_correction_enable: true
+outpost_correction_min_detect_count: 3
+outpost_correction_cancel_count: 5
 
 #####-----aimer参数-----#####
 yaw_offset: 0 # degree -2.5
@@ -74,6 +77,8 @@ min_spin_speed: 2 # rad/s
 decision_speed: 12 # rad/s
 high_speed_delay_time: 0.005 # s
 low_speed_delay_time: 0.005 # s
+gyro_angle_threshold: 60 # degree
+gyro_speed_threshold: 2 # rad/s
 
 #####-----decider参数-----#####
 mode: 1
