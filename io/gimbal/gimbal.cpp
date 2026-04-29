@@ -486,9 +486,6 @@ void Gimbal::read_thread()
       uint16_t stage_remain_time = rx_data_.stage_remain_time;
       uint16_t current_hp = rx_data_.current_hp;
       uint16_t ally_outpost_hp = rx_data_.ally_outpost_hp;
-      float x = rx_data_.x;
-      float y = rx_data_.y;
-      float angle = rx_data_.angle;
       uint8_t state = rx_data_.state;
       uint8_t energy_state = rx_data_.energy_state;
       uint16_t bullets = rx_data_.bullets;
@@ -544,9 +541,6 @@ void Gimbal::read_thread()
             state_.stage_remain_time = stage_remain_time;
             state_.current_hp = current_hp;
             state_.ally_outpost_hp = ally_outpost_hp;
-            state_.x = x;
-            state_.y = y;
-            state_.angle = angle;
             state_.state = state;
             state_.energy_state = energy_state;
             state_.bullets = bullets;

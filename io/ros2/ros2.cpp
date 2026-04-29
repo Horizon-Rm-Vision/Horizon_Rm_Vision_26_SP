@@ -21,9 +21,9 @@ ROS2::~ROS2()
   subscribe_spin_thread_->join();
 }
 
-void ROS2::publish_status(uint8_t game_progress,uint16_t stage_remain_time,uint16_t current_hp,uint16_t ally_outpost_hp,float x,float y,float angle,uint8_t state,uint8_t energy_state,uint16_t bullets)
+void ROS2::publish_status(uint8_t game_progress,uint16_t stage_remain_time,uint16_t current_hp,uint16_t ally_outpost_hp,uint8_t state,uint8_t energy_state,uint16_t bullets)
 {
-    publish2nav_->send_status(game_progress, stage_remain_time, current_hp, ally_outpost_hp, x, y, angle, state, energy_state, bullets);
+    publish2nav_->send_status(game_progress, stage_remain_time, current_hp, ally_outpost_hp, state, energy_state, bullets);
 }
 
 std::optional<geometry_msgs::msg::Twist> ROS2::get_nav_velocity()

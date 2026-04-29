@@ -15,7 +15,7 @@ public:
 
   void publish(const Eigen::Vector4d & target_pos);
 
-  void publish_status(uint8_t game_progress,uint16_t stage_remain_time,uint16_t current_hp,uint16_t ally_outpost_hp,float x,float y,float angle,uint8_t state,uint8_t energy_state,uint16_t bullets);
+  void publish_status(uint8_t game_progress,uint16_t stage_remain_time,uint16_t current_hp,uint16_t ally_outpost_hp,uint8_t state,uint8_t energy_state,uint16_t bullets);
 
   std::vector<int8_t> subscribe_enemy_status();
 
