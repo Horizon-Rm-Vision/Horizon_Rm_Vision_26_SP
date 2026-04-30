@@ -169,7 +169,15 @@ int main(int argc, char * argv[])
       }
 
       //plotter.plot(data);
-      plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
+
+      // outpost mode flag: 1 when tracking outpost, else 0
+      const double outpost_mode_flag =
+        (target.has_value() && target->name == auto_aim::ArmorName::outpost) ? 1.0 : 0.0;
+
+      // 同一帧内把所有曲线一起推送，避免曲线刷新互相覆盖/冲突
+      plotter.drawData(
+        {gs.yaw * 180 / M_PI, plan.target_yaw * 180 / M_PI, plan.yaw * 180 / M_PI, outpost_mode_flag},
+        {"gimbal_yaw", "target_yaw", "plann_yaw", "outpost_mode"});
 
       std::this_thread::sleep_for(10ms);
     }
@@ -206,6 +214,46 @@ int main(int argc, char * argv[])
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
+
+    // hero 弹道：只在“当前帧看得到前哨站 z 最低装甲板”时才跟随
+    bool hero_ballistic = false;
+    try {
+      auto yaml_cfg = YAML::LoadFile(config_path);
+      if (yaml_cfg["ballistic_model"].IsDefined()) {
+        auto s = yaml_cfg["ballistic_model"].as<std::string>();
+        hero_ballistic = (s == "hero");
+      }
+    } catch (...) {
+      hero_ballistic = false;
+    }
+
+    if (hero_ballistic) {
+      // 仅对 outpost 做限制：如果当前帧没检测到 outpost 的最低 z 装甲板（即不在视野/不在正面），则不跟随预测
+      double min_outpost_z = std::numeric_limits<double>::infinity();
+      bool has_outpost_det = false;
+      bool has_bottom_outpost_det = false;
+
+      for (const auto & a : armors) {
+        if (a.name != auto_aim::ArmorName::outpost) continue;
+        has_outpost_det = true;
+        min_outpost_z = std::min(min_outpost_z, static_cast<double>(a.xyz_in_world[2]));
+      }
+
+      if (has_outpost_det) {
+        constexpr double kBottomZEps = 0.02;  // 2cm 容差，避免抖动导致频繁丢跟随
+        for (const auto & a : armors) {
+          if (a.name != auto_aim::ArmorName::outpost) continue;
+          if (static_cast<double>(a.xyz_in_world[2]) <= min_outpost_z + kBottomZEps) {
+            has_bottom_outpost_det = true;
+            break;
+          }
+        }
+
+        if (!has_bottom_outpost_det) {
+          targets.clear();
+        }
+      }
+    }
 
     #ifdef AIM_CENTER
     if(tracker.aim_strategy_ == "follow") {
@@ -252,6 +300,33 @@ int main(int argc, char * argv[])
       }
 
       Eigen::Vector4d aim_xyza = planner.debug_xyza;
+
+      // hero 模式下：前哨站红色预测点只显示 z 最低的那块装甲板
+      if (target.name == auto_aim::ArmorName::outpost) {
+        bool is_hero = false;
+        try {
+          auto yaml_cfg = YAML::LoadFile(config_path);
+          if (yaml_cfg["ballistic_model"].IsDefined()) {
+            auto s = yaml_cfg["ballistic_model"].as<std::string>();
+            is_hero = (s == "hero");
+          }
+        } catch (...) {
+          is_hero = false;
+        }
+
+        if (is_hero && !armor_xyza_list.empty()) {
+          int bottom_id = 0;
+          double min_z = armor_xyza_list[0][2];
+          for (int i = 1; i < static_cast<int>(armor_xyza_list.size()); i++) {
+            if (armor_xyza_list[i][2] < min_z) {
+              min_z = armor_xyza_list[i][2];
+              bottom_id = i;
+            }
+          }
+          aim_xyza = armor_xyza_list[bottom_id];
+        }
+      }
+
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
       #ifndef AIM_CENTER

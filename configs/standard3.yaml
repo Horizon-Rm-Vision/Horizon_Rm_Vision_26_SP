@@ -1,4 +1,4 @@
-#enemy_color: auto #auto表示根据gimbal发送的模式自动判断敌我颜色，非auto表示固定敌我颜色
+# enemy_color: auto #auto表示根据gimbal发送的模式自动判断敌我颜色，非auto表示固定敌我颜色
 enemy_color: "red"
 #enemy_color: "blue"
 
@@ -89,23 +89,23 @@ Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----gimbal参数-----#####
-com_port: /dev/pts/7
+com_port: auto
 
 # #####-----相机参数-----#####
-#camera_name: "mindvision"
-#exposure_ms: 3
-#gamma: 3 #已经废弃
-#vid_pid: "f622:d13a"
+camera_name: "mindvision"
+exposure_ms: 3
+gamma: 3 #已经废弃
+vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
 # vid_pid: "2bdf:0001"
 
-camera_name: "daheng"
-exposure_ms: 6
-gamma: 2.85
-vid_pid: "KE0200010097"
+# camera_name: "daheng"
+# exposure_ms: 6
+# gamma: 2.85
+# vid_pid: "KE0200010097"
 
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 #  1  0  0
@@ -192,7 +192,7 @@ fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
 
 # 弹道解算模式，可选 "no_drag" (默认抛物线) 或 "hero" (带空气阻力迭代)
-ballistic_model: "khero"
+ballistic_model: "hero"
 
 #####-----nav速度倍数（仅用于哨兵模式，导航相关）-----#####
 velocity_n: 30
@@ -204,15 +204,15 @@ armor_yaw_threshold: 10 # 锁车时装甲板yaw角度阈值，degree
 
 # #####-----UI显示配置-----#####
 ui:
-  enabled: false
-  imshow: false
+  enabled: true
+  imshow: true
   web:
-    enabled: true
+    enabled: false
     host: "192.168.1.75"
     port: 9876
 
 plotter:
   web:
-    enabled: true
+    enabled: false
     host: "192.168.1.75"
     port: 9876
