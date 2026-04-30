@@ -1,3 +1,4 @@
+// ./build/udp_marker_bridge --ros-args -p port:=9870 -p bind_address:=127.0.0.1 
 #ifndef TOOLS__UDP_MARKER_BRIDGE_HPP
 #define TOOLS__UDP_MARKER_BRIDGE_HPP
 
@@ -51,6 +52,10 @@ private:
   double armor_scale_y_small_{0.135};
   double armor_scale_y_big_{0.23};
   double armor_scale_z_{0.125};
+
+  bool show_armor_indices_{true};
+  double armor_index_text_scale_z_{0.12};
+  double armor_index_text_z_offset_{0.08};
 
   bool show_armor_measurement_{true};
   bool show_text_{true};

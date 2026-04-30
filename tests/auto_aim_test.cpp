@@ -156,6 +156,10 @@ int main(int argc, char * argv[])
       // aimer瞄准位置
       auto aim_point = aimer.debug_aim_point;
       Eigen::Vector4d aim_xyza = aim_point.xyza;
+      data["armor_x_dug"] = aim_xyza[0];
+      data["armor_y_dug"] = aim_xyza[1];
+      data["armor_z_dug"] = aim_xyza[2];
+      data["armor_yaw_dug"] = aim_xyza[3];
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
       if (aim_point.valid) tools::draw_points(img, image_points, {0, 0, 255});

@@ -31,13 +31,18 @@ UdpMarkerBridgeNode::UdpMarkerBridgeNode(const rclcpp::NodeOptions & options)
   velocity_scale_ = this->declare_parameter<double>("velocity_scale", 0.5);
   yawrate_scale_z_ = this->declare_parameter<double>("yawrate_scale_z", 0.2);
 
+  int armor_size_scale = 2.5;
   show_armors_ = this->declare_parameter<bool>("show_armors", true);
   default_target_armor_num_ = this->declare_parameter<int>("default_target_armor_num", 4);
   armor_pitch_rad_ = this->declare_parameter<double>("armor_pitch_rad", 0.2618);
-  armor_scale_x_ = this->declare_parameter<double>("armor_scale_x", 0.03);
-  armor_scale_y_small_ = this->declare_parameter<double>("armor_scale_y_small", 0.135);
-  armor_scale_y_big_ = this->declare_parameter<double>("armor_scale_y_big", 0.23);
-  armor_scale_z_ = this->declare_parameter<double>("armor_scale_z", 0.125);
+  armor_scale_x_ = this->declare_parameter<double>("armor_scale_x", 0.03 * armor_size_scale);
+  armor_scale_y_small_ = this->declare_parameter<double>("armor_scale_y_small", 0.135 * armor_size_scale);
+  armor_scale_y_big_ = this->declare_parameter<double>("armor_scale_y_big", 0.23 * armor_size_scale);
+  armor_scale_z_ = this->declare_parameter<double>("armor_scale_z", 0.125 * armor_size_scale);
+
+  show_armor_indices_ = this->declare_parameter<bool>("show_armor_indices", true);
+  armor_index_text_scale_z_ = this->declare_parameter<double>("armor_index_text_scale_z", 0.12);
+  armor_index_text_z_offset_ = this->declare_parameter<double>("armor_index_text_z_offset", 0.08);
 
   show_armor_measurement_ = this->declare_parameter<bool>("show_armor_measurement", true);
   show_text_ = this->declare_parameter<bool>("show_text", true);
@@ -219,6 +224,11 @@ void UdpMarkerBridgeNode::publish_from_json(const nlohmann::json & j, const std:
   const auto r = get_number(j, "r");
   const auto l = get_number(j, "l");
   const auto h = get_number(j, "h");
+  // 调试数据
+  const auto armor_x_dug = get_number(j, "armor_x_dug");
+  const auto armor_y_dug = get_number(j, "armor_y_dug");
+  const auto armor_z_dug = get_number(j, "armor_z_dug");
+  const auto armor_yaw_dug = get_number(j, "armor_yaw_dug");
 
   // yaw angle in rad
   double yaw_rad = 0.0;
@@ -351,6 +361,20 @@ void UdpMarkerBridgeNode::publish_from_json(const nlohmann::json & j, const std:
       const double h_val = h.value_or(0.0);
       const bool big = is_big_armor(j);
 
+      // 调试红色框
+        auto cube_dug = make_base_marker(25, "armor_dug", visualization_msgs::msg::Marker::CUBE);
+        cube_dug.pose.position.x = armor_x_dug.value();
+        cube_dug.pose.position.y = armor_y_dug.value();
+        cube_dug.pose.position.z = armor_z_dug.value();
+        cube_dug.pose.orientation = quat_from_rpy(0.0, armor_pitch_rad_, armor_yaw_dug.value());
+
+        cube_dug.scale.x = armor_scale_x_;
+        cube_dug.scale.y = big ? armor_scale_y_big_ : armor_scale_y_small_;
+        cube_dug.scale.z = armor_scale_z_;
+
+        set_color_rgba(cube_dug, 1.0f, 0.2f, 0.2f, 0.5f);
+        array.markers.emplace_back(std::move(cube_dug));
+
       for (int i = 0; i < armor_num; ++i) {
         const double angle = limit_rad(yaw_rad + static_cast<double>(i) * kTwoPi / armor_num);
 
@@ -386,6 +410,17 @@ void UdpMarkerBridgeNode::publish_from_json(const nlohmann::json & j, const std:
 
         set_color_rgba(cube, 0.2f, 0.6f, 1.0f, 1.0f);
         array.markers.emplace_back(std::move(cube));
+
+        if (show_armor_indices_) {
+          auto label = make_base_marker(120 + i, "armors_i", visualization_msgs::msg::Marker::TEXT_VIEW_FACING);
+          label.pose.position.x = armor_x;
+          label.pose.position.y = armor_y;
+          label.pose.position.z = armor_z + 0.5 * cube.scale.z + armor_index_text_z_offset_;
+          label.scale.z = armor_index_text_scale_z_;
+          set_color_rgba(label, 1.0f, 1.0f, 0.2f, 1.0f);
+          label.text = std::to_string(i);
+          array.markers.emplace_back(std::move(label));
+        }
       }
     }
 
