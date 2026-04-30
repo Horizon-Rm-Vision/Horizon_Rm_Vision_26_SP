@@ -4,15 +4,15 @@ center_distance_mm: 25   # 棋盘格方格边长（mm）
 
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0,  0, 0, 1]
 
-# camera_name: "hikrobot"
-# exposure_ms: 3
-# gain: 10.0
-# vid_pid: "2bdf:0001"
+camera_name: "hikrobot"
+exposure_ms: 3
+gain: 10.0
+vid_pid: "2bdf:0001"
 
-camera_name: "mindvision"
-exposure_ms: 8
-gamma: 3 #已经废弃
-vid_pid: "f622:d13a"
+# camera_name: "mindvision"
+# exposure_ms: 8
+# gamma: 3 #已经废弃
+# vid_pid: "f622:d13a"
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x01
@@ -21,7 +21,7 @@ send_canid: 0xff
 can_interface: "can0"
 
 #####-----gimbal参数-----#####
-com_port: "/dev/ttyACM0"
+com_port: "/dev/ttyACM1"
 
 # # MD_HERO_UC
 # camera_matrix: [2467.89248,0, 648.86375, 0, 2468.83665, 467.29131, 0, 0, 1]
