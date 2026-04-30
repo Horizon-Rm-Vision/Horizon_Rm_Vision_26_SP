@@ -188,9 +188,20 @@ endif()
 find_package(ament_cmake QUIET)
 find_package(rclcpp QUIET)
 find_package(std_msgs QUIET)
+find_package(visualization_msgs QUIET)
 find_package(rosidl_typesupport_cpp QUIET)
 find_package(sp_msgs QUIET)
 find_package(geometry_msgs QUIET)
+
+# ========== Optional: UDP(JSON) -> ROS2 topics bridge (for rqt_plot) ==========
+# Build whenever ROS2 core deps are found, independent of BUILD_SENTRY.
+if(ament_cmake_FOUND AND rclcpp_FOUND AND visualization_msgs_FOUND)
+    add_executable(udp_marker_bridge tools/udp_marker_bridge.cpp)
+    target_link_libraries(udp_marker_bridge fmt::fmt nlohmann_json::nlohmann_json)
+    ament_target_dependencies(udp_marker_bridge rclcpp visualization_msgs)
+else()
+    message(STATUS "ROS2 visualization deps not found, skipping udp_marker_bridge")
+endif()
 
 # 只有在找到 ROS 环境且BUILD_SENTRY 或 BUILD_ALL 为 ON 时才会添加 sentry 和 publish_test
 if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_cpp_FOUND AND sp_msgs_FOUND AND geometry_msgs_FOUND AND BUILD_SENTRY)

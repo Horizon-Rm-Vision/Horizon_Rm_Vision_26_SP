@@ -86,6 +86,84 @@ IMU型号：使用C板内置BMI088作为IMU\
     ./build/auto_aim_test
     ```
 
+### 3.2.1 UDP → ROS2 可视化桥接（可选）
+项目里有一个轻量级 UDP 桥接器，用来把 `tools::Plotter::plot(json)` 发送的 JSON 数据，在另一台电脑上转成 ROS2 Topic：
+- `udp_marker_bridge`：发布 `visualization_msgs/msg/MarkerArray`，用于 RViz2 里直观看目标位置/速度/文本信息。
+- `udp_plot_bridge`：把每个数值发布成 `std_msgs/msg/Float64`，用于 `rqt_plot` 画曲线。
+
+#### 依赖
+- 接收端电脑需要安装 ROS2（例如 Humble），并在编译前执行：
+    - `source /opt/ros/humble/setup.bash`
+- 本工程不是 ament 工程，但顶层 CMake 会用 `find_package(rclcpp ...)` 自动探测：
+    - 找不到 ROS2 时会跳过构建上述 bridge target。
+
+#### 编译
+在工程根目录：
+```bash
+source /opt/ros/humble/setup.bash
+cmake -B build
+cmake --build build --target udp_marker_bridge -j
+cmake --build build --target udp_plot_bridge -j
+```
+
+#### 发送端（机器人/算法机）设置
+- 发送代码示例见 [src/mt_auto_aim_debug.cpp](src/mt_auto_aim_debug.cpp)：
+    - `plotter.plot(data);`
+- `tools::Plotter` 默认发送到 `host=10.192.119.217, port=9870`，使用时需要把 `host` 改成接收端电脑 IP。
+- 网络常见坑：
+    - 两台电脑同网段可互通；
+    - 确保接收端放行 UDP 端口（默认 `9870`）。
+
+#### udp_marker_bridge（RViz2）
+运行：
+```bash
+./build/udp_marker_bridge --ros-args \
+    -p port:=9870 \
+    -p bind_address:=0.0.0.0 \
+    -p marker_topic:=/udp_plot/marker \
+    -p frame_id:=odom
+```
+
+RViz2 配置：
+- Fixed Frame 设为 `odom`（或你运行参数里设置的 `frame_id`）
+- Add -> MarkerArray
+- Topic 选 `/udp_plot/marker`
+
+可调参数（部分）：
+- `position_scale`：位置球大小（默认 0.12）
+- `velocity_scale`：速度箭头缩放（默认 0.5）
+- `yawrate_scale_z`：角速度 `w` 映射到 Z 方向箭头长度的系数（默认 0.2）
+- `show_text`：是否显示 TEXT 面板（默认 true）
+- `marker_lifetime_ms`：marker 生命周期（ms，默认 200；设 0 表示不自动过期）
+
+桥接器会优先读取这些 key（与自瞄 debug 数据一致）：
+- `x,vx,y,vy,z,vz,a,w,r,l,h,nis,nees,gimbal_yaw,gimbal_pitch`
+- 可选：`armor_x, armor_y`（显示测量点）
+
+#### udp_plot_bridge（rqt_plot）
+运行：
+```bash
+./build/udp_plot_bridge --ros-args \
+    -p port:=9870 \
+    -p bind_address:=0.0.0.0 \
+    -p topic_prefix:=/udp_plot
+```
+
+查看有哪些曲线 topic：
+```bash
+ros2 topic list | grep /udp_plot
+```
+
+画图（示例）：
+- `rqt_plot /udp_plot/x /udp_plot/y /udp_plot/z`
+- 如果你发的是数组形式：`rqt_plot /udp_plot/values/data[0]`
+
+#### 推荐 JSON 格式
+发送端 JSON 只要是“对象里带数值”即可，例如：
+- 键值对：`{"x": 1.0, "y": 2.0, "z": 0.5, "w": 0.1}`
+- 显式 names/values：`{"names":["x","y"],"values":[1.0,2.0]}`
+- 数组：`[1.0, 2.0, 3.0]`（会自动命名为 `curve_0/curve_1/...`）
+
 4. 注册自启：
     1. 确保已安装`screen`:
         ```

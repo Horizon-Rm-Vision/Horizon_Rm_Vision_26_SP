@@ -239,7 +239,7 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
 }
 Plan Planner::aim_at_center(Target target, double bullet_speed)
 {
-  target.v1 = 30;
+  // target.v1 = 30;
   Plan plan;
 
   double azim_;

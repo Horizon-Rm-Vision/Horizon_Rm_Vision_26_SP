@@ -111,6 +111,7 @@ int main(int argc, char * argv[])
 
       // 当前帧target更新后
       std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
+      data["target_armor_num"] = static_cast<int>(armor_xyza_list.size());
       for (const Eigen::Vector4d & xyza : armor_xyza_list) {
         auto image_points =
           solver.reproject_armor(xyza.head(3), xyza[3], target.armor_type, target.name);
