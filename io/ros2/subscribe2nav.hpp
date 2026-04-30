@@ -9,7 +9,7 @@
 #include "std_msgs/msg/int8.hpp"
 #include "sp_msgs/msg/autoaim_target_msg.hpp"
 #include "sp_msgs/msg/enemy_status_msg.hpp"
-#include "sp_msgs/sp_msgs/msg/nav_velocity_msg.hpp"
+#include "sp_msgs/msg/nav_velocity_msg.hpp"
 #include "tools/thread_safe_queue.hpp"
 
 namespace io
