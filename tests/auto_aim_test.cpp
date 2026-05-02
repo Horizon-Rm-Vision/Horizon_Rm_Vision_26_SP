@@ -130,7 +130,9 @@ int main(int argc, char * argv[])
 
     Eigen::Quaternion q{w, x, y, z};
     auto yaw = tools::eulers(q, 2, 1, 0)[0];
-    data["gimbal_yaw"] = yaw * 57.3;
+    auto pitch = tools::eulers(q, 2, 1, 0)[1];
+    data["gimbal_yaw"] = yaw;
+    data["gimbal_pitch"] = pitch;
     data["cmd_yaw"] = command.yaw * 57.3;
     data["shoot"] = command.shoot;
 

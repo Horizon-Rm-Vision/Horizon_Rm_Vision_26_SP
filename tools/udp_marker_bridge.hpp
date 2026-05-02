@@ -43,6 +43,7 @@ private:
   double position_scale_{0.12};
   double velocity_scale_{0.5};
   double yawrate_scale_z_{0.2};
+  double gimbal_arrow_length_{0.35};
 
   // Armor cubes (generated from target state)
   bool show_armors_{true};

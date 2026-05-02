@@ -229,6 +229,9 @@ void UdpMarkerBridgeNode::publish_from_json(const nlohmann::json & j, const std:
   const auto armor_y_dug = get_number(j, "armor_y_dug");
   const auto armor_z_dug = get_number(j, "armor_z_dug");
   const auto armor_yaw_dug = get_number(j, "armor_yaw_dug");
+  // gimbal angle
+  const auto gimbal_yaw = get_number(j, "gimbal_yaw");
+  const auto gimbal_pitch = get_number(j, "gimbal_pitch");
 
   // yaw angle in rad
   double yaw_rad = 0.0;
@@ -272,6 +275,34 @@ void UdpMarkerBridgeNode::publish_from_json(const nlohmann::json & j, const std:
       p1.x += (*vx) * velocity_scale_;
       p1.y += (*vy) * velocity_scale_;
       p1.z += (*vz) * velocity_scale_;
+
+      vmark.points.emplace_back(p0);
+      vmark.points.emplace_back(p1);
+      array.markers.emplace_back(std::move(vmark));
+    }
+
+    // add) gimbal angle arrow
+    if (gimbal_yaw && gimbal_pitch) {
+      auto vmark = make_base_marker(4, "gimbal", visualization_msgs::msg::Marker::ARROW);
+      vmark.scale.x = 0.03;
+      vmark.scale.y = 0.06;
+      vmark.scale.z = 0.08;
+      set_color_rgba(vmark, 0.57f, 1.97f, 1.87f, 1.0f);
+
+      geometry_msgs::msg::Point p0;
+      p0.x = 0;
+      p0.y = 0;
+      p0.z = 0;
+
+      geometry_msgs::msg::Point p1 = p0;
+      const double yaw = *gimbal_yaw;
+      const double pitch = *gimbal_pitch;
+      const double dir_x = std::cos(pitch) * std::cos(yaw);
+      const double dir_y = std::cos(pitch) * std::sin(yaw);
+      const double dir_z = std::sin(pitch);
+      p1.x += dir_x * gimbal_arrow_length_;
+      p1.y += dir_y * gimbal_arrow_length_;
+      p1.z += dir_z * gimbal_arrow_length_;
 
       vmark.points.emplace_back(p0);
       vmark.points.emplace_back(p1);
