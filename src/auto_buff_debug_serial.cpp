@@ -15,11 +15,12 @@
 #include "tools/math_tools.hpp"
 #include "tools/plotter.hpp"
 #include "tools/recorder.hpp"
+#include "tools/trajectory.hpp"
 
 // 定义命令行参数
 const std::string keys =
-  "{help h usage ? | | 输出命令行参数说明}"
-  "{@config-path   | | yaml配置文件路径 }";
+  "{help h usage ? |                        | 输出命令行参数说明}"
+  "{@config-path   | ../configs/standard3.yaml | 位置参数，yaml配置文件路径 }";
 
 int main(int argc, char * argv[])
 {
@@ -57,7 +58,7 @@ int main(int argc, char * argv[])
     auto gs = gimbal.state();
     // recorder.record(img, q, t);
 
-    // -------------- 打符核心逻辑（无 MPC 版本） --------------
+    // -------------- 打符核心逻辑 --------------
 
     solver.set_R_gimbal2world(q);
 
@@ -69,7 +70,6 @@ int main(int argc, char * argv[])
 
     auto target_copy = target;
 
-    // 使用非 MPC 的 aim 接口，返回简单控制命令
     io::Command cmd = aimer.aim(target_copy, t, gs.bullet_speed, true);
 
     // 将命令通过串口发送给云台，速度/加速度字段置为 0
@@ -141,16 +141,10 @@ int main(int argc, char * argv[])
     // 云台响应情况
     data["gimbal_yaw"] = gs.yaw * 57.3;
     data["gimbal_pitch"] = gs.pitch * 57.3;
-    data["gimbal_yaw_vel"] = gs.yaw_vel * 57.3;
-    data["gimbal_pitch_vel"] = gs.pitch_vel * 57.3;
 
     if (cmd.control) {
       data["plan_yaw"] = cmd.yaw * 57.3;
       data["plan_pitch"] = cmd.pitch * 57.3;
-      data["plan_yaw_vel"] = 0;
-      data["plan_pitch_vel"] = 0;
-      data["plan_yaw_acc"] = 0;
-      data["plan_pitch_acc"] = 0;
       data["shoot"] = cmd.shoot ? 1 : 0;
     }
 

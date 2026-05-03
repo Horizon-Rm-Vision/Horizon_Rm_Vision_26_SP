@@ -18,6 +18,12 @@ enum PowerRune_type { SMALL, BIG };
 enum FanBlade_type { _target, _unlight, _light };
 enum Track_status { TRACK, TEM_LOSE, LOSE };
 
+struct GridAndStride {
+  int grid0;
+  int grid1;
+  int stride;
+};
+
 class FanBlade
 {
 public:

@@ -4,14 +4,24 @@
 #include <yaml-cpp/yaml.h>
 
 #include <deque>
+#include <memory>
 #include <optional>
 
 #include "buff_type.hpp"
 #include "tools/ui_manager.hpp"
 #include "yolo11_buff.hpp"
+#include "yolox_buff.hpp"
+#ifdef USE_CUDA
+#include "yolox_buff_trt.hpp"
+#endif
+
 const int LOSE_MAX = 20;  // 丢失的阙值
+
 namespace auto_buff
 {
+
+enum DetectorMode { YOLO11_MODE, YOLOX_MODE, YOLOX_TRT_MODE };
+
 class Buff_Detector
 {
 public:
@@ -28,9 +38,30 @@ private:
 
   cv::Point2f get_r_center(std::vector<FanBlade> & fanblades, cv::Mat & bgr_img);
 
+  // R tag detection using traditional vision method (ported from ROS)
+  std::tuple<cv::Point2f, cv::Mat> detectRTag(
+    const cv::Mat & img, int binary_thresh, const cv::Point2f & prior);
+
+  // Shared logic for detect_24 and detect (runs after inference)
+  std::optional<PowerRune> processResults(
+    std::vector<std::vector<cv::Point2f>> & all_kpts, cv::Mat & bgr_img);
+
   void handle_lose();
 
-  YOLO11_BUFF MODE_;
+  // Detector instances (only the selected mode is constructed)
+  std::unique_ptr<YOLO11_BUFF> MODE_;
+  std::unique_ptr<YOLOX_BUFF> MODE_YOLOX_;
+#ifdef USE_CUDA
+  std::unique_ptr<YOLOX_BUFF_TRT> MODE_YOLOX_TRT_;
+#endif
+
+  // Mode selection
+  DetectorMode mode_;
+
+  // R tag detection parameters
+  bool detect_r_tag_;
+  int binary_thresh_;
+
   Track_status status_;
   int lose_;  // 丢失的次数
   double lastlen_;

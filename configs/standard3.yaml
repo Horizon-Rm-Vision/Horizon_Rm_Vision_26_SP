@@ -2,7 +2,7 @@
 enemy_color: "red"
 #enemy_color: "blue"
 
-#####-----神经网络参数-----#####
+#####-----自瞄神经网络参数-----#####
 yolo_name: yolov5_trt
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
@@ -89,7 +89,7 @@ Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----gimbal参数-----#####
-com_port: /dev/pts/7
+com_port: /dev/pts/4
 
 # #####-----相机参数-----#####
 #camera_name: "mindvision"
@@ -103,7 +103,7 @@ com_port: /dev/pts/7
 # vid_pid: "2bdf:0001"
 
 camera_name: "daheng"
-exposure_ms: 6
+exposure_ms: 10
 gamma: 2.85
 vid_pid: "KE0200010097"
 
@@ -184,8 +184,12 @@ t_camera2gimbal: [0.14536664794108903, 0.047210792174469635, 0.10461993940789979
 # #R_camera2gimbal: [0.010227926370181439, -0.068247836370815107, 0.99761596937542485, -0.9997325295038072, -0.021393318744386436, 0.0087860892904833964, 0.020742684833102345, -0.99743900001143104, -0.068448391377088358]
 # #t_camera2gimbal: [0.13581761689413138, 0.012348126218333725, 0.066730865526566735]
 
-#####-----buff_detector参数-----#####
-model: "../assets/yolo11_buff_int8.xml"
+#####-----能量机关神经网络参数-----#####
+model: ../assets/yolo11_buff_int8.xml  # YOLO11 buff检测模型路径
+yolox_model: ../assets/yolox_rune_3.6m.xml  # YOLOX buff检测模型路径（移植ROS版）
+
+#####-----能量机关检测器模式-----#####
+detector_mode: "yolox"  # 检测器模式: "yolo11" 或 "yolox"
 
 #####-----buff_aimer参数-----#####
 fire_gap_time: 0.700   # s

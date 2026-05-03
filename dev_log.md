@@ -103,6 +103,13 @@
 - **已验证:**
   1.已确认daheng相机帧率不稳定引起云台不稳定的问题并不存在
 ## 
+
+#### Release Candidate 1 DEV10：
+
+- **功能更新:**
+  1.新增基于YOLOX和传统视觉修正的能量机关识别模型,支持OpenVINO模式与TensorRT模式运行,有aimer(auto_buff_debug_mpc)和mpc(auto_buff_debug_serial)两种模式,demo则启动auto_buff_test即可
+
+## 
 待开发任务：
 1.TRT推理性能进一步优化
 2.NANO简化代码模式（对应代码内的宏LIM_CODE），启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销（尤其是JETSON）,目前已将src里不需要的几个程序和DM_IMU部分的代码屏蔽

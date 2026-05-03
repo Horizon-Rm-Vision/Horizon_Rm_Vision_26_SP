@@ -200,7 +200,6 @@ int main(int argc, char * argv[])
     
     camera.read(img, t);
     ui_web_stream.beginFrame(img.cols, img.rows);
-    ui_web_stream.beginFrame(img.cols, img.rows);
     auto q = gimbal.q(t);
 
     solver.set_R_gimbal2world(q);
@@ -329,8 +328,6 @@ int main(int argc, char * argv[])
     
     // 应用UI绘制
     ui_manager.render(img);
-    ui_web_stream.capturePanels(ui_manager);
-    ui_web_stream.sendFrame();
     ui_web_stream.capturePanels(ui_manager);
     ui_web_stream.sendFrame();
 
