@@ -42,9 +42,16 @@ public:
 
   Eigen::Vector3d point_buff2world(const Eigen::Vector3d & point_in_buff) const;
 
+  /// blade_id 重载: blade_id=0..4 对应 fanblades 中的 5 个位置偏移
+  Eigen::Vector3d point_buff2world(
+    const Eigen::Vector3d & point_in_buff, int blade_id) const;
+
   bool is_unsolve() const;
 
   Eigen::VectorXd ekf_x() const;
+
+  /// 获取 EKF 估计的 roll 角, 供 Director 做叶片 ID 匹配
+  double get_roll() const { return ekf_.x[5]; }
 
   double spd = 0;  //调试用
 

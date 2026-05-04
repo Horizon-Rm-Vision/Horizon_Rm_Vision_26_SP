@@ -50,6 +50,10 @@ public:
 
   int light_num;
 
+  /// 2026 大符双目标: 记录 fanblades[0..4] 中哪些位置是被点亮的目标
+  std::vector<int> target_indices_;
+  bool big_2026_mode_ = false;
+
   Eigen::Vector3d xyz_in_world;  // 单位：m
   Eigen::Vector3d ypr_in_world;  // 单位：rad
   Eigen::Vector3d ypd_in_world;  // 球坐标系
@@ -59,10 +63,14 @@ public:
 
   explicit PowerRune(
     std::vector<FanBlade> & ts, const cv::Point2f r_center,
-    std::optional<PowerRune> last_powerrune);
+    std::optional<PowerRune> last_powerrune,
+    bool big_2026_mode = false);
   explicit PowerRune() = default;
 
   FanBlade & target() { return fanblades[0]; };
+
+  /// 2026: 返回所有被点亮的 fanblade 指针
+  std::vector<FanBlade*> get_targets();
 
   bool is_unsolve() const { return unsolvable_; }
 

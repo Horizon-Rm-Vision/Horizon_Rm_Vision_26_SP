@@ -183,7 +183,7 @@ std::optional<PowerRune> Buff_Detector::processResults(
 
   /// 生成PowerRune
   auto r_center = get_r_center(fanblades, bgr_img);
-  PowerRune powerrune(fanblades, r_center, last_powerrune_);
+  PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
 
   /// handle error
   if (powerrune.is_unsolve()) {
@@ -249,7 +249,7 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
     }
 
     /// 生成PowerRune
-    PowerRune powerrune(fanblades, r_center, last_powerrune_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
 
     if (powerrune.is_unsolve()) {
       handle_lose();
@@ -312,7 +312,7 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
     }
 
     /// 生成PowerRune
-    PowerRune powerrune(fanblades, r_center, last_powerrune_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
 
     if (powerrune.is_unsolve()) {
       handle_lose();
@@ -345,7 +345,7 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
 
     /// 生成PowerRune
     auto r_center = get_r_center(fanblades, bgr_img);
-    PowerRune powerrune(fanblades, r_center, last_powerrune_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
 
     /// handle error
     if (powerrune.is_unsolve()) {
@@ -412,7 +412,7 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
     }
 
     /// 生成PowerRune
-    PowerRune powerrune(fanblades, r_center, last_powerrune_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
 
     if (powerrune.is_unsolve()) {
       handle_lose();
@@ -475,7 +475,7 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
     }
 
     /// 生成PowerRune
-    PowerRune powerrune(fanblades, r_center, last_powerrune_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
 
     if (powerrune.is_unsolve()) {
       handle_lose();
@@ -509,7 +509,7 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
 
     /// 生成PowerRune
     auto r_center = get_r_center(fanblades, bgr_img);
-    PowerRune powerrune(fanblades, r_center, last_powerrune_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
 
     /// handle error
     if (powerrune.is_unsolve()) {

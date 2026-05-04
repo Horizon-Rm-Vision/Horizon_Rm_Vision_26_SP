@@ -23,9 +23,16 @@ Target::Target() : first_in_(true), unsolvable_(true) {};
 
 Eigen::Vector3d Target::point_buff2world(const Eigen::Vector3d & point_in_buff) const
 {
+  return point_buff2world(point_in_buff, 0);
+}
+
+Eigen::Vector3d Target::point_buff2world(
+  const Eigen::Vector3d & point_in_buff, int blade_id) const
+{
   if (unsolvable_) return Eigen::Vector3d(0, 0, 0);
+  double blade_roll = ekf_.x[5] + double(blade_id) * 2.0 * CV_PI / 5.0;
   Eigen::Matrix3d R_buff2world =
-    tools::rotation_matrix(Eigen::Vector3d(ekf_.x[4], 0.0, ekf_.x[5]));  // pitch = 0
+    tools::rotation_matrix(Eigen::Vector3d(ekf_.x[4], 0.0, blade_roll));  // pitch = 0
 
   auto R_yaw = ekf_.x[0];
   auto R_pitch = ekf_.x[2];

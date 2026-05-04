@@ -33,6 +33,9 @@ public:
 
 std::optional<PowerRune> detect_debug(cv::Mat & bgr_img, cv::Point2f v);
 
+  /// 设置 2026 大符模式 (双目标激活)
+  void setBig2026Mode(bool on) { big_2026_mode_ = on; }
+
 private:
   void handle_img(const cv::Mat & bgr_img, cv::Mat & dilated_img);
 
@@ -57,6 +60,9 @@ private:
 
   // Mode selection
   DetectorMode mode_;
+
+  // 2026 大符模式: 启用双目标识别
+  bool big_2026_mode_ = false;
 
   // R tag detection parameters
   bool detect_r_tag_;

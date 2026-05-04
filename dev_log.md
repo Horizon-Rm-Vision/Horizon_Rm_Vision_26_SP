@@ -103,11 +103,18 @@
 - **已验证:**
   1.已确认daheng相机帧率不稳定引起云台不稳定的问题并不存在
 ## 
-
 #### Release Candidate 1 DEV10：
 
 - **功能更新:**
   1.新增基于YOLOX和传统视觉修正的能量机关识别模型,支持OpenVINO模式与TensorRT模式运行,有aimer(auto_buff_debug_mpc)和mpc(auto_buff_debug_serial)两种模式,demo则启动auto_buff_test即可
+
+## 
+
+#### Release Candidate 1 DEV11：
+
+- **功能更新:**
+  1.能量机关识别根据26赛季规则进行修改,大符模式新增双板选择功能,按选择离图像中心最近的策略选板
+  2.测试启用内录模式
 
 ## 
 待开发任务：

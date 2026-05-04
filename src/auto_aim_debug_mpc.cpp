@@ -21,6 +21,7 @@
 #include "tools/thread_safe_queue.hpp"
 #include "tools/ui_manager.hpp"
 #include "tools/yaml.hpp"
+#include "tools/recorder.hpp"
 
 #ifdef SENTRY_SR
 #include "io/ros2/publish2nav.hpp"
@@ -36,8 +37,10 @@ const std::string keys =
 
 int main(int argc, char * argv[])
 {
-  tools::Exiter exiter;
+  // 初始化绘图器、录制器、退出器
   tools::Plotter plotter;
+  tools::Recorder recorder;
+  tools::Exiter exiter;
 
   cv::CommandLineParser cli(argc, argv, keys);
   auto config_path = cli.get<std::string>(0);
@@ -201,6 +204,7 @@ int main(int argc, char * argv[])
     camera.read(img, t);
     ui_web_stream.beginFrame(img.cols, img.rows);
     auto q = gimbal.q(t);
+    //recorder.record(img, q, t);
 
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
