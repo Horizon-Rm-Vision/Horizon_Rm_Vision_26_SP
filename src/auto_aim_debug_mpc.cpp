@@ -49,6 +49,9 @@ int main(int argc, char * argv[])
     return 0;
   }
 
+  auto recorder_config = tools::load(config_path);
+  bool enable_recorder = recorder_config["recorder"] ? recorder_config["recorder"].as<bool>() : false;
+
   // 终端 FPS 显示变量
   auto last_fps_time = std::chrono::steady_clock::now();
   int frame_count = 0;
@@ -204,7 +207,7 @@ int main(int argc, char * argv[])
     camera.read(img, t);
     ui_web_stream.beginFrame(img.cols, img.rows);
     auto q = gimbal.q(t);
-    //recorder.record(img, q, t);
+    if (enable_recorder) recorder.record(img, q, t);
 
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);

@@ -117,9 +117,21 @@
   2.测试启用内录模式
 
 ## 
+
+#### Release Candidate 1 DEV12：
+
+- **功能更新:**
+  1.为auto_buff_debug_mpc和auto_buff_debug_serial引入ui_manager调试信息,同步支持web_receiver显示
+  2.正式为auto_aim_debug_mpc的方法为standard_serial,auto_buff_debug_mpc,auto_buff_debug_serial添加内录模式,可以将本次运行的视频连带收到的电控数据录制下来,可以使用test程序重新解算回放
+  3.弹速机制更新,yaml设为auto时保持接受电控弹速,设为数值时使用赋予的数值
+- **质量更新:**
+  1.自启脚本和gimbal已删除已经不再使用的ths串口
+
+## 
 待开发任务：
 1.TRT推理性能进一步优化
 2.NANO简化代码模式（对应代码内的宏LIM_CODE），启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销（尤其是JETSON）,目前已将src里不需要的几个程序和DM_IMU部分的代码屏蔽
 3.分析bullet_count对火控的影响
 4.新版前哨站机制
 5.打符子程序
+6.引入基于lenet的传统识别识别器

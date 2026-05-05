@@ -43,6 +43,9 @@ int main(int argc, char * argv[])
     return 0;
   }
 
+  auto yaml_config = tools::load(config_path);
+  bool enable_recorder = yaml_config["recorder"] ? yaml_config["recorder"].as<bool>() : false;
+
   // 终端 FPS 显示变量
   auto last_fps_time = std::chrono::steady_clock::now();
   int frame_count = 0;
@@ -127,7 +130,7 @@ int main(int argc, char * argv[])
       last_mode = mode;
     }
 
-    // recorder.record(img, q, t);
+    if (enable_recorder) recorder.record(img, q, t);
 
     solver.set_R_gimbal2world(q);
 

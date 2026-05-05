@@ -25,15 +25,30 @@ Gimbal::Gimbal(const std::string & config_path)
 {
   auto yaml = tools::load(config_path);
   com_port_ = tools::read<std::string>(yaml, "com_port");
+  if (yaml["bullet_speed"]) {
+    auto bullet_speed_node = yaml["bullet_speed"];
+    if (bullet_speed_node.IsScalar()) {
+      auto bullet_speed_value = bullet_speed_node.as<std::string>();
+      if (bullet_speed_value != "auto") {
+        use_bullet_speed_override_ = true;
+        bullet_speed_override_ = bullet_speed_node.as<float>();
+        tools::logger()->info("[Gimbal] Bullet speed override enabled: {:.2f} m/s", bullet_speed_override_);
+      }
+    } else {
+      use_bullet_speed_override_ = true;
+      bullet_speed_override_ = bullet_speed_node.as<float>();
+      tools::logger()->info("[Gimbal] Bullet speed override enabled: {:.2f} m/s", bullet_speed_override_);
+    }
+  }
 
   if (com_port_ == "auto") {
     // 候选串口列表
     const char* candidates[] = {
-        "/dev/ttyACM0", "/dev/ttyUSB0", "/dev/ttyTHS0","/dev/ttyCH341USB0",
-        "/dev/ttyACM1", "/dev/ttyUSB1", "/dev/ttyTHS1","/dev/ttyCH341USB1",
-        "/dev/ttyACM2", "/dev/ttyUSB2", "/dev/ttyTHS2","/dev/ttyCH341USB2",
-        "/dev/ttyACM3", "/dev/ttyUSB3", "/dev/ttyTHS3","/dev/ttyCH341USB3",
-        "/dev/ttyACM4", "/dev/ttyUSB4", "/dev/ttyTHS4","/dev/ttyCH341USB4",
+        "/dev/ttyACM0", "/dev/ttyUSB0","/dev/ttyCH341USB0",
+        "/dev/ttyACM1", "/dev/ttyUSB1","/dev/ttyCH341USB1",
+        "/dev/ttyACM2", "/dev/ttyUSB2","/dev/ttyCH341USB2",
+        "/dev/ttyACM3", "/dev/ttyUSB3","/dev/ttyCH341USB3",
+        "/dev/ttyACM4", "/dev/ttyUSB4","/dev/ttyCH341USB4",
         nullptr
     };
     bool found = false;
@@ -473,7 +488,10 @@ void Gimbal::read_thread()
 
       float yaw   = -rx_data_.yaw   * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
       float pitch = -rx_data_.pitch * (M_PI / 180.0f); // 接收时从角度制转换为弧度制并取负
-      float bullet_speed = rx_data_.bullet_speed/10.0f; //弹速除10从整数转换为浮点数，单位为m/s
+      float bullet_speed = rx_data_.bullet_speed / 10.0f; //弹速除10从整数转换为浮点数，单位为m/s
+      if (use_bullet_speed_override_) {
+        bullet_speed = bullet_speed_override_;
+      }
       #ifdef SR_VEL
         float yaw_vel = -rx_data_.yaw_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负
         float pitch_vel = -rx_data_.pitch_vel * (M_PI / 180.0);  // 接收时从角度每秒转换为弧度每秒并取负

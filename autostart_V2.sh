@@ -29,12 +29,11 @@ do
             #英雄，哨兵和串口版步兵用ttyACM0
             echo '1' | sudo -S chmod 666 /dev/ttyACM0
             echo '1' | sudo -S chmod 666 /dev/ttyACM1
+            echo '1' | sudo -S chmod 666 /dev/ttyACM2
+            echo '1' | sudo -S chmod 666 /dev/ttyACM3
             #老串口模块
             echo '1' | sudo -S chmod 666 /dev/ttyUSB0
             echo '1' | sudo -S chmod 666 /dev/ttyUSB1
-            #飞机的达妙NX新载板用ttyTHS0
-            echo '1' | sudo -S chmod 666 /dev/ttyTHS0
-            echo '1' | sudo -S chmod 666 /dev/ttyTHS1
             #jetson nano用ttyCH341USB0
             echo '1' | sudo -S chmod 666 /dev/ttyCH341USB0
             echo '1' | sudo -S chmod 666 /dev/ttyCH341USB1
