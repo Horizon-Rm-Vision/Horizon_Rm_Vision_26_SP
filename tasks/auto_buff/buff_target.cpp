@@ -378,7 +378,7 @@ void BigTarget::get_target(
   }
 
   // 处理识别时间间隔过大
-  if (lost_cn > 6) {
+  if (lost_cn > 30) {
     unsolvable_ = true;
     tools::logger()->debug("[Target] 丢失buff");
     lost_cn = 0;

@@ -18,10 +18,10 @@
 
 const std::string keys =
   "{help h usage ? |                        | 输出命令行参数说明 }"
-  "{config-path c  | ../configs/sentry.yaml    | yaml配置文件的路径}"
+  "{config-path c  | ../configs/uav.yaml    | yaml配置文件的路径}"
   "{start-index s  | 0                      | 视频起始帧下标    }"
   "{end-index e    | 0                      | 视频结束帧下标    }"
-  "{@input-path    |                        | avi和txt文件的路径}";
+  "{@input-path    |   ../assets/demo/rune  | avi和txt文件的路径}";
 
 int main(int argc, char * argv[])
 {
@@ -160,12 +160,13 @@ int main(int argc, char * argv[])
       data["cmd_yaw"] = command.yaw * 57.3;
       data["cmd_pitch"] = command.pitch * 57.3;
     }
+    tools::logger()->debug("[cmd] yaw: {}, pitch: {}", data["cmd_yaw"], data["cmd_pitch"]);
 
     plotter.plot(data);
 
     cv::imshow("result", img);
 
-    int key = cv::waitKey(1);
+    int key = cv::waitKey(10);
     if (key == 'q') break;
     while (key == ' ') {
       int y = cv::waitKey(30);

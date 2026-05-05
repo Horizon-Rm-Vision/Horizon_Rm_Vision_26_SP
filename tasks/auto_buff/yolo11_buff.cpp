@@ -1,5 +1,7 @@
 #include "yolo11_buff.hpp"
 
+#include <algorithm>
+
 const double ConfidenceThreshold = 0.7f;
 const double IouThreshold = 0.4f;
 namespace auto_buff
@@ -25,36 +27,21 @@ std::vector<YOLO11_BUFF::Object> YOLO11_BUFF::get_multicandidateboxes(cv::Mat & 
 
   /// 预处理
 
-  // const float factor = fill_tensor_data_image(input_tensor, image);  // 填充图片到合适的input size
-
   if (image.empty()) {
     tools::logger()->warn("Empty img!, camera drop!");
-    return std::vector<YOLO11_BUFF::Object> ();
+    return std::vector<YOLO11_BUFF::Object>();
   }
 
-  cv::Mat bgr_img = image;
-
-  auto x_scale = static_cast<double>(640) / bgr_img.rows;
-  auto y_scale = static_cast<double>(640) / bgr_img.cols;
-  auto scale = std::min(x_scale, y_scale);
-  auto h = static_cast<int>(bgr_img.rows * scale);
-  auto w = static_cast<int>(bgr_img.cols * scale);
-
-  double factor = scale;  
-
-  // preproces
-  auto input = cv::Mat(640, 640, CV_8UC3, cv::Scalar(0, 0, 0));
-  auto roi = cv::Rect(0, 0, w, h);
-  cv::resize(bgr_img, input(roi), {w, h});
-  ov::Tensor input_tensor(ov::element::u8, {1, 640, 640, 3}, input.data);
+  // 填充图片到合适的 input size，并返回回映射到原图坐标系的缩放因子
+  const float factor = fill_tensor_data_image(input_tensor, image);
 
   /// 执行推理计算
   infer_request.infer();
 
   /// 处理推理计算结果
-  const ov::Tensor output = infer_request.get_output_tensor();  // 获得推理结果
+  ov::Tensor output = infer_request.get_output_tensor();  // 获得推理结果
   const ov::Shape output_shape = output.get_shape();
-  const float * output_buffer = output.data<const float>();
+  const float * output_buffer = output.data<float>();
   const int out_rows = output_shape[1];  // 获得"output"节点的rows 15
   const int out_cols = output_shape[2];  // 获得"output"节点的cols 8400
   const cv::Mat det_output(
@@ -62,8 +49,8 @@ std::vector<YOLO11_BUFF::Object> YOLO11_BUFF::get_multicandidateboxes(cv::Mat & 
   std::vector<cv::Rect> boxes;                            // 目标框
   std::vector<float> confidences;                         // 置信度
   std::vector<std::vector<float>> objects_keypoints;      // 关键点
-  // 输出格式是[15,8400], 每列代表一个框(即最多有8400个框), 前面4行分别是[cx, cy, ow, oh], 中间score, 最后5*2关键点(3代表每个关键点的信息, 包括[x, y, visibility],如果是2，则没有visibility)
-  // 15 = 4 + 1 + NUM_POINTS * 2      56
+  // 输出格式是[4 + 1 + NUM_POINTS*2, 8400], 每列代表一个框
+  // 前 4 行: [cx, cy, ow, oh]；第 5 行: score；最后: NUM_POINTS*2 关键点 [x1,y1,x2,y2,...]
   for (int i = 0; i < det_output.cols; ++i) {
     const float score = det_output.at<float>(4, i);
     // 如果置信度满足条件则放进vector
@@ -85,7 +72,7 @@ std::vector<YOLO11_BUFF::Object> YOLO11_BUFF::get_multicandidateboxes(cv::Mat & 
 
       // 获取关键点
       std::vector<float> keypoints;
-      cv::Mat kpts = det_output.col(i).rowRange(NUM_POINTS, 15);
+      cv::Mat kpts = det_output.col(i).rowRange(5, 5 + NUM_POINTS * 2);
       for (int j = 0; j < NUM_POINTS; ++j) {
         const float x = kpts.at<float>(j * 2 + 0, 0) * factor;
         const float y = kpts.at<float>(j * 2 + 1, 0) * factor;
@@ -103,16 +90,16 @@ std::vector<YOLO11_BUFF::Object> YOLO11_BUFF::get_multicandidateboxes(cv::Mat & 
   cv::dnn::NMSBoxes(boxes, confidences, ConfidenceThreshold, IouThreshold, indexes);
 
   std::vector<Object> object_result;  // 最终得到的object
-  for (size_t i = 0; i < indexes.size(); ++i) {
+  for (size_t n = 0; n < indexes.size(); ++n) {
     Object obj;
-    const int index = indexes[i];
+    const int index = indexes[n];
     obj.rect = boxes[index];
     obj.prob = confidences[index];
 
     const std::vector<float> & keypoint = objects_keypoints[index];
-    for (int i = 0; i < NUM_POINTS; ++i) {
-      const float x_coord = keypoint[i * 2];
-      const float y_coord = keypoint[i * 2 + 1];
+    for (int j = 0; j < NUM_POINTS; ++j) {
+      const float x_coord = keypoint[j * 2];
+      const float y_coord = keypoint[j * 2 + 1];
       obj.kpt.push_back(cv::Point2f(x_coord, y_coord));
     }
     object_result.push_back(obj);
@@ -128,10 +115,19 @@ std::vector<YOLO11_BUFF::Object> YOLO11_BUFF::get_multicandidateboxes(cv::Mat & 
       image, label, cv::Point(obj.rect.tl().x, obj.rect.tl().y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5,
       cv::Scalar(0, 0, 0));
     const int radius = 2;  // 绘制关键点
-    const cv::Size & shape = image.size();
-    for (int i = 0; i < NUM_POINTS; ++i)
-      cv::circle(image, obj.kpt[i], radius, cv::Scalar(255, 0, 0), -1, cv::LINE_AA);
+    for (int j = 0; j < NUM_POINTS; ++j)
+      cv::circle(image, obj.kpt[j], radius, cv::Scalar(255, 0, 0), -1, cv::LINE_AA);
   }
+
+  // 保证前两个候选按置信度从高到低排序
+  if (object_result.size() > 1) {
+    const auto k = std::min<size_t>(2, object_result.size());
+    std::partial_sort(
+      object_result.begin(), object_result.begin() + static_cast<std::ptrdiff_t>(k),
+      object_result.end(),
+      [](const YOLO11_BUFF::Object & a, const YOLO11_BUFF::Object & b) { return a.prob > b.prob; });
+  }
+
   /// 计算FPS
   const float t = (cv::getTickCount() - start) / static_cast<float>(cv::getTickFrequency());
   cv::putText(
@@ -157,9 +153,9 @@ std::vector<YOLO11_BUFF::Object> YOLO11_BUFF::get_onecandidatebox(cv::Mat & imag
 
   /// 处理推理计算结果  output 输出格式是[17,8400], 每列代表一个框(即最多有8400个框), 前面4行分别是[cx, cy, ow, oh], 中间score, 最后6*2关键点
 
-  const ov::Tensor output = infer_request.get_output_tensor();  // 获得推理结果
+  ov::Tensor output = infer_request.get_output_tensor();  // 获得推理结果
   const ov::Shape output_shape = output.get_shape();
-  const float * output_buffer = output.data<const float>();
+  const float * output_buffer = output.data<float>();
   const int out_rows = output_shape[1];  // 获得"output"节点的rows 17
   const int out_cols = output_shape[2];  // 获得"output"节点的cols 8400
   const cv::Mat det_output(

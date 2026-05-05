@@ -122,17 +122,19 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
   return P;
 }
 
-std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
+std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img, std::string buff_model)
 {
   /// onnx 模型检测
 
-  std::vector<YOLO11_BUFF::Object> results = MODE_.get_onecandidatebox(bgr_img);
+  // std::vector<YOLO11_BUFF::Object> results = MODE_.get_onecandidatebox(bgr_img);
+  std::vector<YOLO11_BUFF::Object> results = MODE_.get_multicandidateboxes(bgr_img);
 
   /// 处理未获得的情况
 
   if (results.empty()) {
     handle_lose();
     return std::nullopt;
+    tools::logger()->debug("[Target] 无目标");
   }
 
   /// results转扇叶FanBlade
@@ -140,6 +142,10 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
   std::vector<FanBlade> fanblades;
   auto result = results[0];
   fanblades.emplace_back(FanBlade(result.kpt, result.kpt[4], _light));
+  if(buff_model == "large" && results[1].prob > 0.6) {
+    auto result_2 = results[1];
+    fanblades.emplace_back(FanBlade(result_2.kpt, result_2.kpt[4], _light));
+  }
 
   /// 生成PowerRune
   auto r_center = get_r_center(fanblades, bgr_img);
@@ -149,6 +155,7 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
   if (powerrune.is_unsolve()) {
     handle_lose();
     return std::nullopt;
+    tools::logger()->debug("[Target] 能量机关生成失败");
   }
 
   status_ = TRACK;
