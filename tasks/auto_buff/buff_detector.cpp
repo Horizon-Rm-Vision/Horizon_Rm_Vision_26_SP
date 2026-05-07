@@ -236,11 +236,11 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
       r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
     }
 
-    /// 右上角二值化小窗口（移植自ROS）
+    /// 右下角二值化小窗口（移植自ROS）
 
     if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
       cv::Rect roi_rect =
-        cv::Rect(bgr_img.cols - binary_roi.cols, 0, binary_roi.cols, binary_roi.rows);
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
         binary_roi.copyTo(bgr_img(roi_rect));
@@ -299,11 +299,11 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
       r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
     }
 
-    /// 右上角二值化小窗口（移植自ROS）
+    /// 右下角二值化小窗口（移植自ROS）
 
     if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
       cv::Rect roi_rect =
-        cv::Rect(bgr_img.cols - binary_roi.cols, 0, binary_roi.cols, binary_roi.rows);
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
         binary_roi.copyTo(bgr_img(roi_rect));
@@ -399,11 +399,11 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
       r_center = raw_r_center;
     }
 
-    /// 右上角二值化小窗口
+    /// 右下角二值化小窗口
 
     if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
       cv::Rect roi_rect =
-        cv::Rect(bgr_img.cols - binary_roi.cols, 0, binary_roi.cols, binary_roi.rows);
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
         binary_roi.copyTo(bgr_img(roi_rect));
@@ -462,11 +462,11 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
       r_center = raw_r_center;
     }
 
-    /// 右上角二值化小窗口
+    /// 右下角二值化小窗口
 
     if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
       cv::Rect roi_rect =
-        cv::Rect(bgr_img.cols - binary_roi.cols, 0, binary_roi.cols, binary_roi.rows);
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
         binary_roi.copyTo(bgr_img(roi_rect));
@@ -558,11 +558,11 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
       r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
     }
 
-    /// 右上角二值化小窗口
+    /// 右下角二值化小窗口
 
     if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
       cv::Rect roi_rect =
-        cv::Rect(bgr_img.cols - binary_roi.cols, 0, binary_roi.cols, binary_roi.rows);
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
         binary_roi.copyTo(bgr_img(roi_rect));
@@ -615,11 +615,11 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
       r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
     }
 
-    /// 右上角二值化小窗口
+    /// 右下角二值化小窗口
 
     if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
       cv::Rect roi_rect =
-        cv::Rect(bgr_img.cols - binary_roi.cols, 0, binary_roi.cols, binary_roi.rows);
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
         binary_roi.copyTo(bgr_img(roi_rect));

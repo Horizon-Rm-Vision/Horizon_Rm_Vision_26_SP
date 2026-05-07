@@ -316,6 +316,9 @@ std::optional<PowerRune> BuffTracker::matchObservations(
       nu(3) = tools::limit_rad(
         pr.ypr[2] - (pred_roll + double(id) * 2.0 * CV_PI / 5.0));
 
+      // 硬门限: roll 残差超过半片间距 (π/5 = 36°) 说明不可能是该 ID
+      if (std::fabs(nu(3)) > CV_PI / 5.0) continue;
+
       double d2 = nu.transpose() * R_ldlt.solve(nu);
 
       if (std::isfinite(d2) && d2 < best_d2) {

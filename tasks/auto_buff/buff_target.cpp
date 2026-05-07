@@ -203,8 +203,8 @@ void SmallTarget::update(double nowtime, const PowerRune & p)
   const Eigen::VectorXd & ypr = p.ypr_in_world;
   const Eigen::VectorXd & B_ypd = p.blade_ypd_in_world;  // center of blade
 
-  // 处理扇叶跳变 angle/row
-  if (abs(ypr[2] - ekf_.x[5]) > CV_PI / 12) {
+  // 处理扇叶跳变 angle/row (先将差值归一化到 [-π,π] 再比较)
+  if (std::fabs(tools::limit_rad(ypr[2] - ekf_.x[5])) > CV_PI / 12) {
     for (int i = -5; i <= 5; i++) {
       double angle_c = ekf_.x[5] + i * 2 * CV_PI / 5;
       if (std::fabs(angle_c - ypr[2]) < CV_PI / 5) {
@@ -553,8 +553,8 @@ void BigTarget::update(double nowtime, const PowerRune & p)
   const Eigen::VectorXd & ypr = p.ypr_in_world;
   const Eigen::VectorXd & B_ypd = p.blade_ypd_in_world;  // center of blade
 
-  // 处理扇叶跳变 angle/row
-  if (abs(ypr[2] - ekf_.x[5]) > CV_PI / 12) {
+  // 处理扇叶跳变 angle/row (先将差值归一化到 [-π,π] 再比较)
+  if (std::fabs(tools::limit_rad(ypr[2] - ekf_.x[5])) > CV_PI / 12) {
     for (int i = -5; i <= 5; i++) {
       double angle_c = ekf_.x[5] + i * 2 * CV_PI / 5;
       if (std::fabs(angle_c - ypr[2]) < CV_PI / 5) {
