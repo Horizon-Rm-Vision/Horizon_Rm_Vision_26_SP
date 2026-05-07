@@ -191,6 +191,19 @@ yolox_model: ../assets/yolox_rune_3.6m.xml  # YOLOX buff检测模型路径（移
 #####-----能量机关检测器模式-----#####
 detector_mode: "yolox"  # 检测器模式: "yolo11" 或 "yolox"
 
+#####-----buff tracker参数-----#####
+buff_tracker:
+  lost_time_thres: 2.0
+  tracking_thres: 5
+  match_gate: 15.0
+  max_dis_diff: 1.0
+  r_yaw_var: 0.01
+  r_pitch_var: 0.01
+  r_dis_var: 0.5
+  r_roll_var: 0.1
+  motion_delay_ms: 0
+  pose_buffer_size: 200
+
 #####-----buff_aimer参数-----#####
 fire_gap_time: 0.700   # s
 predict_time: 0.120     # s

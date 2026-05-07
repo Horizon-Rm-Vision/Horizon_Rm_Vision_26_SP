@@ -3,6 +3,7 @@
 
 #include <Eigen/Dense>
 #include <opencv2/opencv.hpp>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -39,6 +40,10 @@ public:
     std::chrono::steady_clock::time_point & timestamp) = 0;  // 纯虚函数
 
   virtual void predict(double dt) = 0;  // 纯虚函数
+
+  virtual std::unique_ptr<Target> clone() const = 0;
+
+  void reset();
 
   Eigen::Vector3d point_buff2world(const Eigen::Vector3d & point_in_buff) const;
 
@@ -80,6 +85,8 @@ class SmallTarget : public Target
 public:
   SmallTarget();
 
+  std::unique_ptr<Target> clone() const override;
+
   void get_target(
     const std::optional<PowerRune> & p, std::chrono::steady_clock::time_point & timestamp) override;
 
@@ -102,6 +109,8 @@ class BigTarget : public Target
 {
 public:
   BigTarget();
+
+  std::unique_ptr<Target> clone() const override;
 
   void get_target(
     const std::optional<PowerRune> & p, std::chrono::steady_clock::time_point & timestamp) override;

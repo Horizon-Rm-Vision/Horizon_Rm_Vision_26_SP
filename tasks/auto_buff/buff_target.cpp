@@ -21,6 +21,13 @@ int Voter::clockwise() { return clockwise_ > 0 ? 1 : -1; }
 
 Target::Target() : first_in_(true), unsolvable_(true) {};
 
+void Target::reset()
+{
+  first_in_ = true;
+  unsolvable_ = true;
+  lasttime_ = 0;
+}
+
 Eigen::Vector3d Target::point_buff2world(const Eigen::Vector3d & point_in_buff) const
 {
   return point_buff2world(point_in_buff, 0);
@@ -53,14 +60,17 @@ Eigen::VectorXd Target::ekf_x() const { return ekf_.x; }
 
 SmallTarget::SmallTarget() : Target() {}
 
+std::unique_ptr<Target> SmallTarget::clone() const
+{
+  return std::make_unique<SmallTarget>(*this);
+}
+
 void SmallTarget::get_target(
   const std::optional<PowerRune> & p, std::chrono::steady_clock::time_point & timestamp)
 {
   // 如果没有识别，退出函数
-  static int lost_cn = 0;
   if (!p.has_value()) {
     unsolvable_ = true;
-    lost_cn++;
     return;
   }
 
@@ -72,15 +82,6 @@ void SmallTarget::get_target(
     unsolvable_ = true;
     init(time_gap, p.value());
     first_in_ = false;
-  }
-
-  // 处理识别时间间隔过大
-  if (lost_cn > 6) {
-    unsolvable_ = true;
-    tools::logger()->debug("[Target] 丢失buff");
-    lost_cn = 0;
-    first_in_ = true;
-    return;
   }
 
   // kalman update
@@ -363,14 +364,17 @@ Eigen::MatrixXd SmallTarget::h_jacobian() const
 
 BigTarget::BigTarget() : Target(), spd_fitter_(100, 0.5, 1.884, 2.000) {}
 
+std::unique_ptr<Target> BigTarget::clone() const
+{
+  return std::make_unique<BigTarget>(*this);
+}
+
 void BigTarget::get_target(
   const std::optional<PowerRune> & p, std::chrono::steady_clock::time_point & timestamp)
 {
   // 如果没有识别，退出函数
-  static int lost_cn = 0;
   if (!p.has_value()) {
     unsolvable_ = true;
-    lost_cn++;
     return;
   }
 
@@ -382,15 +386,6 @@ void BigTarget::get_target(
     unsolvable_ = true;
     init(time_gap, p.value());
     first_in_ = false;
-  }
-
-  // 处理识别时间间隔过大
-  if (lost_cn > 6) {
-    unsolvable_ = true;
-    tools::logger()->debug("[Target] 丢失buff");
-    lost_cn = 0;
-    first_in_ = true;
-    return;
   }
 
   // kalman update

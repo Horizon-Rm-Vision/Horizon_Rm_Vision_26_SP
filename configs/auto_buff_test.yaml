@@ -43,6 +43,19 @@ confidence_threshold: 0.7  # 置信度阈值
 iou_threshold: 0.4  # NMS的IOU阈值
 lose_max: 20  # 最大丢失帧数
 
+#####-----buff tracker参数-----#####
+buff_tracker:
+  lost_time_thres: 2.0
+  tracking_thres: 5
+  match_gate: 15.0
+  max_dis_diff: 1.0
+  r_yaw_var: 0.01
+  r_pitch_var: 0.01
+  r_dis_var: 0.5
+  r_roll_var: 0.1
+  motion_delay_ms: 0
+  pose_buffer_size: 200
+
 #####-----R标签检测参数（移植自ROS版）-----#####
 detect_r_tag: true  # 是否使用传统视觉方法检测R标中心
 binary_thresh: 100  # 二值化阈值（用于R标检测）

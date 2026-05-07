@@ -9,7 +9,7 @@
 #include "tasks/auto_buff/buff_aimer.hpp"
 #include "tasks/auto_buff/buff_detector.hpp"
 #include "tasks/auto_buff/buff_solver.hpp"
-#include "tasks/auto_buff/buff_target.hpp"
+#include "tasks/auto_buff/buff_tracker.hpp"
 #include "tasks/auto_buff/buff_type.hpp"
 #include "tools/exiter.hpp"
 #include "tools/ui_manager.hpp"
@@ -20,6 +20,8 @@
 #include "tools/recorder.hpp"
 #include "tools/yaml.hpp"
 #include "tools/trajectory.hpp"
+#include "tools/pose_buffer.hpp"
+#include <yaml-cpp/yaml.h>
 
 // 定义命令行参数
 const std::string keys =
@@ -58,11 +60,23 @@ int main(int argc, char * argv[])
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
 
+  // 运动延时补偿 (pose buffer, 移植自 MK2)
+  double motion_delay_ms = 0.0;
+  size_t pose_buffer_size = 200;
+  {
+    auto yaml = YAML::LoadFile(config_path);
+    if (yaml["buff_tracker"].IsDefined()) {
+      auto node = yaml["buff_tracker"];
+      motion_delay_ms = node["motion_delay_ms"].as<double>(motion_delay_ms);
+      pose_buffer_size = node["pose_buffer_size"].as<int>(static_cast<int>(pose_buffer_size));
+    }
+  }
+  tools::PoseBuffer pose_buffer(pose_buffer_size);
+
   // 初始化识别器、解算器、追踪器、瞄准器
   auto_buff::Buff_Detector detector(config_path);
   auto_buff::Solver solver(config_path);
-  auto_buff::SmallTarget target;
-  // auto_buff::BigTarget target;
+  auto_buff::BuffTracker tracker(config_path, auto_buff::SMALL);
   auto_buff::Aimer aimer(config_path);
 
   cv::Mat img;
@@ -74,6 +88,13 @@ int main(int argc, char * argv[])
 
     camera.read(img, t);
     q = gimbal.q(t);
+    pose_buffer.push(q, t);
+    {
+      auto q_sample = pose_buffer.sample(t - std::chrono::milliseconds(static_cast<int>(motion_delay_ms)));
+      if (q_sample.has_value()) {
+        q = q_sample.value();
+      }
+    }
     auto gs = gimbal.state();
     if (enable_recorder) recorder.record(img, q, t);
 
@@ -93,19 +114,20 @@ int main(int argc, char * argv[])
 
     ui_web_stream.beginFrame(img.cols, img.rows);
 
-    // -------------- 打符核心逻辑 --------------
+    // -------------- 打符核心逻辑 (BuffTracker + Aimer) --------------
 
     solver.set_R_gimbal2world(q);
 
     auto power_runes = detector.detect(img);
 
-    solver.solve(power_runes);
+    auto found = tracker.update(power_runes, t, solver);
 
-    target.get_target(power_runes, t);
+    auto target_copy = tracker.clone_target();
 
-    auto target_copy = target;
-
-    io::Command cmd = aimer.aim(target_copy, t, gs.bullet_speed, true);
+    io::Command cmd = {false, false, 0, 0};
+    if (found && target_copy) {
+      cmd = aimer.aim(*target_copy, t, gs.bullet_speed, true);
+    }
 
     // 将命令通过串口发送给云台，速度/加速度字段置为 0
     gimbal.send(
@@ -114,8 +136,9 @@ int main(int argc, char * argv[])
 
     // -------------- 调试绘制 --------------
 
-    if (!target.is_unsolve()) {
-      auto & p = power_runes.value();
+    auto selected = tracker.last_observation();
+    if (found && selected.has_value() && target_copy) {
+      auto & p = selected.value();
 
       // 显示
       for (int i = 0; i < 4; i++) tools::draw_point(img, p.target().points[i]);
@@ -123,19 +146,20 @@ int main(int argc, char * argv[])
       tools::draw_point(img, p.r_center, {0, 0, 255}, 3);
 
       // 当前帧target更新后buff
-      auto Rxyz_in_world_now = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
+      auto & target_ref = tracker.target();
+      auto Rxyz_in_world_now = target_ref.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
       auto image_points =
-        solver.reproject_buff(Rxyz_in_world_now, target.ekf_x()[4], target.ekf_x()[5]);
+        solver.reproject_buff(Rxyz_in_world_now, target_ref.ekf_x()[4], target_ref.ekf_x()[5]);
       tools::draw_points(
         img, std::vector<cv::Point2f>(image_points.begin(), image_points.begin() + 4), {0, 255, 0});
       tools::draw_points(
         img, std::vector<cv::Point2f>(image_points.begin() + 4, image_points.end()), {0, 255, 0});
 
       // buff瞄准位置(预测)
-      double dangle = target.ekf_x()[5] - target_copy.ekf_x()[5];
-      auto Rxyz_in_world_pre = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
+      double dangle = target_ref.ekf_x()[5] - target_copy->ekf_x()[5];
+      auto Rxyz_in_world_pre = target_ref.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
       image_points =
-        solver.reproject_buff(Rxyz_in_world_pre, target_copy.ekf_x()[4], target_copy.ekf_x()[5]);
+        solver.reproject_buff(Rxyz_in_world_pre, target_copy->ekf_x()[4], target_copy->ekf_x()[5]);
       tools::draw_points(
         img, std::vector<cv::Point2f>(image_points.begin(), image_points.begin() + 4), {255, 0, 0});
       tools::draw_points(
@@ -146,8 +170,8 @@ int main(int argc, char * argv[])
 
     nlohmann::json data;
 
-    if (power_runes.has_value()) {
-      const auto & p = power_runes.value();
+    if (selected.has_value()) {
+      const auto & p = selected.value();
       data["buff_R_yaw"] = p.ypd_in_world[0];
       data["buff_R_pitch"] = p.ypd_in_world[1];
       data["buff_R_dis"] = p.ypd_in_world[2];
@@ -156,8 +180,9 @@ int main(int argc, char * argv[])
       data["buff_roll"] = p.ypr_in_world[2] * 57.3;
     }
 
-    if (!target.is_unsolve()) {
-      Eigen::VectorXd x = target.ekf_x();
+    if (tracker.is_tracking() && target_copy) {
+      auto & target_ref = tracker.target();
+      Eigen::VectorXd x = target_ref.ekf_x();
       data["R_yaw"] = x[0];
       data["R_V_yaw"] = x[1];
       data["R_pitch"] = x[2];
@@ -171,7 +196,7 @@ int main(int argc, char * argv[])
         data["a"] = x[7];
         data["w"] = x[8];
         data["fi"] = x[9];
-        data["spd0"] = target.spd;
+        data["spd0"] = target_ref.spd;
       }
     }
 
@@ -196,24 +221,25 @@ int main(int argc, char * argv[])
     ui_manager.addLeftText("detect", fmt::format("Detect: {}", has_rune ? "YES" : "NO"),
                           has_rune ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
 
-    bool is_solved = !target.is_unsolve();
-    ui_manager.addLeftText("solve", fmt::format("Solve: {}", is_solved ? "YES" : "NO"),
-                          is_solved ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
+    bool is_tracking = tracker.is_tracking();
+    ui_manager.addLeftText("track", fmt::format("Track: {}", is_tracking ? "YES" : "NO"),
+                          is_tracking ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
 
     ui_manager.addLeftText("shoot", fmt::format("Shoot: {}", cmd.shoot ? "YES" : "NO"),
                           cmd.shoot ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
 
     // 大符文姿态与距离
-    if (has_rune) {
-      const auto & p = power_runes.value();
+    if (selected.has_value()) {
+      const auto & p = selected.value();
       ui_manager.addLeftText("rune_attitude", fmt::format("Rune Y:{:.1f} P:{:.1f} R:{:.1f}",
                             p.ypr_in_world[0] * 57.3, p.ypr_in_world[1] * 57.3, p.ypr_in_world[2] * 57.3));
       ui_manager.addLeftText("rune_distance", fmt::format("Rune Dist: {:.2f}m", p.ypd_in_world[2]));
     }
 
     // EKF目标状态
-    if (is_solved) {
-      Eigen::VectorXd x = target.ekf_x();
+    if (is_tracking && target_copy) {
+      auto & target_ref = tracker.target();
+      Eigen::VectorXd x = target_ref.ekf_x();
 
       // 核心旋转信息：当前角度和角速度
       ui_manager.addLeftText("rotation", fmt::format("Angle: {:.1f}  Spd: {:.2f}",
@@ -223,10 +249,10 @@ int main(int argc, char * argv[])
       ui_manager.addLeftText("ekf_r", fmt::format("R_yaw: {:.2f}  R_Vyaw: {:.2f}", x[0], x[1]));
       ui_manager.addLeftText("ekf_rp", fmt::format("R_pitch: {:.2f}  R_dis: {:.2f}", x[2], x[3]));
 
-      // 谐波模型参数 (仅SmallTarget)
+      // 谐波模型参数 (仅BigTarget)
       if (x.size() >= 10) {
         ui_manager.addLeftText("ekf_harmonic", fmt::format("a:{:.2f}  w:{:.2f}  fi:{:.2f}  spd0:{:.2f}",
-                              x[7], x[8], x[9], target.spd), cv::Scalar(0, 165, 255));
+                              x[7], x[8], x[9], target_ref.spd), cv::Scalar(0, 165, 255));
       }
     }
 
