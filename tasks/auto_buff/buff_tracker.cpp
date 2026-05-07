@@ -252,23 +252,23 @@ void BuffTracker::reset_target()
   }
 }
 
-/// WUST式多目标 ID 匹配
+/// WUST 式多目标 ID 匹配 (4D Mahalanobis)
 ///
-/// 对检测到的每个可见扇叶:
-///   1. PnP 获取扇叶姿态 (roll + 尖端位置)
-///   2. 对比 EKF 预测的 roll + k*2π/5 找到最佳 ID (马氏距离思想)
-///   3. 门控筛选, 贪心保留, 填入 PowerRune::matched_blades_
-///
-/// 返回的 PowerRune 中 fanblades[0] 为"主扇叶"(用于 R_center 观测),
-/// matched_blades_ 包含所有其它匹配成功的扇叶观测.
+/// 每个可见扇叶:
+///   1. PnP 获得完整姿态 (R_center + ypr + blade_tip)
+///   2. 对候选 ID 0..4 分别计算 4D Mahalanobis 距离:
+///        z  = [R_yaw, R_pitch, R_dis, roll]
+///        zp = [pred_yaw, pred_pitch, pred_dis, pred_roll + id×2π/5]
+///        d² = (z-zp)ᵀ · R⁻¹ · (z-zp)
+///   3. 门控 + 贪心分配 → 存入 matched_blades_
 std::optional<PowerRune> BuffTracker::matchObservations(
   const PowerRune & detected, Solver & solver)
 {
-  // ---- 1. 收集可见扇叶, 全部做 PnP 一次 ----
+  // ---- 1. 所有可见扇叶一次性 PnP ----
   struct PnPResult {
     int slot;
-    Eigen::Vector3d ypd;           // R 中心球坐标 (所有扇叶应一致)
-    Eigen::Vector3d ypr;           // roll 用于 ID 匹配
+    Eigen::Vector3d ypd;
+    Eigen::Vector3d ypr;
     Eigen::Vector3d blade_xyz;
     Eigen::Vector3d blade_ypd;
   };
@@ -282,54 +282,70 @@ std::optional<PowerRune> BuffTracker::matchObservations(
     solver.solveFanBladeCorners(detected.fanblades[i].points, ypd, ypr, bxyz, bypd);
     pnp_results.push_back({i, ypd, ypr, bxyz, bypd});
   }
-
   if (pnp_results.empty()) return std::nullopt;
 
-  // ---- 2. 预测的基准 roll ----
-  double pred_roll = target_->get_roll();  // EKF 状态 x[5]
+  // ---- 2. EKF 预测值 ----
+  Eigen::VectorXd x = target_->ekf_x();
+  double pred_yaw   = x[0];
+  double pred_pitch = x[2];
+  double pred_dis   = x[3];
+  double pred_roll  = x[5];
 
-  // ---- 3. roll 匹配: 找到每个观测对应的 blade_id ----
-  // first = blade_id (0..4), second = (error, PnPResult 索引)
+  // 测量协方差矩阵 (4x4), 复用 tracker 配置
+  Eigen::Matrix4d R_mat = Eigen::Matrix4d::Zero();
+  R_mat(0, 0) = config_.r_yaw_var;
+  R_mat(1, 1) = config_.r_pitch_var;
+  R_mat(2, 2) = config_.r_dis_var;
+  R_mat(3, 3) = config_.r_roll_var;
+  auto R_ldlt = R_mat.ldlt();
+
+  // ---- 3. 4D Mahalanobis 匹配 + 贪心分配 ----
   std::map<int, std::pair<double, size_t>> best_per_id;
 
   for (size_t idx = 0; idx < pnp_results.size(); ++idx) {
     const auto & pr = pnp_results[idx];
-    double obs_roll = pr.ypr[2];
 
-    int best_id = -1;
-    double best_err = 1e9;
+    int    best_id = -1;
+    double best_d2 = 1e9;
+
     for (int id = 0; id < 5; ++id) {
-      double expected = pred_roll + double(id) * 2.0 * CV_PI / 5.0;
-      double err = std::abs(tools::limit_rad(obs_roll - expected));
-      if (err < best_err) {
-        best_err = err;
+      Eigen::Vector4d nu;
+      nu(0) = tools::limit_rad(pr.ypd[0] - pred_yaw);
+      nu(1) = tools::limit_rad(pr.ypd[1] - pred_pitch);
+      nu(2) = pr.ypd[2] - pred_dis;
+      nu(3) = tools::limit_rad(
+        pr.ypr[2] - (pred_roll + double(id) * 2.0 * CV_PI / 5.0));
+
+      double d2 = nu.transpose() * R_ldlt.solve(nu);
+
+      if (std::isfinite(d2) && d2 < best_d2) {
+        best_d2 = d2;
         best_id = id;
       }
     }
 
-    if (best_err > config_.blade_match_gate) continue;
+    if (best_d2 > config_.match_gate || best_id < 0) continue;
 
     auto it = best_per_id.find(best_id);
-    if (it == best_per_id.end() || best_err < it->second.first) {
-      best_per_id[best_id] = {best_err, idx};
+    if (it == best_per_id.end() || best_d2 < it->second.first) {
+      best_per_id[best_id] = {best_d2, idx};
     }
   }
-
   if (best_per_id.empty()) return std::nullopt;
 
-  // ---- 4. 选择主扇叶 (最接近预测 roll) ----
-  int primary_id = -1;
-  size_t primary_idx = 0;
-  double min_err = 1e9;
+  // ---- 4. 主扇叶: d² 最小的作为 primary (用于 R_center 观测) ----
+  int    primary_id  = best_per_id.begin()->first;
+  double min_d2      = best_per_id.begin()->second.first;
+  size_t primary_idx = best_per_id.begin()->second.second;
   for (const auto & [id, pair] : best_per_id) {
-    if (pair.first < min_err) {
-      min_err = pair.first;
-      primary_id = id;
+    if (pair.first < min_d2) {
+      min_d2      = pair.first;
+      primary_id  = id;
       primary_idx = pair.second;
     }
   }
 
-  // ---- 5. 构建输出 PowerRune ----
+  // ---- 5. 构造输出 PowerRune ----
   int primary_slot = pnp_results[primary_idx].slot;
 
   PowerRune selected = detected;
@@ -343,13 +359,12 @@ std::optional<PowerRune> BuffTracker::matchObservations(
   solver.solve(opt);
   if (!opt.has_value()) return std::nullopt;
 
-  // ---- 6. 填入所有其它匹配观测 ----
+  // ---- 6. 填入其它匹配扇叶观测 ----
   PowerRune & result = opt.value();
   for (const auto & [id, pair] : best_per_id) {
     if (id == primary_id) continue;
     const auto & pr = pnp_results[pair.second];
-    result.matched_blades_.push_back(
-      {id, pr.blade_ypd, pr.blade_xyz});
+    result.matched_blades_.push_back({id, pr.blade_ypd, pr.blade_xyz});
   }
 
   return result;
