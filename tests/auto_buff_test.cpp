@@ -9,6 +9,7 @@
 #include "tasks/auto_buff/buff_detector.hpp"
 #include "tasks/auto_buff/buff_solver.hpp"
 #include "tasks/auto_buff/buff_target.hpp"
+#include "tasks/auto_buff/buff_tracker.hpp"
 #include "tasks/auto_buff/buff_type.hpp"
 #include "tools/exiter.hpp"
 #include "tools/img_tools.hpp"
@@ -48,6 +49,7 @@ int main(int argc, char * argv[])
   auto_buff::Solver solver(config_path);
   // auto_buff::SmallTarget target;
   auto_buff::BigTarget target;
+  auto_buff::Tracker tracker;
   auto_buff::Aimer aimer(config_path);
 
   cv::Mat img, drawing;
@@ -74,15 +76,17 @@ int main(int argc, char * argv[])
 
     /// 自瞄核心逻辑
 
-    solver.set_R_gimbal2world({w, x, y, z});
+    solver.set_R_gimbal2world({1, 0, 0, 0});
 
     auto power_runes = detector.detect(img);
 
     solver.solve(power_runes);
 
-    target.get_target(power_runes, timestamp);
+    // target.get_target(power_runes, timestamp);
+    tracker.track(power_runes, target, timestamp);
 
     auto target_copy = target;
+    
 
     auto command = aimer.aim(target_copy, timestamp, 22, false);
 
@@ -105,13 +109,13 @@ int main(int argc, char * argv[])
       data["buff_roll"] = p.ypr_in_world[2] * 57.3;
     }
 
-    if (!target.is_unsolve()) {
-      auto & p = power_runes.value();
+    if (1) {
+      // auto & p = power_runes.value();
 
-      // 显示
-      for (int i = 0; i < 4; i++) tools::draw_point(img, p.target().points[i]);
-      tools::draw_point(img, p.target().center, {0, 0, 255}, 3);
-      tools::draw_point(img, p.r_center, {0, 0, 255}, 3);
+      // // 显示
+      // for (int i = 0; i < 4; i++) tools::draw_point(img, p.target().points[i]);
+      // tools::draw_point(img, p.target().center, {0, 0, 255}, 3);
+      // tools::draw_point(img, p.r_center, {0, 0, 255}, 3);
 
       // 当前帧target更新后buff
       auto Rxyz_in_world_now = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
@@ -160,7 +164,6 @@ int main(int argc, char * argv[])
       data["cmd_yaw"] = command.yaw * 57.3;
       data["cmd_pitch"] = command.pitch * 57.3;
     }
-    tools::logger()->debug("[cmd] yaw: {}, pitch: {}", data["cmd_yaw"], data["cmd_pitch"]);
 
     plotter.plot(data);
 

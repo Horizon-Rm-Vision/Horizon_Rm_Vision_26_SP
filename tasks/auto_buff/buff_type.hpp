@@ -41,6 +41,7 @@ class PowerRune
 public:
   cv::Point2f r_center;
   std::vector<FanBlade> fanblades;  // 按target开始顺时针
+  double angle;
 
   int light_num;
 

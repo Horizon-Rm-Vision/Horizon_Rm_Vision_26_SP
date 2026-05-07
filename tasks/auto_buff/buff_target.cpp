@@ -356,34 +356,67 @@ Eigen::MatrixXd SmallTarget::h_jacobian() const
 
 BigTarget::BigTarget() : Target(), spd_fitter_(100, 0.5, 1.884, 2.000) {}
 
+// 暂时无用
+std::optional<PowerRune> BigTarget::ekf_x2rune(const Eigen::VectorXd & x)
+{
+  // convert EKF state to PowerRune
+  // x layout (BigTarget):
+  // [0] R_yaw, [1] v_R_yaw, [2] R_pitch, [3] R_dis, [4] yaw, [5] roll(row), [6] spd, [7] a, [8] w, [9] fi
+  if (x.size() < 6) return std::nullopt;
+  if (!std::isfinite(x[3]) || x[3] <= 0.0) return std::nullopt;
+
+  PowerRune rune;
+
+  const double R_yaw = tools::limit_rad(x[0]);
+  const double R_pitch = tools::limit_rad(x[2]);
+  const double R_dis = x[3];
+  rune.ypd_in_world = Eigen::Vector3d(R_yaw, R_pitch, R_dis);
+  rune.xyz_in_world = tools::ypd2xyz(rune.ypd_in_world);
+
+  const double yaw = tools::limit_rad(x[4]);
+  const double roll = tools::limit_rad(x[5]);
+  rune.ypr_in_world = Eigen::Vector3d(yaw, 0.0, roll);  // pitch is assumed 0 throughout this module
+
+  // Blade center in world: rotate local offset then translate by rune center
+  constexpr double kBladeOffsetZ = 0.7;  // meters
+  const Eigen::Matrix3d R_buff2world = tools::rotation_matrix(Eigen::Vector3d(yaw, 0.0, roll));
+  const Eigen::Vector3d blade_in_buff(0.0, 0.0, kBladeOffsetZ);
+  rune.blade_xyz_in_world = R_buff2world * blade_in_buff + rune.xyz_in_world;
+  rune.blade_ypd_in_world = tools::xyz2ypd(rune.blade_xyz_in_world);
+
+  // Populate non-essential fields with safe defaults (this rune is geometry-only)
+  rune.r_center = cv::Point2f(0.0f, 0.0f);
+  rune.light_num = 0;
+  rune.fanblades.resize(5);
+  for (auto & fb : rune.fanblades) {
+    fb.type = _unlight;
+    fb.center = cv::Point2f(0.0f, 0.0f);
+    fb.points.clear();
+    fb.angle = 0.0;
+    fb.width = 0.0;
+    fb.height = 0.0;
+  }
+
+  return rune;
+}
+
 void BigTarget::get_target(
   const std::optional<PowerRune> & p, std::chrono::steady_clock::time_point & timestamp)
 {
-  // 如果没有识别，退出函数
-  static int lost_cn = 0;
-  if (!p.has_value()) {
-    unsolvable_ = true;
-    lost_cn++;
-    return;
-  }
-
   static std::chrono::steady_clock::time_point start_timestamp = timestamp;
   auto time_gap = tools::delta_time(timestamp, start_timestamp);
+  static int lost_cn = 0;
+ 
+  // 检测不到扇叶时直接退出
+  if (!p.has_value()) return;
+
+  lost_cn = 0;
 
   // init
   if (first_in_) {
     unsolvable_ = true;
     init(time_gap, p.value());
     first_in_ = false;
-  }
-
-  // 处理识别时间间隔过大
-  if (lost_cn > 30) {
-    unsolvable_ = true;
-    tools::logger()->debug("[Target] 丢失buff");
-    lost_cn = 0;
-    first_in_ = true;
-    return;
   }
 
   // kalman update
@@ -395,6 +428,7 @@ void BigTarget::get_target(
     ekf_.x[7] > 1.045 * 1.5 || ekf_.x[7] < 0.78 / 1.5 || ekf_.x[8] > 2.0 * 1.5 ||
     ekf_.x[8] < 1.884 / 1.5) {
     tools::logger()->debug("[Target] 大符角度发散a: {:.2f}b:{:.2f}", ekf_.x[7], ekf_.x[8]);
+    unsolvable_ = true;
     first_in_ = true;
     return;
   }
@@ -524,6 +558,20 @@ void BigTarget::init(double nowtime, const PowerRune & p)
   ekf_ = tools::ExtendedKalmanFilter(x0_, P0_, x_add);
 }
 
+std::vector<float> BigTarget::blades_angle_list(const PowerRune & p) const
+{
+  std::vector<float> angles;
+  const double target_offset = 2.0 * CV_PI / 5.0;
+  float raw_angle = p.ypr_in_world[2];
+  float new_angle = raw_angle - target_offset * ID;
+  
+  for (int i = 0; i < 5; i++) {
+    angles.push_back(static_cast<float>(tools::limit_rad(new_angle + target_offset * i)));
+  }
+
+  return angles;
+}
+
 void BigTarget::update(double nowtime, const PowerRune & p)
 {
   // [R_yaw]
@@ -540,8 +588,13 @@ void BigTarget::update(double nowtime, const PowerRune & p)
   const Eigen::VectorXd & ypr = p.ypr_in_world;
   const Eigen::VectorXd & B_ypd = p.blade_ypd_in_world;  // center of blade
 
-  // 处理扇叶跳变 angle/row
-  if (abs(ypr[2] - ekf_.x[5]) > CV_PI / 12) {
+  static PowerRune last_rune = p;
+  const std::vector<float> angle_list = blades_angle_list(p);
+  // tools::logger()->debug("[angle1] :angle: {:.3f} rad", angle_list[0] * 180.0 / CV_PI);
+
+  // 处理扇叶跳变 angle
+  double angle_diff = tools::limit_rad(ypr[2] - ekf_.x[5]);
+  if (std::abs(angle_diff) > CV_PI / 10) {
     for (int i = -5; i <= 5; i++) {
       double angle_c = ekf_.x[5] + i * 2 * CV_PI / 5;
       if (std::fabs(angle_c - ypr[2]) < CV_PI / 5) {
@@ -549,7 +602,28 @@ void BigTarget::update(double nowtime, const PowerRune & p)
         break;
       }
     }
+    // tools::logger()->debug("[Tracker] 跳变");
+    const std::vector<float> last_angle_list = blades_angle_list(last_rune);
+    
+    // 找最接近观测到的装甲板
+    float min_diff = CV_PI;
+    int best_id = ID;
+    for (int i = 0; i < 5; i++) {
+      float diff = std::fabs(tools::limit_rad(last_angle_list[i] - ypr[2]));
+      if (diff < min_diff) {
+        min_diff = diff;
+        best_id = i;
+      }
+    }
+    
+    if (best_id != ID && min_diff < CV_PI / 10) {
+      tools::logger()->debug("[BigTarget armor switch] ID: {} -> {}, angle_error: {:.3f} rad", ID, best_id, min_diff);
+      ID = best_id;
+      angle = last_angle_list[best_id];
+    }
   }
+  
+  last_rune = p;
 
   // vote判断是顺时针还是逆时针旋转
   voter.vote(ekf_.x[5], ypr[2]);

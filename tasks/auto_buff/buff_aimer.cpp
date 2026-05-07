@@ -164,6 +164,7 @@ bool Aimer::get_send_angle(
   target.predict(predict_time);
   // std::cout << "gap: " << detect_now_gap << std::endl;
   angle = target.ekf_x()[5];
+  // angle = target.angle;
 
   // 计算目标点的空间坐标
   auto aim_in_world = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
@@ -196,7 +197,7 @@ bool Aimer::get_send_angle(
   // 计算时间误差
   auto time_error = trajectory1.fly_time - trajectory0.fly_time;
   if (std::abs(time_error) > 0.01) {  // 如果时间误差过大，返回未命中结果
-    tools::logger()->debug("[Aimer] Large time error: {:.3f}", time_error);
+    // tools::logger()->debug("[Aimer] Large time error: {:.3f}", time_error);
     return false;
   }
 

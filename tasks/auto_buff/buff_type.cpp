@@ -21,18 +21,6 @@ PowerRune::PowerRune(
   std::vector<FanBlade> & ts, const cv::Point2f center, std::optional<PowerRune> last_powerrune)
 : r_center(center), light_num(ts.size())
 {
-  /// 找出target
-  // // 亮两个fanblade，设最近的为target
-  //  if (light_num == 2) {
-  //   float min_distance = norm(ts[0].center - ts[1].center);
-  //   for (auto it = ts.begin(); it != ts.end(); ++it) {
-  //     float distance = norm(it->center - );
-  //     if (distance < min_distance) {
-  //       min_distance = distance;
-  //       target_fanblade_it = it;  // 更新最近的 fanblade 的迭代器
-  //     }
-  //   }
-  //  }
   // 只有一个fanblade，就为target
   if (light_num == 1) ts[0].type = _target;
   // 没有新亮起来的fanblade

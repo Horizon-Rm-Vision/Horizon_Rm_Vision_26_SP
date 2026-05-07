@@ -101,10 +101,19 @@ public:
 
   void predict(double dt) override;
 
+  std::vector<float> blades_angle_list(const PowerRune & p) const;
+
+  void update(double nowtime, const PowerRune & p) override;
+  // void update(double nowtime, PowerRune & p);、
+  PowerRune p_r;
+  double angle;
+  int ID = 0;
+
 private:
   void init(double nowtime, const PowerRune & p) override;
 
-  void update(double nowtime, const PowerRune & p) override;
+  // void update(double nowtime, const PowerRune & p) override;
+  std::optional<PowerRune> ekf_x2rune(const Eigen::VectorXd & x);
 
   Eigen::MatrixXd h_jacobian() const;
 

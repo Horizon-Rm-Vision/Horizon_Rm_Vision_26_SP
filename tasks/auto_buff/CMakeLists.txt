@@ -10,6 +10,7 @@ add_library(auto_buff OBJECT
     buff_solver.cpp
     buff_aimer.cpp
     buff_target.cpp
+    buff_tracker.cpp
     yolo11_buff.cpp
 )
 
