@@ -97,7 +97,8 @@ private:
 
   void update(double nowtime, const PowerRune & p) override;
 
-  Eigen::MatrixXd h_jacobian() const;
+  /// blade_id 参量化雅可比: 在 roll 上叠加 blade_id * 2π/5
+  Eigen::MatrixXd h_jacobian(int blade_id = 0) const;
 
   const double SMALL_W = CV_PI / 3;
   // const double SMALL_W = 0;
@@ -122,7 +123,8 @@ private:
 
   void update(double nowtime, const PowerRune & p) override;
 
-  Eigen::MatrixXd h_jacobian() const;
+  /// blade_id 参量化雅可比: 在 roll 上叠加 blade_id * 2π/5
+  Eigen::MatrixXd h_jacobian(int blade_id = 0) const;
 
   tools::RansacSineFitter spd_fitter_;
 

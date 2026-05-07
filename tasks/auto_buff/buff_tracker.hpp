@@ -8,6 +8,8 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <map>
+
 #include "buff_solver.hpp"
 #include "buff_target.hpp"
 #include "buff_type.hpp"
@@ -31,6 +33,9 @@ public:
     double r_pitch_var = 0.01;
     double r_dis_var = 0.5;
     double r_roll_var = 0.1;
+
+    /// WUST式ID匹配: 扇叶角度门控 (rad)
+    double blade_match_gate = CV_PI / 10.0;  // 18°
   };
 
   BuffTracker(const std::string & config_path, PowerRune_type type = SMALL);
@@ -50,6 +55,9 @@ public:
   std::optional<PowerRune> last_observation() const { return last_selected_; }
 
 private:
+  /// WUST式ID匹配: 对每个可见扇叶做 PnP, 用 roll 匹配到 0..4 编号
+  std::optional<PowerRune> matchObservations(const PowerRune & detected, Solver & solver);
+
   std::optional<PowerRune> select_observation(const PowerRune & detected, Solver & solver);
   double compute_gate_distance(const PowerRune & obs) const;
   bool passes_gate(const PowerRune & obs) const;

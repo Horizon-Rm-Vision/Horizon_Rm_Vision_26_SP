@@ -265,14 +265,14 @@ void SmallTarget::update(double nowtime, const PowerRune & p)
 
   ekf_.update(z1, H1, R1, z_subtract1);
 
-  ///2.
+  ///2. 主扇叶观测 (blade_id = 0)
 
   // [B_yaw]     angle4
   // [B_pitch]   angle5
   // [B_dis]
 
   // clang-format off
-  Eigen::MatrixXd H2 = h_jacobian();  // 3*7
+  Eigen::MatrixXd H2 = h_jacobian(0);  // 3*7
 
   Eigen::MatrixXd R2{
     {0.01, 0.0, 0.0}, // B_yaw
@@ -282,13 +282,14 @@ void SmallTarget::update(double nowtime, const PowerRune & p)
   // clang-format on
 
   // 定义非线性转换函数h: x -> z
-  auto h2 = [&](const Eigen::VectorXd & x) -> Eigen::Vector3d {
-    Eigen::VectorXd R_ypd{{x[0], x[2], x[3]}};
-    Eigen::VectorXd R_xyz = tools::ypd2xyz(R_ypd);
-    Eigen::VectorXd R_xyz_and_yr{{R_ypd[0], R_ypd[1], R_ypd[2], x[4], x[5]}};
-    Eigen::VectorXd B_xyz = point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
-    Eigen::VectorXd B_ypd = tools::xyz2ypd(B_xyz);
-    return B_ypd;
+  auto h2_blade = [this](int blade_id) {
+    return [this, blade_id](const Eigen::VectorXd & x) -> Eigen::Vector3d {
+      Eigen::VectorXd R_ypd{{x[0], x[2], x[3]}};
+      Eigen::VectorXd R_xyz = tools::ypd2xyz(R_ypd);
+      Eigen::VectorXd B_xyz = point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7), blade_id);
+      Eigen::VectorXd B_ypd = tools::xyz2ypd(B_xyz);
+      return B_ypd;
+    };
   };
 
   // 防止夹角求差出现异常值
@@ -299,16 +300,26 @@ void SmallTarget::update(double nowtime, const PowerRune & p)
     return c;
   };
 
-  Eigen::VectorXd z2{{B_ypd[0], B_ypd[1], B_ypd[2]}};
+  // 主扇叶 (id=0)
+  {
+    Eigen::VectorXd z2{{B_ypd[0], B_ypd[1], B_ypd[2]}};
+    ekf_.update(z2, H2, R2, h2_blade(0), z_subtract2);
+  }
 
-  ekf_.update(z2, H2, R2, h2, z_subtract2);
+  /// 3+. 其它匹配扇叶观测 (multi-blade)
+  for (const auto & mb : p.matched_blades_) {
+    Eigen::VectorXd z_mb{
+      {mb.blade_ypd_in_world[0], mb.blade_ypd_in_world[1], mb.blade_ypd_in_world[2]}};
+    Eigen::MatrixXd H2_mb = h_jacobian(mb.blade_id);
+    ekf_.update(z_mb, H2_mb, R2, h2_blade(mb.blade_id), z_subtract2);
+  }
 
   // 更新lasttime
   lasttime_ = nowtime;
   return;
 }
 
-Eigen::MatrixXd SmallTarget::h_jacobian() const
+Eigen::MatrixXd SmallTarget::h_jacobian(int blade_id) const
 {
   /// Z(3,1) = H3(3,3) * H2(3,5) * H1(5,5) * H0(5,7) * x(7,1)
 
@@ -333,7 +344,7 @@ Eigen::MatrixXd SmallTarget::h_jacobian() const
 
   // double pitch = 0;
   double yaw = ekf_.x[4];
-  double roll = ekf_.x[5];
+  double roll = ekf_.x[5] + double(blade_id) * 2.0 * CV_PI / 5.0;  // blade_id 偏移
   double cos_yaw = cos(yaw);
   double sin_yaw = sin(yaw);
   double cos_roll = cos(roll);
@@ -605,14 +616,14 @@ void BigTarget::update(double nowtime, const PowerRune & p)
 
   ekf_.update(z1, H1, R1, z_subtract1);
 
-  ///2.
+  ///2. 主扇叶观测 (blade_id = 0)
 
   // [B_yaw]     angle4
   // [B_pitch]   angle5
   // [B_dis]
 
   // clang-format off
-  Eigen::MatrixXd H2 = h_jacobian();  // 3*10
+  Eigen::MatrixXd H2 = h_jacobian(0);  // 3*10
 
   Eigen::MatrixXd R2{
     {0.01, 0.0, 0.0}, // B_yaw
@@ -622,13 +633,14 @@ void BigTarget::update(double nowtime, const PowerRune & p)
   // clang-format on
 
   // 定义非线性转换函数h: x -> z
-  auto h2 = [&](const Eigen::VectorXd & x) -> Eigen::Vector3d {
-    Eigen::VectorXd R_ypd{{x[0], x[2], x[3]}};
-    Eigen::VectorXd R_xyz = tools::ypd2xyz(R_ypd);
-    Eigen::VectorXd R_xyz_and_yr{{R_ypd[0], R_ypd[1], R_ypd[2], x[4], x[5]}};
-    Eigen::VectorXd B_xyz = point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
-    Eigen::VectorXd B_ypd = tools::xyz2ypd(B_xyz);
-    return B_ypd;
+  auto h2_blade = [this](int blade_id) {
+    return [this, blade_id](const Eigen::VectorXd & x) -> Eigen::Vector3d {
+      Eigen::VectorXd R_ypd{{x[0], x[2], x[3]}};
+      Eigen::VectorXd R_xyz = tools::ypd2xyz(R_ypd);
+      Eigen::VectorXd B_xyz = point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7), blade_id);
+      Eigen::VectorXd B_ypd = tools::xyz2ypd(B_xyz);
+      return B_ypd;
+    };
   };
 
   // 防止夹角求差出现异常值
@@ -639,9 +651,19 @@ void BigTarget::update(double nowtime, const PowerRune & p)
     return c;
   };
 
-  Eigen::VectorXd z2{{B_ypd[0], B_ypd[1], B_ypd[2]}};
+  // 主扇叶 (id=0)
+  {
+    Eigen::VectorXd z2{{B_ypd[0], B_ypd[1], B_ypd[2]}};
+    ekf_.update(z2, H2, R2, h2_blade(0), z_subtract2);
+  }
 
-  ekf_.update(z2, H2, R2, h2, z_subtract2);
+  /// 3+. 其它匹配扇叶观测 (multi-blade)
+  for (const auto & mb : p.matched_blades_) {
+    Eigen::VectorXd z_mb{
+      {mb.blade_ypd_in_world[0], mb.blade_ypd_in_world[1], mb.blade_ypd_in_world[2]}};
+    Eigen::MatrixXd H2_mb = h_jacobian(mb.blade_id);
+    ekf_.update(z_mb, H2_mb, R2, h2_blade(mb.blade_id), z_subtract2);
+  }
 
   // 对ekf速度进行最小二乘拟合 ekf_.x[6] -> fitting_speed -> predict position
   if (ekf_.x[6] < 2.1 && ekf_.x[6] >= 0) spd_fitter_.add_data(nowtime, ekf_.x[6]);
@@ -661,7 +683,7 @@ void BigTarget::update(double nowtime, const PowerRune & p)
   return;
 }
 
-Eigen::MatrixXd BigTarget::h_jacobian() const
+Eigen::MatrixXd BigTarget::h_jacobian(int blade_id) const
 {
   /// Z(3,1) = H3(3,3) * H2(3,5) * H1(5,5) * H0(5,10) * x(10,1)
 
@@ -686,7 +708,7 @@ Eigen::MatrixXd BigTarget::h_jacobian() const
 
   // double pitch = 0;
   double yaw = ekf_.x[4];
-  double roll = ekf_.x[5];
+  double roll = ekf_.x[5] + double(blade_id) * 2.0 * CV_PI / 5.0;  // blade_id 偏移
   double cos_yaw = cos(yaw);
   double sin_yaw = sin(yaw);
   double cos_roll = cos(roll);

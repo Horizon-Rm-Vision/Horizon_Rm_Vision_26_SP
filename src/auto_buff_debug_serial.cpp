@@ -216,18 +216,14 @@ int main(int argc, char * argv[])
 
     ui_manager.initialize(img);
 
-    // 左侧面板：检测、目标状态、旋转信息
-    bool has_rune = power_runes.has_value();
-    ui_manager.addLeftText("detect", fmt::format("Detect: {}", has_rune ? "YES" : "NO"),
-                          has_rune ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
+    // 左侧面板：云台状态与cmd数据、旋转信息
+    ui_manager.addLeftText("gimbal", fmt::format("Gimbal Y: {:.1f}  P: {:.1f}",
+                            -gs.yaw * 57.3, -gs.pitch * 57.3));
 
-    bool is_tracking = tracker.is_tracking();
-    ui_manager.addLeftText("track", fmt::format("Track: {}", is_tracking ? "YES" : "NO"),
-                          is_tracking ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
-
-    ui_manager.addLeftText("shoot", fmt::format("Shoot: {}", cmd.shoot ? "YES" : "NO"),
-                          cmd.shoot ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
-
+    if (cmd.control) {
+      ui_manager.addLeftText("cmd", fmt::format("Cmd Y: {:.1f}  P: {:.1f}",
+                              -cmd.yaw * 57.3, -cmd.pitch * 57.3), cv::Scalar(0, 165, 255));
+    }
     // 大符文姿态与距离
     if (selected.has_value()) {
       const auto & p = selected.value();
@@ -236,6 +232,7 @@ int main(int argc, char * argv[])
       ui_manager.addLeftText("rune_distance", fmt::format("Rune Dist: {:.2f}m", p.ypd_in_world[2]));
     }
 
+    bool is_tracking = tracker.is_tracking();
     // EKF目标状态
     if (is_tracking && target_copy) {
       auto & target_ref = tracker.target();
@@ -258,13 +255,18 @@ int main(int argc, char * argv[])
 
     // 右侧面板：云台状态与瞄准指令
     ui_manager.addRightText("bullet_speed", fmt::format("Bullet Speed: {:.1f}", gs.bullet_speed));
-    ui_manager.addRightText("gimbal", fmt::format("Gimbal Y: {:.1f}  P: {:.1f}",
-                            -gs.yaw * 57.3, -gs.pitch * 57.3));
 
-    if (cmd.control) {
-      ui_manager.addRightText("cmd", fmt::format("Cmd Y: {:.1f}  P: {:.1f}",
-                              -cmd.yaw * 57.3, -cmd.pitch * 57.3), cv::Scalar(0, 165, 255));
-    }
+
+    bool has_rune = power_runes.has_value();
+    ui_manager.addRightText("detect", fmt::format("Detect: {}", has_rune ? "YES" : "NO"),
+                          has_rune ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
+
+
+    ui_manager.addRightText("track", fmt::format("Track: {}", is_tracking ? "YES" : "NO"),
+                          is_tracking ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
+
+    ui_manager.addRightText("shoot", fmt::format("Shoot: {}", cmd.shoot ? "YES" : "NO"),
+                          cmd.shoot ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
 
     ui_manager.render(img);
     ui_web_stream.capturePanels(ui_manager);

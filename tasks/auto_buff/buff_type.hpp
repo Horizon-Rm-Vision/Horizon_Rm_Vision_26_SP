@@ -61,6 +61,14 @@ public:
   Eigen::Vector3d blade_xyz_in_world;  // 单位：m
   Eigen::Vector3d blade_ypd_in_world;  // 球坐标系, 单位: m
 
+  /// 多目标匹配: 记录每个可见扇叶匹配到的 blade_id + 尖端坐标
+  struct MatchedBlade {
+    int blade_id;                         ///< 匹配到的叶片编号 0..4
+    Eigen::Vector3d blade_ypd_in_world;   ///< 扇叶尖端球坐标
+    Eigen::Vector3d blade_xyz_in_world;   ///< 扇叶尖端笛卡尔坐标
+  };
+  std::vector<MatchedBlade> matched_blades_;
+
   explicit PowerRune(
     std::vector<FanBlade> & ts, const cv::Point2f r_center,
     std::optional<PowerRune> last_powerrune,
