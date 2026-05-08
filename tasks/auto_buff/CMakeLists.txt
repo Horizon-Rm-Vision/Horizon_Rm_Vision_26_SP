@@ -1,10 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
-set(OpenVINO_DIR "/opt/intel/openvino_2024.6.0/runtime/cmake")
 
-find_package(OpenVINO REQUIRED)
 find_package(Ceres REQUIRED)
 
-add_library(auto_buff OBJECT
+set(AUTO_BUFF_SRCS
     buff_type.cpp
     buff_detector.cpp
     buff_solver.cpp
@@ -12,15 +10,28 @@ add_library(auto_buff OBJECT
     buff_target.cpp
     buff_tracker.cpp
     buff_director.cpp
-    yolo11_buff.cpp
-    yolox_buff.cpp
 )
 
-if(USE_CUDA)
-    target_sources(auto_buff PRIVATE yolox_buff_trt.cpp)
+if(USE_OPENVINO)
+    set(OpenVINO_DIR "/opt/intel/openvino_2024.6.0/runtime/cmake")
+    find_package(OpenVINO REQUIRED)
+    list(APPEND AUTO_BUFF_SRCS
+        yolo11_buff.cpp
+        yolox_buff.cpp
+    )
 endif()
 
-target_link_libraries(auto_buff auto_aim openvino::runtime ${CERES_LIBRARIES})
+if(USE_CUDA)
+    list(APPEND AUTO_BUFF_SRCS yolox_buff_trt.cpp)
+endif()
+
+add_library(auto_buff OBJECT ${AUTO_BUFF_SRCS})
+
+target_link_libraries(auto_buff auto_aim ${CERES_LIBRARIES})
+
+if(USE_OPENVINO)
+    target_link_libraries(auto_buff openvino::runtime)
+endif()
 
 # CUDA/TensorRT 库 (用于 yolox_buff_trt)
 if(USE_CUDA)

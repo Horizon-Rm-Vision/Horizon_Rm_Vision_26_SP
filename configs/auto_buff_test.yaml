@@ -7,7 +7,7 @@ yolox_model: ../assets/yolox_rune_3.6m.xml  # YOLOX buff检测模型路径（移
 yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-ampere.engine  # YOLOX TRT buff检测模型路径（TensorRT引擎文件）
 
 #####-----检测器模式-----#####
-detector_mode: "yolox"  # 检测器模式: "yolo11" / "yolox" / "yolox_trt"
+detector_mode: "yolox_trt"  # 检测器模式: "yolo11" / "yolox" / "yolox_trt"
 
 #####-----相机参数-----#####
 image_width: 1280

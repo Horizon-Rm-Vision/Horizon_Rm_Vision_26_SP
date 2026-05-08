@@ -9,8 +9,10 @@
 
 #include "buff_type.hpp"
 #include "tools/ui_manager.hpp"
+#ifdef USE_OPENVINO
 #include "yolo11_buff.hpp"
 #include "yolox_buff.hpp"
+#endif
 #ifdef USE_CUDA
 #include "yolox_buff_trt.hpp"
 #endif
@@ -52,8 +54,10 @@ private:
   void handle_lose();
 
   // Detector instances (only the selected mode is constructed)
+#ifdef USE_OPENVINO
   std::unique_ptr<YOLO11_BUFF> MODE_;
   std::unique_ptr<YOLOX_BUFF> MODE_YOLOX_;
+#endif
 #ifdef USE_CUDA
   std::unique_ptr<YOLOX_BUFF_TRT> MODE_YOLOX_TRT_;
 #endif

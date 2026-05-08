@@ -1,5 +1,7 @@
 #include "mt_detector.hpp"
 
+#ifdef USE_OPENVINO
+
 #include <yaml-cpp/yaml.h>
 
 namespace auto_aim
@@ -100,3 +102,5 @@ MultiThreadDetector::debug_pop()
 }  // namespace multithread
 
 }  // namespace auto_aim
+
+#endif  // USE_OPENVINO

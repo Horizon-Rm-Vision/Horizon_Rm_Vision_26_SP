@@ -4,6 +4,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <filesystem>
+#include <numeric>
 
 #include "tools/ui_manager.hpp"
 #include "tools/logger.hpp"

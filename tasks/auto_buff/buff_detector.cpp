@@ -10,23 +10,35 @@ Buff_Detector::Buff_Detector(const std::string & config)
   auto yaml = YAML::LoadFile(config);
   std::string mode_str = yaml["detector_mode"].as<std::string>("yolo11");
   if (mode_str == "yolox") {
+#ifdef USE_OPENVINO
     mode_ = YOLOX_MODE;
     tools::logger()->info("[Buff_Detector] Using YOLOX mode");
     MODE_YOLOX_ = std::make_unique<YOLOX_BUFF>(config);
+#else
+    tools::logger()->error("[Buff_Detector] YOLOX mode requires OpenVINO (USE_OPENVINO=OFF)");
+#endif
   } else if (mode_str == "yolox_trt") {
 #ifdef USE_CUDA
     mode_ = YOLOX_TRT_MODE;
     tools::logger()->info("[Buff_Detector] Using YOLOX TRT mode");
     MODE_YOLOX_TRT_ = std::make_unique<YOLOX_BUFF_TRT>(config);
 #else
+    #ifdef USE_OPENVINO
     tools::logger()->warn("[Buff_Detector] YOLOX TRT mode requested but USE_CUDA not enabled, falling back to YOLO11");
     mode_ = YOLO11_MODE;
     MODE_ = std::make_unique<YOLO11_BUFF>(config);
+    #else
+    tools::logger()->warn("[Buff_Detector] YOLOX TRT mode requested but neither CUDA nor OpenVINO enabled");
+    #endif
 #endif
   } else {
+#ifdef USE_OPENVINO
     mode_ = YOLO11_MODE;
     tools::logger()->info("[Buff_Detector] Using YOLO11 mode");
     MODE_ = std::make_unique<YOLO11_BUFF>(config);
+#else
+    tools::logger()->error("[Buff_Detector] YOLO11 mode requires OpenVINO (USE_OPENVINO=OFF)");
+#endif
   }
 
   // R tag detection parameters (ROS port)
@@ -265,6 +277,7 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
 
   }
 #endif
+#ifdef USE_OPENVINO
   if (mode_ == YOLOX_MODE) {
     /// YOLOX model detection
 
@@ -360,6 +373,10 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
     last_powerrune_ = P;
     return P;
   }
+#else
+    handle_lose();
+    return std::nullopt;
+#endif
 }
 
 std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
@@ -428,6 +445,7 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
 
   }
 #endif
+#ifdef USE_OPENVINO
   if (mode_ == YOLOX_MODE) {
     /// YOLOX model detection (use NMS, take top-1)
 
@@ -524,6 +542,10 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
     last_powerrune_ = P;
     return P;
   }
+#else
+    handle_lose();
+    return std::nullopt;
+#endif
 }
 
 std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Point2f v)
@@ -586,6 +608,7 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
 
   }
 #endif
+#ifdef USE_OPENVINO
   if (mode_ == YOLOX_MODE) {
     /// YOLOX model detection
 
@@ -672,6 +695,10 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
     P.emplace(powerrune);
     return P;
   }
+#else
+    handle_lose();
+    return std::nullopt;
+#endif
 }
 
 }  // namespace auto_buff

@@ -161,6 +161,15 @@
 - **质量更新:**
 
 ## 
+
+#### Release Candidate 1 DEV17：
+
+- **功能更新:**
+  1.引入中南的lenet传统视觉装甲板识别器,yolo_name设置为tra即可启用
+  2.剥离OpenVINO,现在可以单独启用和关闭OpenVINO和TensorRT,实现可选无OpenVINO依赖,实现Jetson纯粹的TensorRT模式
+- **质量更新:**
+
+## 
 待开发任务：
 1.TRT推理性能进一步优化
 2.NANO简化代码模式（对应代码内的宏LIM_CODE），启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销（尤其是JETSON）,目前已将src里不需要的几个程序和DM_IMU部分的代码屏蔽

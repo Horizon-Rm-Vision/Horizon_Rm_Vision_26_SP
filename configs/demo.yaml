@@ -2,7 +2,7 @@
 enemy_color: "blue"
 
 #####-----神经网络参数-----#####
-yolo_name: yolov5_trt
+yolo_name: tra
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
@@ -34,6 +34,30 @@ max_armor_ratio: 5
 max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
 min_confidence: 0.8
+
+#####-----自瞄传统视觉模式识别参数 (yolo_name: tra)-----#####
+traditional:
+  binary_thres: 90
+  use_pca: true      # 使用PCA算法矫正灯条角点
+  light:
+    min_ratio: 0.0001
+    max_ratio: 1.0
+    max_angle: 40.0
+    color_diff_thresh: 20
+  armor:
+    min_light_ratio: 0.8
+    min_small_center_distance: 0.8
+    max_small_center_distance: 3.5
+    min_large_center_distance: 3.5
+    max_large_center_distance: 8.0
+    max_angle: 35.0
+  classifier:
+    model_path: ../assets/lenet.onnx
+    label_path: ../assets/label.txt
+    threshold: 0.7
+    ignore_classes: ["negative"]
+
+
 
 #####-----tracker参数-----#####
 min_detect_count: 5
