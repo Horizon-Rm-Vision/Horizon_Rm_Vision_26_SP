@@ -184,14 +184,17 @@ std::list<Target> Tracker::track(
     return {};
   }
 
-  // 收敛效果检测：
-  if (
-    std::accumulate(
-      target_.ekf().recent_nis_failures.begin(), target_.ekf().recent_nis_failures.end(), 0) >=
-    (0.4 * target_.ekf().window_size)) {
-    tools::logger()->debug("[Target] Bad Converge Found!");
-    state_ = "lost";
-    return {};
+  // 收敛效果检测：（仅在tracking状态执行，避免temp_lost恢复时误触发重置）
+  // 参照 Auto_Aim tracker 的设计：NIS失败检查只应在滤波器稳定跟踪时评估
+  if (state_ == "tracking") {
+    if (
+      std::accumulate(
+        target_.ekf().recent_nis_failures.begin(), target_.ekf().recent_nis_failures.end(), 0) >=
+      (0.4 * target_.ekf().window_size)) {
+      tools::logger()->debug("[Target] Bad Converge Found!");
+      state_ = "lost";
+      return {};
+    }
   }
 
   if (state_ == "lost") return {};
@@ -372,6 +375,7 @@ void Tracker::state_machine(bool found)
   else if (state_ == "temp_lost") {
     if (found) {
       state_ = "tracking";
+      temp_lost_count_ = 0;  // 参照Auto_Aim：恢复时重置丢失计数，避免累积
     } else {
       temp_lost_count_++;
       if (target_.name == ArmorName::outpost)
@@ -406,7 +410,9 @@ bool Tracker::set_target(std::list<Armor> & armors, std::chrono::steady_clock::t
     #ifdef NOVA_OUTPOST_V1
     Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 81, 0.4, 100, 1, 1, 1}};
     #else
-    Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 81, 0.4, 100, 1e-4, 0, 0}};
+    // h1(9)和h2(10)初始协方差设为0.1，允许滤波器在初始化后快速学习Z轴高度差
+    // 参照Auto_Aim OutpostTarget的初始化逻辑，避免P=0导致Kalman增益为0无法更新
+    Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 81, 0.4, 100, 1e-4, 0.1, 0.1}};
     #endif
     target_ = Target(armor, t, 0.2765, 3, P0_dig);
   }
