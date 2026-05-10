@@ -115,6 +115,7 @@ int main(int argc, char * argv[])
     }
     
     camera.read(img, t);
+    ui_web_stream.sendImage(img);
     ui_web_stream.beginFrame(img.cols, img.rows);
     q = gimbal.q(t);
     auto gimbal_mode = gimbal.mode();
@@ -249,8 +250,10 @@ int main(int argc, char * argv[])
     }
     //#endif
 
-    plotter.drawData({gs.yaw * 180/M_PI, command.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw"});
-    
+    plotter.subplot("Yaw", {gs.yaw * 180/M_PI, command.yaw * 180/M_PI},
+                    {"gimbal_yaw", "target_yaw"});
+    plotter.draw();
+
     #ifdef FIRE_CONSTRAINT
     // 开火约束检查
     bool allow_fire = command.shoot;

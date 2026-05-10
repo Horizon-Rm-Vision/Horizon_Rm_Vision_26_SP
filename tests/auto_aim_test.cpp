@@ -39,6 +39,7 @@ int main(int argc, char * argv[])
   tools::Plotter plotter;
   tools::Exiter exiter;
   tools::UIManager ui_manager(config_path);
+  //plotter.setWindowName("MPC Debug");
 
   auto video_path = fmt::format("{}.avi", input_path);
   auto text_path = fmt::format("{}.txt", input_path);
@@ -191,7 +192,12 @@ int main(int argc, char * argv[])
 
           //plotter.drawData({ command.pitch * 180/M_PI}, {"target_pitch"});
     }
-plotter.drawData({ command.yaw * 180/M_PI,yaw * 180/M_PI}, {"target_yaw","gimbal_yaw"});
+//plotter.drawData({ command.yaw * 180/M_PI,yaw * 180/M_PI}, {"target_yaw","gimbal_yaw"});
+      plotter.subplot("Yaw", {yaw * 180/M_PI, command.yaw * 180/M_PI},
+                      {"gimbal_yaw", "target_yaw"});
+      plotter.subplot("Pitch", {command.pitch * 180/M_PI},
+                      {"target_pitch"});
+      plotter.draw();
     //plotter.plot(data);
   
 

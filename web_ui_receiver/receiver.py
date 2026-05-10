@@ -1,9 +1,12 @@
 import argparse
 import json
+import mmap
+import os
 import socket
+import struct
 import time
 from collections import deque
-from typing import Any, Deque, Dict, List, Tuple
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -96,6 +99,30 @@ def _draw_commands(img, draws):
             cv2.line(img, (int(p1[0]), int(p1[1])), (int(p2[0]), int(p2[1])), color, thickness)
 
 
+# ─── 单子图状态（兼容旧格式） ──────────────────────────────
+
+class SubplotState:
+    """单个子图的数据状态。"""
+
+    def __init__(self) -> None:
+        self.name = ""
+        self.names: List[str] = []
+        self.colors: List[Tuple[int, int, int]] = []
+        self.data: List[Deque[float]] = []
+
+    def configure(self, name: str, names: List[str], colors: List[Any], max_points: int) -> None:
+        self.name = name
+        if self.names != names:
+            self.names = list(names)
+            self.colors = [_color_from_list(c) for c in colors]
+            self.data = [deque(maxlen=max_points) for _ in self.names]
+
+    def push_values(self, values: List[float]) -> None:
+        for idx, value in enumerate(values):
+            if idx < len(self.data):
+                self.data[idx].append(float(value))
+
+
 class PlotterState:
     def __init__(self) -> None:
         self.width = 1400
@@ -105,11 +132,9 @@ class PlotterState:
         self.margin_right = 150
         self.margin_top = 40
         self.margin_bottom = 40
-        self.names: List[str] = []
-        self.colors: List[Tuple[int, int, int]] = []
-        self.data: List[Deque[float]] = []
+        self.subplots: List[SubplotState] = []
 
-    def update(self, payload: Dict[str, Any]) -> None:
+    def _update_common(self, payload: Dict[str, Any]) -> None:
         self.width = int(payload.get("width", self.width))
         self.height = int(payload.get("height", self.height))
         self.max_points = int(payload.get("max_points", self.max_points))
@@ -118,38 +143,130 @@ class PlotterState:
         self.margin_top = int(payload.get("margin_top", self.margin_top))
         self.margin_bottom = int(payload.get("margin_bottom", self.margin_bottom))
 
+    def update_single(self, payload: Dict[str, Any]) -> None:
+        """兼容旧格式：单子图。"""
+        self._update_common(payload)
         names = payload.get("names", [])
         colors = payload.get("colors", [])
         values = payload.get("values", [])
-
         if not names or not values:
             return
 
-        if self.names != names:
-            self.names = list(names)
-            self.colors = [_color_from_list(c) for c in colors]
-            self.data = [deque(maxlen=self.max_points) for _ in self.names]
+        if not self.subplots:
+            self.subplots.append(SubplotState())
+        sp = self.subplots[0]
+        sp.configure("Plot", names, colors, self.max_points)
+        sp.push_values(values)
 
-        for idx, value in enumerate(values):
-            if idx >= len(self.data):
-                break
-            self.data[idx].append(float(value))
+    def update_multi(self, payload: Dict[str, Any]) -> None:
+        """新格式：多子图。"""
+        self._update_common(payload)
+        subplots_raw = payload.get("subplots", [])
+        if not subplots_raw:
+            return
+
+        # 保证子图数量一致
+        while len(self.subplots) < len(subplots_raw):
+            self.subplots.append(SubplotState())
+
+        for idx, raw in enumerate(subplots_raw):
+            sp = self.subplots[idx]
+            sp.configure(
+                raw.get("name", ""),
+                raw.get("names", []),
+                raw.get("colors", []),
+                self.max_points,
+            )
+            sp.push_values(raw.get("values", []))
 
 
-def _draw_plotter(state: PlotterState) -> np.ndarray:
-    width = state.width
-    height = state.height
-    img = np.full((height, width, 3), 255, dtype=np.uint8)
+# ─── 单子图绘制（兼容） ──────────────────────────────
 
-    plot_width = width - state.margin_left - state.margin_right
-    plot_height = height - state.margin_top - state.margin_bottom
+def _draw_subplot_grid(
+    img: np.ndarray,
+    state: PlotterState,
+    plot_width: int,
+    plot_height: int,
+    min_val: float,
+    max_val: float,
+    y_offset: int = 0,
+) -> None:
+    top = state.margin_top + y_offset
+    bottom = top + plot_height
+    left = state.margin_left
+    right = left + plot_width
 
+    cv2.rectangle(img, (left, top), (right, bottom), (200, 200, 200), 1)
+
+    num_h_lines = 6
+    for i in range(num_h_lines + 1):
+        y = top + plot_height * i // num_h_lines
+        cv2.line(img, (left, y), (right, y), (220, 220, 220), 1)
+        val = max_val - (max_val - min_val) * i / num_h_lines
+        cv2.putText(img, f"{val:.2f}", (5, y + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (80, 80, 80), 1)
+
+    num_v_lines = 10
+    for i in range(num_v_lines + 1):
+        x = left + plot_width * i // num_v_lines
+        cv2.line(img, (x, top), (x, bottom), (220, 220, 220), 1)
+
+
+def _draw_subplot_curves(
+    img: np.ndarray,
+    state: PlotterState,
+    subplot: SubplotState,
+    plot_width: int,
+    plot_height: int,
+    min_val: float,
+    max_val: float,
+    y_offset: int = 0,
+) -> None:
+    value_range = max_val - min_val
+    top = state.margin_top + y_offset
+
+    for idx, curve in enumerate(subplot.data):
+        if len(curve) < 2:
+            continue
+        color = subplot.colors[idx] if idx < len(subplot.colors) else (0, 255, 0)
+        for i in range(1, len(curve)):
+            x1_ratio = (i - 1) / max(state.max_points, 1)
+            x2_ratio = i / max(state.max_points, 1)
+            x1 = int(state.margin_left + x1_ratio * plot_width)
+            x2 = int(state.margin_left + x2_ratio * plot_width)
+            y1 = int(top + plot_height - (curve[i - 1] - min_val) / value_range * plot_height)
+            y2 = int(top + plot_height - (curve[i] - min_val) / value_range * plot_height)
+            y1 = max(top, min(top + plot_height, y1))
+            y2 = max(top, min(top + plot_height, y2))
+            cv2.line(img, (x1, y1), (x2, y2), color, 2)
+
+
+def _draw_subplot_legend(
+    img: np.ndarray,
+    state: PlotterState,
+    subplot: SubplotState,
+    y_offset: int = 0,
+) -> None:
+    legend_x = state.width - state.margin_right + 10
+    legend_y = state.margin_top + y_offset + 10
+    line_height = 25
+    for idx, name in enumerate(subplot.names):
+        y = legend_y + idx * line_height
+        color = subplot.colors[idx] if idx < len(subplot.colors) else (0, 255, 0)
+        cv2.line(img, (legend_x, y + 5), (legend_x + 30, y + 5), color, 3)
+        cv2.putText(img, name, (legend_x + 40, y + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1)
+
+
+def _draw_single_subplot(state: PlotterState, subplot: SubplotState) -> np.ndarray:
+    """绘制单个子图的图像（兼容旧版单窗口）。"""
+    img = np.full((state.height, state.width, 3), 255, dtype=np.uint8)
+    plot_width = state.width - state.margin_left - state.margin_right
+    plot_height = state.height - state.margin_top - state.margin_bottom
     if plot_width <= 0 or plot_height <= 0:
         return img
 
     min_val = None
     max_val = None
-    for curve in state.data:
+    for curve in subplot.data:
         if not curve:
             continue
         local_min = min(curve)
@@ -159,108 +276,182 @@ def _draw_plotter(state: PlotterState) -> np.ndarray:
 
     if min_val is None or max_val is None:
         min_val, max_val = 0.0, 1.0
-
     if abs(max_val - min_val) < 1e-6:
         max_val = min_val + 1.0
 
-    _draw_plotter_grid(img, state, plot_width, plot_height, min_val, max_val)
-    _draw_plotter_curves(img, state, plot_width, plot_height, min_val, max_val)
-    _draw_plotter_legend(img, state)
+    _draw_subplot_grid(img, state, plot_width, plot_height, min_val, max_val)
+    _draw_subplot_curves(img, state, subplot, plot_width, plot_height, min_val, max_val)
+    _draw_subplot_legend(img, state, subplot)
     return img
 
 
-def _draw_plotter_grid(
-    img: np.ndarray,
-    state: PlotterState,
-    plot_width: int,
-    plot_height: int,
-    min_val: float,
-    max_val: float,
-) -> None:
-    cv2.rectangle(
-        img,
-        (state.margin_left, state.margin_top),
-        (state.margin_left + plot_width, state.margin_top + plot_height),
-        (200, 200, 200),
-        1,
-    )
+# ─── 多子图绘制 ──────────────────────────────
 
-    num_h_lines = 6
-    for i in range(num_h_lines + 1):
-        y = state.margin_top + plot_height * i // num_h_lines
-        cv2.line(img, (state.margin_left, y), (state.margin_left + plot_width, y), (220, 220, 220), 1)
-        val = max_val - (max_val - min_val) * i / num_h_lines
-        cv2.putText(
-            img,
-            f"{val:.2f}",
-            (5, y + 5),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.4,
-            (80, 80, 80),
-            1,
-        )
+def _draw_multi_subplots(state: PlotterState) -> np.ndarray:
+    """绘制所有子图，竖直堆叠。"""
+    num = len(state.subplots)
+    total_height = num * state.height
+    img = np.full((total_height, state.width, 3), 255, dtype=np.uint8)
+    plot_width = state.width - state.margin_left - state.margin_right
+    plot_height = state.height - state.margin_top - state.margin_bottom
 
-    num_v_lines = 10
-    for i in range(num_v_lines + 1):
-        x = state.margin_left + plot_width * i // num_v_lines
-        cv2.line(img, (x, state.margin_top), (x, state.margin_top + plot_height), (220, 220, 220), 1)
+    if plot_width <= 0 or plot_height <= 0:
+        return img
 
+    for s, subplot in enumerate(state.subplots):
+        y_off = s * state.height
 
-def _draw_plotter_curves(
-    img: np.ndarray,
-    state: PlotterState,
-    plot_width: int,
-    plot_height: int,
-    min_val: float,
-    max_val: float,
-) -> None:
-    value_range = max_val - min_val
-    for idx, curve in enumerate(state.data):
-        if len(curve) < 2:
+        if not subplot.data:
             continue
-        color = state.colors[idx] if idx < len(state.colors) else (0, 255, 0)
-        for i in range(1, len(curve)):
-            x1_ratio = (i - 1) / max(state.max_points, 1)
-            x2_ratio = i / max(state.max_points, 1)
-            x1 = int(state.margin_left + x1_ratio * plot_width)
-            x2 = int(state.margin_left + x2_ratio * plot_width)
-            y1 = int(state.margin_top + plot_height - (curve[i - 1] - min_val) / value_range * plot_height)
-            y2 = int(state.margin_top + plot_height - (curve[i] - min_val) / value_range * plot_height)
-            y1 = max(state.margin_top, min(state.margin_top + plot_height, y1))
-            y2 = max(state.margin_top, min(state.margin_top + plot_height, y2))
-            cv2.line(img, (x1, y1), (x2, y2), color, 2)
 
-
-def _draw_plotter_legend(img: np.ndarray, state: PlotterState) -> None:
-    legend_x = state.width - state.margin_right + 10
-    legend_y = state.margin_top + 10
-    line_height = 25
-    for idx, name in enumerate(state.names):
-        y = legend_y + idx * line_height
-        color = state.colors[idx] if idx < len(state.colors) else (0, 255, 0)
-        cv2.line(img, (legend_x, y + 5), (legend_x + 30, y + 5), color, 3)
+        # 子图标题
         cv2.putText(
             img,
-            name,
-            (legend_x + 40, y + 10),
+            subplot.name,
+            (state.margin_left, y_off + 20),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.45,
+            0.5,
             (0, 0, 0),
             1,
         )
 
+        min_val = None
+        max_val = None
+        for curve in subplot.data:
+            if not curve:
+                continue
+            local_min = min(curve)
+            local_max = max(curve)
+            if min_val is None or local_min < min_val:
+                min_val = local_min
+            if max_val is None or local_max > max_val:
+                max_val = local_max
 
-def run_receiver(host: str, port: int, window_name: str) -> None:
+        if min_val is None or max_val is None:
+            min_val, max_val = 0.0, 1.0
+        if abs(max_val - min_val) < 1e-6:
+            max_val = min_val + 1.0
+
+        _draw_subplot_grid(img, state, plot_width, plot_height, min_val, max_val, y_off)
+        _draw_subplot_curves(img, state, subplot, plot_width, plot_height, min_val, max_val, y_off)
+        _draw_subplot_legend(img, state, subplot, y_off)
+
+    return img
+
+
+# ─── 共享内存图像读取 (参考 wust_vision web.py 的共享内存模式) ──
+
+class ShmImageReader:
+    """从 POSIX 共享内存读取 JPEG 图像 (C++ ShmWriter 写入的格式).
+
+    格式: [4-byte uint32 size][JPEG data], 与 wust_vision 的 ShmWriter 一致.
+    图像通过 cv2.imdecode 解码为 BGR 的 numpy 数组.
+    """
+
+    _SHM_PATH = "/dev/shm/nova_cam_frame"
+    _SHM_SIZE = 2 * 1024 * 1024  # 2 MB, 与 C++ kShmMaxSize 保持一致
+
+    def __init__(self, shm_path: Optional[str] = None) -> None:
+        self._path = shm_path or self._SHM_PATH
+        self._fd: Optional[int] = None
+        self._map: Optional[mmap.mmap] = None
+        self._connected = False
+        self._last_attempt = 0.0
+        self._retry_interval = 2.0  # seconds between reconnect attempts
+
+    def _try_connect(self) -> None:
+        now = time.time()
+        if now - self._last_attempt < self._retry_interval:
+            return
+        self._last_attempt = now
+
+        # Close any stale handle from a previous connect attempt
+        self._disconnect()
+
+        try:
+            if not os.path.exists(self._path):
+                return
+            self._fd = os.open(self._path, os.O_RDONLY)
+            # 验证文件大小
+            size = os.fstat(self._fd).st_size
+            if size < 4:
+                os.close(self._fd)
+                self._fd = None
+                return
+            self._map = mmap.mmap(self._fd, self._SHM_SIZE, mmap.MAP_SHARED, mmap.PROT_READ)
+            self._connected = True
+        except (OSError, ValueError):
+            self._disconnect()
+
+    def _disconnect(self) -> None:
+        self._connected = False
+        if self._map is not None:
+            try:
+                self._map.close()
+            except OSError:
+                pass
+            self._map = None
+        if self._fd is not None:
+            try:
+                os.close(self._fd)
+            except OSError:
+                pass
+            self._fd = None
+
+    def read(self) -> Optional[np.ndarray]:
+        """返回 BGR 图像，若不可用则返回 None。"""
+        if not self._connected:
+            self._try_connect()
+        if not self._connected or self._map is None:
+            return None
+
+        try:
+            self._map.seek(0)
+            raw_size = self._map.read(4)
+            if len(raw_size) < 4:
+                return None
+            jpg_size = struct.unpack("I", raw_size)[0]
+            if jpg_size <= 0 or jpg_size > self._SHM_SIZE - 4:
+                return None
+            jpg_bytes = self._map.read(jpg_size)
+            if len(jpg_bytes) != jpg_size:
+                return None
+            if jpg_bytes[0:3] != b"\xff\xd8\xff":  # JPEG magic
+                return None
+
+            arr = np.frombuffer(jpg_bytes, dtype=np.uint8)
+            return cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        except (OSError, ValueError):
+            self._disconnect()
+            return None
+
+    def close(self) -> None:
+        self._disconnect()
+
+
+# ─── 主循环 ──────────────────────────────
+
+def run_receiver(host: str, port: int, window_name: str, shm_path: Optional[str] = None) -> None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((host, port))
     sock.setblocking(False)
 
+    # 图像来源：UDP NVIC 包 > SHM（本地回退）> 黑画布
+    shm_reader = ShmImageReader(shm_path) if shm_path else ShmImageReader()
+    latest_udp_img: Optional[np.ndarray] = None          # from NVIC UDP packets
+    ui_frame_width: int = 1280
+    ui_frame_height: int = 1024
+
     last_frame = None
     plotter_state = PlotterState()
-    last_plotter = None
+    last_plotter_single = None
+    last_plotter_multi = None
     last_time = time.time()
     fps = 0.0
     frame_count = 0
+    rx_img_fps = 0.0
+    rx_img_count = 0
+    last_img_time = time.time()
 
     while True:
         try:
@@ -269,23 +460,54 @@ def run_receiver(host: str, port: int, window_name: str) -> None:
             data = None
 
         if data:
+            # ── Check for NVIC image packet ──
+            if len(data) >= 8 and data[:4] == b'NVIC':
+                jpg_size = struct.unpack("I", data[4:8])[0]
+                if 0 < jpg_size <= len(data) - 8 and data[8:11] == b'\xff\xd8\xff':
+                    arr = np.frombuffer(data[8:8+jpg_size], dtype=np.uint8)
+                    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                    if img is not None:
+                        latest_udp_img = img
+                continue  # don't treat as JSON
+
+            # ── JSON payload ──
             try:
                 payload: Dict[str, Any] = json.loads(data.decode("utf-8"))
             except json.JSONDecodeError:
                 payload = {}
 
-            if payload.get("type") == "plotter":
-                plotter_state.update(payload)
-                last_plotter = _draw_plotter(plotter_state)
+            ptype = payload.get("type", "")
+
+            if ptype == "plotter":
+                plotter_state.update_single(payload)
+                if plotter_state.subplots:
+                    last_plotter_single = _draw_single_subplot(plotter_state, plotter_state.subplots[0])
+
+            elif ptype == "plotter_multi":
+                plotter_state.update_multi(payload)
+                if plotter_state.subplots:
+                    last_plotter_multi = _draw_multi_subplots(plotter_state)
+
             else:
-                width = int(payload.get("width", 1280))
-                height = int(payload.get("height", 1024))
+                # UI 帧
+                ui_frame_width = int(payload.get("width", ui_frame_width))
+                ui_frame_height = int(payload.get("height", ui_frame_height))
                 layout = payload.get("layout", {})
                 left_items = payload.get("left", [])
                 right_items = payload.get("right", [])
                 draws = payload.get("draws", [])
 
-                canvas = np.zeros((height, width, 3), dtype=np.uint8)
+                # 画布：NVIC UDP 图像 > SHM 图像 > 黑画布
+                if latest_udp_img is not None:
+                    canvas = cv2.resize(latest_udp_img, (ui_frame_width, ui_frame_height))
+                    rx_img_count += 1
+                else:
+                    camera_img = shm_reader.read()
+                    if camera_img is not None:
+                        canvas = cv2.resize(camera_img, (ui_frame_width, ui_frame_height))
+                        rx_img_count += 1
+                    else:
+                        canvas = np.zeros((ui_frame_height, ui_frame_width, 3), dtype=np.uint8)
 
                 _draw_left_panel(canvas, left_items, layout)
                 _draw_right_panel(canvas, right_items, layout)
@@ -301,9 +523,14 @@ def run_receiver(host: str, port: int, window_name: str) -> None:
                 frame_count = 0
                 last_time = now
 
+            if now - last_img_time >= 1.0:
+                rx_img_fps = rx_img_count / (now - last_img_time)
+                rx_img_count = 0
+                last_img_time = now
+
             cv2.putText(
                 last_frame,
-                f"RX FPS: {fps:.1f}",
+                f"RX FPS: {fps:.1f}  IMG: {rx_img_fps:.1f}",
                 (10, last_frame.shape[0] - 20),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
@@ -313,13 +540,17 @@ def run_receiver(host: str, port: int, window_name: str) -> None:
 
             cv2.imshow(window_name, last_frame)
 
-        if last_plotter is not None:
-            cv2.imshow("Plotter", last_plotter)
+        if last_plotter_single is not None:
+            cv2.imshow("Plotter", last_plotter_single)
+
+        if last_plotter_multi is not None:
+            cv2.imshow("Plotter Multi", last_plotter_multi)
 
         key = cv2.waitKey(1)
         if key == ord("q"):
             break
 
+    shm_reader.close()
     sock.close()
     cv2.destroyAllWindows()
 
@@ -329,9 +560,11 @@ def main() -> None:
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=9876)
     parser.add_argument("--window", default="Web UI Receiver")
+    parser.add_argument("--shm-path", default=None,
+                        help="Path to shared memory frame (default: /dev/shm/nova_cam_frame)")
     args = parser.parse_args()
 
-    run_receiver(args.host, args.port, args.window)
+    run_receiver(args.host, args.port, args.window, args.shm_path)
 
 
 if __name__ == "__main__":

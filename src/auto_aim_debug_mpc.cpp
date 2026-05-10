@@ -175,7 +175,16 @@ int main(int argc, char * argv[])
       }
 
       //plotter.plot(data);
-      plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
+      plotter.setWindowName("MPC Debug");
+      plotter.subplot("Yaw", {gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI},
+                      {"gimbal_yaw", "target_yaw", "plan_yaw"});
+      plotter.subplot("Pitch", {gs.pitch * 180/M_PI, plan.target_pitch * 180/M_PI, plan.pitch * 180/M_PI},
+                      {"gimbal_pitch", "target_pitch", "plan_pitch"});
+      //plotter.subplot("Yaw Vel", {gs.yaw_vel, plan.yaw_vel},
+                      //{"gimbal_yaw_vel", "plan_yaw_vel"});
+      //plotter.subplot("Acc", {plan.yaw_acc, plan.pitch_acc},
+                      //{"plan_yaw_acc", "plan_pitch_acc"});
+      plotter.draw();
 
       std::this_thread::sleep_for(10ms);
     }
@@ -205,6 +214,7 @@ int main(int argc, char * argv[])
     }
     
     camera.read(img, t);
+    ui_web_stream.sendImage(img);
     ui_web_stream.beginFrame(img.cols, img.rows);
     auto q = gimbal.q(t);
     if (enable_recorder) recorder.record(img, q, t);

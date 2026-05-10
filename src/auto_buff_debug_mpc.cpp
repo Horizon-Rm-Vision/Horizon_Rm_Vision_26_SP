@@ -87,6 +87,7 @@ int main(int argc, char * argv[])
     auto loop_start_time = std::chrono::steady_clock::now();
 
     camera.read(img, t);
+    ui_web_stream.sendImage(img);
     q = gimbal.q(t);
     pose_buffer.push(q, t);
     {

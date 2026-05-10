@@ -3,7 +3,7 @@ enemy_color: "red"
 #enemy_color: "blue"
 
 #####-----自瞄神经网络模式参数-----#####
-yolo_name: yolov5_ov
+yolo_name: yolov5_trt
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
@@ -112,7 +112,7 @@ Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----gimbal参数-----#####
-com_port: /dev/pts/7
+com_port: /dev/pts/3
 
 # #####-----相机参数-----#####
 #camera_name: "mindvision"
@@ -248,13 +248,16 @@ ui:
   imshow: true
   web:
     enabled: true
-    host: "192.168.1.75"
+    host: "192.168.1.241"
     port: 9876
+    send_image: true
+    image_quality: 75
+    max_image_dim: 640
 
 plotter:
   web:
     enabled: true
-    host: "192.168.1.75"
+    host: "192.168.1.241"
     port: 9876
 
 #####-----recorder参数-----#####
