@@ -128,9 +128,11 @@ int main(int argc, char * argv[])
 
       // buff瞄准位置(预测)
       double dangle = target.ekf_x()[5] - target_copy.ekf_x()[5];
+      auto angle_d = tools::limit_rad(target.ekf_x()[5] - (2.0 * CV_PI / 5.0) * target.ID);
+      tools::logger()->debug("[angle1] :angle: {:.3f} rad", angle_d * 180.0 / CV_PI);
       auto Rxyz_in_world_pre = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
       image_points =
-        solver.reproject_buff(Rxyz_in_world_pre, target_copy.ekf_x()[4], target_copy.ekf_x()[5]);
+        solver.reproject_buff(Rxyz_in_world_pre, target.ekf_x()[4], angle_d);
       tools::draw_points(
         img, std::vector<cv::Point2f>(image_points.begin(), image_points.begin() + 4), {255, 0, 0});
       tools::draw_points(

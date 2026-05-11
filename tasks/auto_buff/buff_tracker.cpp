@@ -90,15 +90,31 @@ void Tracker::track(std::optional<PowerRune> & p, BigTarget &target, std::chrono
   // p.fanblades = p_r.fanblades[i].type;
   }
   // big_target_.angle = big_target_.p_r.angle;
+  set_blade_target(p);
   
 
 }
 
-void Tracker::set_blade_target(std::optional<PowerRune> last_powerrune)
+void Tracker::set_blade_target(std::optional<PowerRune> p)
 {
-  if (!last_powerrune.has_value()) return;
+  if (!p.has_value()) {
+    switch_count_++;
+    return;
+  }
 
-  
+  if (big_target_.ID != last_blade_id_) {
+    switch_count_++;
+    if (switch_count_ > 5) {
+      last_blade_id_ = big_target_.ID;
+      tools::logger()->debug("[Tracker] blade switch to ID: {}", last_blade_id_);
+      switch_count_ = 0;
+    }
+  } else {
+    switch_count_ = 0;
+  }
+
+  big_target_.best_blade_id = last_blade_id_;
+
 }
 
 }

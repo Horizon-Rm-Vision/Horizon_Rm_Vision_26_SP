@@ -33,6 +33,7 @@ private:
 class Target
 {
 public:
+  int best_blade_id = 0;
   Target();
   virtual void get_target(
     const std::optional<PowerRune> & p,
@@ -107,7 +108,7 @@ public:
   // void update(double nowtime, PowerRune & p);、
   PowerRune p_r;
   double angle;
-  int ID = 0;
+  int ID = 0; // 当前目标对应的扇叶ID，0-4，按target开始顺时针编号
 
 private:
   void init(double nowtime, const PowerRune & p) override;
