@@ -12,6 +12,7 @@
 #include "tasks/auto_aim/tracker.hpp"
 #include "tasks/auto_buff/buff_aimer.hpp"
 #include "tasks/auto_buff/buff_detector.hpp"
+#include "tasks/auto_buff/buff_director.hpp"
 #include "tasks/auto_buff/buff_solver.hpp"
 #include "tasks/auto_buff/buff_target.hpp"
 #include "tasks/auto_buff/buff_type.hpp"
@@ -57,6 +58,7 @@ int main(int argc, char * argv[])
   auto_buff::SmallTarget buff_small_target;
   auto_buff::BigTarget buff_big_target;
   auto_buff::Aimer buff_aimer(config_path);
+  auto_buff::Buff2026Director buff_director;
 
   cv::Mat img;
   Eigen::Quaterniond q;
@@ -115,7 +117,10 @@ int main(int argc, char * argv[])
     else if (mode.load() == io::GimbalMode::SMALL_BUFF || mode.load() == io::GimbalMode::BIG_BUFF) {
       buff_solver.set_R_gimbal2world(q);
 
-      auto power_runes = buff_detector.detect(img);
+      /// 大符启用 2026 双目标模式
+      buff_detector.setBig2026Mode(mode.load() == io::GimbalMode::BIG_BUFF);
+
+      auto power_runes = buff_detector.detect_24(img);
 
       buff_solver.solve(power_runes);
 
@@ -126,8 +131,11 @@ int main(int argc, char * argv[])
         buff_plan = buff_aimer.mpc_aim(target_copy, t, gs, true);
       } else if (mode.load() == io::GimbalMode::BIG_BUFF) {
         buff_big_target.get_target(power_runes, t);
+        buff_director.update(power_runes, t, buff_big_target, cv::Point2f(img.cols / 2.0f, img.rows / 2.0f));
+        int blade_id = buff_director.getAimBladeId();
+        if (blade_id < 0) blade_id = 0;
         auto target_copy = buff_big_target;
-        buff_plan = buff_aimer.mpc_aim(target_copy, t, gs, true);
+        buff_plan = buff_aimer.mpc_aim(target_copy, t, gs, true, blade_id);
       }
       gimbal.send(
         buff_plan.control, buff_plan.fire, buff_plan.yaw, buff_plan.yaw_vel, buff_plan.yaw_acc,

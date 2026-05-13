@@ -36,11 +36,9 @@ struct __attribute__((packed)) GimbalToVision
   uint16_t stage_remain_time;                 // 剩余时间
   uint16_t current_hp;                // 当前血量
   uint16_t ally_outpost_hp;                // 己方基地血量
-  float x;                   // x方向位置
-  float y;                   // y方向位置
-  float angle;                   // 朝向
   uint8_t state;                // 姿态
   uint8_t energy_state;             // 能量机关状态
+  uint16_t bullets;                // 子弹数量
   #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
 };
@@ -90,13 +88,11 @@ struct GimbalState
   uint8_t game_progress;           // 比赛阶段
   uint16_t stage_remain_time;                 // 剩余时间
   uint16_t current_hp;                 // 血量
-  uint16_t ally_outpost_hp;                // 己方基地血量
-  float x;                   // x方向位置
-  float y;                   // y方向位置
-  float angle;                   // 朝向    
+  uint16_t ally_outpost_hp;                // 己方基地血量 
   uint8_t state;                // 姿态
   uint8_t energy_state;             // 能量机关状态
-  #endif
+  uint16_t bullets;                // 子弹数量
+   #endif
 };
 
 int8_t latest_self_color();
@@ -136,6 +132,8 @@ public:
 private:
   int fd_ = -1;
   std::string com_port_;
+  bool use_bullet_speed_override_ = false;
+  float bullet_speed_override_ = 0.0f;
   
   std::thread thread_;
   std::atomic<bool> quit_ = false;

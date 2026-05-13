@@ -19,7 +19,7 @@ int main(int argc, char ** argv)
       msg.invincible_enemy_ids = {1, 2, 3};
       msg.timestamp = clock.now();
       string_publisher->publish(msg);
-      ros2.publish_status(0,0,0,0,0,0,0,0,0);
+      ros2.publish_status(0,0,0,0,0,0,0);
     RCLCPP_INFO(
       rclcpp::get_logger("msg send timestamp is"), "msg.timestamp: %d.%09u", msg.timestamp.sec,
       msg.timestamp.nanosec);

@@ -2,6 +2,7 @@
 #define IO__MINDVISION_HPP
 
 #include <chrono>
+#include <mutex>
 #include <opencv2/opencv.hpp>
 #include <thread>
 
@@ -17,6 +18,8 @@ public:
   MindVision(double exposure_ms, double gamma, const std::string & vid_pid);
   ~MindVision() override;
   void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp) override;
+  bool setExposureMs(double exposure_ms) override;
+  double exposureMs() const override;
 
 private:
   struct CameraData
@@ -33,6 +36,7 @@ private:
   std::thread daemon_thread_;
   tools::ThreadSafeQueue<CameraData> queue_;
   int vid_, pid_;
+  mutable std::mutex control_mutex_;
 
   void open();
   void try_open();

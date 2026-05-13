@@ -13,6 +13,11 @@ class CameraBase
 public:
   virtual ~CameraBase() = default;
   virtual void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp) = 0;
+  virtual bool setExposureMs(double exposure_ms) = 0;
+  virtual double exposureMs() const = 0;
+
+  /// 设备方位名: "left" / "right" / "front" / "back"
+  std::string device_name;
 };
 
 class Camera
@@ -20,6 +25,8 @@ class Camera
 public:
   Camera(const std::string & config_path);
   void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp);
+  bool setExposureMs(double exposure_ms);
+  double exposureMs() const;
 
 private:
   std::unique_ptr<CameraBase> camera_;

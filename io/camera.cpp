@@ -43,4 +43,14 @@ void Camera::read(cv::Mat & img, std::chrono::steady_clock::time_point & timesta
   camera_->read(img, timestamp);
 }
 
+bool Camera::setExposureMs(double exposure_ms)
+{
+  return camera_->setExposureMs(exposure_ms);
+}
+
+double Camera::exposureMs() const
+{
+  return camera_->exposureMs();
+}
+
 }  // namespace io

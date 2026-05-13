@@ -1,14 +1,14 @@
-# enemy_color: auto #auto表示根据gimbal发送的模式自动判断敌我颜色，非auto表示固定敌我颜色
+#enemy_color: auto #auto表示根据gimbal发送的模式自动判断敌我颜色，非auto表示固定敌我颜色
 enemy_color: "red"
 #enemy_color: "blue"
 
-#####-----神经网络参数-----#####
+#####-----自瞄神经网络模式参数-----#####
 yolo_name: yolov5_trt
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
 yolov5_model_path: ../assets/yolov5.xml
-yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
+yolov5_trt_model_path: ../assets/yolov5a-fp16-blackwell.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
 device: CPU
@@ -24,7 +24,7 @@ roi:
 
 use_roi: false
 
-#####-----传统方法参数-----#####
+#####-----自瞄神经网络模式传统方法参数-----#####
 threshold: 150
 max_angle_error: 45 # degree
 min_lightbar_ratio: 1.5
@@ -34,6 +34,29 @@ min_armor_ratio: 1
 max_armor_ratio: 5
 max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
+
+#####-----自瞄传统视觉模式识别参数 (yolo_name: tra)-----#####
+traditional:
+  binary_thres: 90
+  use_pca: true      # 使用PCA算法矫正灯条角点
+  light:
+    min_ratio: 0.0001
+    max_ratio: 1.0
+    max_angle: 40.0
+    color_diff_thresh: 20
+  armor:
+    min_light_ratio: 0.8
+    min_small_center_distance: 0.8
+    max_small_center_distance: 3.5
+    min_large_center_distance: 3.5
+    max_large_center_distance: 8.0
+    max_angle: 35.0
+  classifier:
+    model_path: ../assets/lenet.onnx
+    label_path: ../assets/label.txt
+    threshold: 0.7
+    ignore_classes: ["negative"]
+
 
 #####-----tracker参数-----#####
 min_detect_count: 5
@@ -92,20 +115,20 @@ R_pitch: [1]
 com_port: auto
 
 # #####-----相机参数-----#####
-camera_name: "mindvision"
-exposure_ms: 3
-gamma: 3 #已经废弃
-vid_pid: "f622:d13a"
+# camera_name: "mindvision"
+# exposure_ms: 3
+# gamma: 3 #已经废弃
+# vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
 # vid_pid: "2bdf:0001"
 
-# camera_name: "daheng"
-# exposure_ms: 6
-# gamma: 2.85
-# vid_pid: "KE0200010097"
+camera_name: "daheng"
+exposure_ms: 10
+gamma: 2.85
+vid_pid: "KE0200010097"
 
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 #  1  0  0
@@ -184,8 +207,25 @@ t_camera2gimbal: [0.14536664794108903, 0.047210792174469635, 0.10461993940789979
 # #R_camera2gimbal: [0.010227926370181439, -0.068247836370815107, 0.99761596937542485, -0.9997325295038072, -0.021393318744386436, 0.0087860892904833964, 0.020742684833102345, -0.99743900001143104, -0.068448391377088358]
 # #t_camera2gimbal: [0.13581761689413138, 0.012348126218333725, 0.066730865526566735]
 
-#####-----buff_detector参数-----#####
-model: "../assets/yolo11_buff_int8.xml"
+#####-----能量机关神经网络参数-----#####
+model: ../assets/yolo11_buff_int8.xml  # YOLO11 buff检测模型路径
+yolox_model: ../assets/yolox_rune_3.6m.xml  # YOLOX buff检测模型路径（移植ROS版）
+
+#####-----能量机关检测器模式-----#####
+detector_mode: "yolox"  # 检测器模式: "yolo11" 或 "yolox"
+
+#####-----buff tracker参数-----#####
+buff_tracker:
+  lost_time_thres: 2.0
+  tracking_thres: 5
+  match_gate: 15.0
+  max_dis_diff: 1.0
+  r_yaw_var: 0.01
+  r_pitch_var: 0.01
+  r_dis_var: 0.5
+  r_roll_var: 0.1
+  motion_delay_ms: 0
+  pose_buffer_size: 200
 
 #####-----buff_aimer参数-----#####
 fire_gap_time: 0.700   # s
@@ -207,12 +247,21 @@ ui:
   enabled: true
   imshow: true
   web:
-    enabled: false
-    host: "192.168.1.75"
+    enabled: true
+    host: "192.168.1.241"
     port: 9876
+    send_image: true
+    image_quality: 75
+    max_image_dim: 640
 
 plotter:
   web:
-    enabled: false
-    host: "192.168.1.75"
+    enabled: true
+    host: "192.168.1.241"
     port: 9876
+
+#####-----recorder参数-----#####
+recorder: false
+
+#####-----弹速参数-----#####
+bullet_speed: "auto"

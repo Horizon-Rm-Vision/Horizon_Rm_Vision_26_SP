@@ -157,22 +157,6 @@ AimPoint Aimer::choose_aim_point(const Target & target)
   Eigen::VectorXd ekf_x = target.ekf_x();
   std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
   auto armor_num = armor_xyza_list.size();
-
-  // hero 模式：前哨站只跟随/只打 z 最低的装甲板（观测与重投影仍由 tracker/ekf 构建）
-  if (ballistic_model_ == tools::Trajectory::Model::kHero && target.name == ArmorName::outpost) {
-    if (armor_xyza_list.empty()) return {false, Eigen::Vector4d::Zero()};
-
-    int bottom_id = 0;
-    double min_z = armor_xyza_list[0][2];
-    for (int i = 1; i < static_cast<int>(armor_xyza_list.size()); i++) {
-      if (armor_xyza_list[i][2] < min_z) {
-        min_z = armor_xyza_list[i][2];
-        bottom_id = i;
-      }
-    }
-    return {true, armor_xyza_list[bottom_id]};
-  }
-
   // 如果装甲板未发生过跳变，则只有当前装甲板的位置已知
   if (!target.jumped) return {true, armor_xyza_list[0]};
 

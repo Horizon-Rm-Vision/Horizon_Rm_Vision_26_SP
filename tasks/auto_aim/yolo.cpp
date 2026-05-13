@@ -2,9 +2,12 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include "yolos/traditional.hpp"
+#ifdef USE_OPENVINO
 #include "yolos/yolo11.hpp"
 #include "yolos/yolov5_ov.hpp"
 #include "yolos/yolov8.hpp"
+#endif
 
 #ifdef USE_CUDA
 #include "yolos/yolov5_trt.hpp"
@@ -17,7 +20,12 @@ YOLO::YOLO(const std::string & config_path, bool debug)
   auto yaml = YAML::LoadFile(config_path);
   auto yolo_name = yaml["yolo_name"].as<std::string>();
 
-  if (yolo_name == "yolov8") {
+  if (yolo_name == "tra") {
+    yolo_ = std::make_unique<TraditionalDetector>(config_path, debug);
+  }
+
+#ifdef USE_OPENVINO
+  else if (yolo_name == "yolov8") {
     yolo_ = std::make_unique<YOLOV8>(config_path, debug);
   }
 
@@ -28,6 +36,7 @@ YOLO::YOLO(const std::string & config_path, bool debug)
   else if (yolo_name == "yolov5_ov") {
     yolo_ = std::make_unique<YOLOV5>(config_path, debug);
   }
+#endif
 
 #ifdef USE_CUDA
   else if (yolo_name == "yolov5_trt") {

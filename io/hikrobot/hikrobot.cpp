@@ -51,6 +51,28 @@ void HikRobot::read(cv::Mat & img, std::chrono::steady_clock::time_point & times
   timestamp = data.timestamp;
 }
 
+bool HikRobot::setExposureMs(double exposure_ms)
+{
+  std::lock_guard<std::mutex> lock(control_mutex_);
+  if (handle_ == nullptr) return false;
+
+  const double exposure_us = exposure_ms * 1e3;
+  unsigned int ret = MV_CC_SetFloatValue(handle_, "ExposureTime", exposure_us);
+  if (ret != MV_OK) {
+    tools::logger()->warn("HikRobot set exposure failed: {:#x}", ret);
+    return false;
+  }
+
+  exposure_us_ = exposure_us;
+  return true;
+}
+
+double HikRobot::exposureMs() const
+{
+  std::lock_guard<std::mutex> lock(control_mutex_);
+  return exposure_us_ / 1e3;
+}
+
 void HikRobot::capture_start()
 {
   capturing_ = false;

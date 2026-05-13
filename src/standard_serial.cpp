@@ -43,6 +43,9 @@ int main(int argc, char * argv[])
     return 0;
   }
 
+  auto yaml_config = tools::load(config_path);
+  bool enable_recorder = yaml_config["recorder"] ? yaml_config["recorder"].as<bool>() : false;
+
   // 终端 FPS 显示变量
   auto last_fps_time = std::chrono::steady_clock::now();
   int frame_count = 0;
@@ -79,6 +82,9 @@ int main(int argc, char * argv[])
   tools::UIManager ui_manager(config_path);
   tools::UIWebStream ui_web_stream(config_path);
   ui_manager.setProgramMode("AutoAim AIMER");
+  ui_web_stream.setExposureHandler([&camera](double exposure_ms) {
+    camera.setExposureMs(exposure_ms);
+  });
 
   cv::Mat img;
   Eigen::Quaterniond q;
@@ -112,6 +118,7 @@ int main(int argc, char * argv[])
     }
     
     camera.read(img, t);
+    ui_web_stream.sendImage(img);
     ui_web_stream.beginFrame(img.cols, img.rows);
     q = gimbal.q(t);
     auto gimbal_mode = gimbal.mode();
@@ -127,7 +134,7 @@ int main(int argc, char * argv[])
       last_mode = mode;
     }
 
-    // recorder.record(img, q, t);
+    if (enable_recorder) recorder.record(img, q, t);
 
     solver.set_R_gimbal2world(q);
 
@@ -194,7 +201,7 @@ int main(int argc, char * argv[])
     auto form = ros2.subscribe_form();
     int8_t gimbal_form_value = gimbal_form ? gimbal_form->data : 0;
     //发布导航的信息
-    ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.x, gs.y, gs.angle, gs.state, gs.energy_state);
+    ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.state, gs.energy_state,gs.bullets);
     #endif
     ui_manager.addLeftText("gimbal_status", fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", -gs.yaw * 180.0 / M_PI, -gs.pitch * 180.0 / M_PI));
     
@@ -207,10 +214,9 @@ int main(int argc, char * argv[])
     ui_manager.addLeftText("stage_remain_time", fmt::format("Blood: {} ", (int)gs.stage_remain_time));
     ui_manager.addLeftText("current_hp", fmt::format("Bullet: {} ", (int)gs.current_hp));
     ui_manager.addLeftText("ally_outpost_hp", fmt::format("Ally Outpost HP: {} ", (int)gs.ally_outpost_hp));
-    ui_manager.addLeftText("position", fmt::format("Position X: {:.2f}  Y: {:.2f}", gs.x, gs.y));
-    ui_manager.addLeftText("angle", fmt::format("Angle: {:.2f}", gs.angle));
     ui_manager.addLeftText("state", fmt::format("State: {} ", (int)gs.state));
     ui_manager.addLeftText("energy_state", fmt::format("  Energy State: {} ", (int)gs.energy_state));
+    ui_manager.addLeftText("bullets", fmt::format("  Bullets: {} ", (int)gs.bullets));
     #endif
     
     // 添加右侧UI元素
@@ -247,8 +253,10 @@ int main(int argc, char * argv[])
     }
     //#endif
 
-    plotter.drawData({gs.yaw * 180/M_PI, command.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw"});
-    
+    plotter.subplot("Yaw", {gs.yaw * 180/M_PI, command.yaw * 180/M_PI},
+                    {"gimbal_yaw", "target_yaw"});
+    plotter.draw();
+
     #ifdef FIRE_CONSTRAINT
     // 开火约束检查
     bool allow_fire = command.shoot;

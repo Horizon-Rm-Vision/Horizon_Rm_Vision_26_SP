@@ -15,6 +15,7 @@ set(AUTO_AIM_SRCS
     voter.cpp
     shooter.cpp
     yolo.cpp
+    yolos/traditional.cpp
     multithread/commandgener.cpp
     multithread/mt_detector.cpp
     planner/planner.cpp

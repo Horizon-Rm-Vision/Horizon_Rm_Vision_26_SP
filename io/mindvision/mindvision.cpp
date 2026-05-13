@@ -59,6 +59,27 @@ void MindVision::read(cv::Mat & img, std::chrono::steady_clock::time_point & tim
   timestamp = data.timestamp;
 }
 
+bool MindVision::setExposureMs(double exposure_ms)
+{
+  std::lock_guard<std::mutex> lock(control_mutex_);
+  if (handle_ == -1) return false;
+
+  const auto status = CameraSetExposureTime(handle_, exposure_ms * 1e3);
+  if (status != CAMERA_STATUS_SUCCESS) {
+    tools::logger()->warn("MindVision set exposure failed: {}", status);
+    return false;
+  }
+
+  exposure_ms_ = exposure_ms;
+  return true;
+}
+
+double MindVision::exposureMs() const
+{
+  std::lock_guard<std::mutex> lock(control_mutex_);
+  return exposure_ms_;
+}
+
 void MindVision::open()
 {
   int camera_num = 1;

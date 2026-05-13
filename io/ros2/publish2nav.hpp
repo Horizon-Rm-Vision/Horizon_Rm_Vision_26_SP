@@ -11,7 +11,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
-#include "sp_msgs/sp_msgs/msg/nav_status_msg.hpp"
+#include "sp_msgs/msg/nav_status_msg.hpp"
 
 namespace io
 {
@@ -26,7 +26,7 @@ public:
 
   void send_data(const Eigen::Vector4d & data);
 
-  void send_status(uint8_t game_progress,uint16_t stage_remain_time,uint16_t current_hp,uint16_t ally_outpost_hp,float x,float y,float angle,uint8_t state,uint8_t energy_state);
+  void send_status(uint8_t game_progress,uint16_t stage_remain_time,uint16_t current_hp,uint16_t ally_outpost_hp,uint8_t state,uint8_t energy_state,uint16_t bullets);
 
 private:
   // ROS2 发布者

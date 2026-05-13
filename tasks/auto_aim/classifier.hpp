@@ -2,10 +2,13 @@
 #define AUTO_AIM__CLASSIFIER_HPP
 
 #include <opencv2/opencv.hpp>
-#include <openvino/openvino.hpp>
 #include <string>
 
 #include "armor.hpp"
+
+#ifdef USE_OPENVINO
+#include <openvino/openvino.hpp>
+#endif
 
 namespace auto_aim
 {
@@ -20,8 +23,10 @@ public:
 
 private:
   cv::dnn::Net net_;
+#ifdef USE_OPENVINO
   ov::Core core_;
   ov::CompiledModel compiled_model_;
+#endif
 };
 
 }  // namespace auto_aim

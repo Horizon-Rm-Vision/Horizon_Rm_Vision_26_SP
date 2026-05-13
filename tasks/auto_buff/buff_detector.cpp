@@ -4,7 +4,47 @@
 
 namespace auto_buff
 {
-Buff_Detector::Buff_Detector(const std::string & config) : status_(LOSE), lose_(0), MODE_(config) {}
+Buff_Detector::Buff_Detector(const std::string & config)
+: status_(LOSE), lose_(0)
+{
+  auto yaml = YAML::LoadFile(config);
+  std::string mode_str = yaml["detector_mode"].as<std::string>("yolo11");
+  if (mode_str == "yolox") {
+#ifdef USE_OPENVINO
+    mode_ = YOLOX_MODE;
+    tools::logger()->info("[Buff_Detector] Using YOLOX mode");
+    MODE_YOLOX_ = std::make_unique<YOLOX_BUFF>(config);
+#else
+    tools::logger()->error("[Buff_Detector] YOLOX mode requires OpenVINO (USE_OPENVINO=OFF)");
+#endif
+  } else if (mode_str == "yolox_trt") {
+#ifdef USE_CUDA
+    mode_ = YOLOX_TRT_MODE;
+    tools::logger()->info("[Buff_Detector] Using YOLOX TRT mode");
+    MODE_YOLOX_TRT_ = std::make_unique<YOLOX_BUFF_TRT>(config);
+#else
+    #ifdef USE_OPENVINO
+    tools::logger()->warn("[Buff_Detector] YOLOX TRT mode requested but USE_CUDA not enabled, falling back to YOLO11");
+    mode_ = YOLO11_MODE;
+    MODE_ = std::make_unique<YOLO11_BUFF>(config);
+    #else
+    tools::logger()->warn("[Buff_Detector] YOLOX TRT mode requested but neither CUDA nor OpenVINO enabled");
+    #endif
+#endif
+  } else {
+#ifdef USE_OPENVINO
+    mode_ = YOLO11_MODE;
+    tools::logger()->info("[Buff_Detector] Using YOLO11 mode");
+    MODE_ = std::make_unique<YOLO11_BUFF>(config);
+#else
+    tools::logger()->error("[Buff_Detector] YOLO11 mode requires OpenVINO (USE_OPENVINO=OFF)");
+#endif
+  }
+
+  // R tag detection parameters (ROS port)
+  detect_r_tag_ = yaml["detect_r_tag"].as<bool>(true);
+  binary_thresh_ = yaml["binary_thresh"].as<int>(100);
+}
 
 void Buff_Detector::handle_img(const cv::Mat & bgr_img, cv::Mat & dilated_img)
 {
@@ -76,6 +116,60 @@ cv::Point2f Buff_Detector::get_r_center(std::vector<FanBlade> & fanblades, cv::M
   return r_center;
 };
 
+std::tuple<cv::Point2f, cv::Mat> Buff_Detector::detectRTag(
+  const cv::Mat & img, int binary_thresh, const cv::Point2f & prior)
+{
+  // Check if prior is within image bounds
+  if (prior.x < 0 || prior.x > img.cols || prior.y < 0 || prior.y > img.rows) {
+    cv::Mat empty_roi = cv::Mat::zeros(cv::Size(200, 200), CV_8UC3);
+    return {prior, empty_roi};
+  }
+
+  // Create ROI around prior point (200x200 window)
+  cv::Rect roi = cv::Rect(prior.x - 100, prior.y - 100, 200, 200) &
+                 cv::Rect(0, 0, img.cols, img.rows);
+  cv::Point2f prior_in_roi = prior - cv::Point2f(roi.tl());
+
+  cv::Mat img_roi = img(roi);
+
+  // Gray -> Binary -> Dilate
+  cv::Mat gray_img;
+  cv::cvtColor(img_roi, gray_img, cv::COLOR_BGR2GRAY);
+  cv::Mat binary_img;
+  cv::threshold(gray_img, binary_img, binary_thresh, 255, cv::THRESH_BINARY);
+  cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+  cv::dilate(binary_img, binary_img, kernel);
+
+  // Find contours
+  std::vector<std::vector<cv::Point>> contours;
+  cv::findContours(binary_img, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+
+  // Find contour containing the prior point
+  auto it =
+    std::find_if(contours.begin(), contours.end(),
+                 [p = prior_in_roi](const std::vector<cv::Point> & contour) -> bool {
+                   return cv::boundingRect(contour).contains(p);
+                 });
+
+  // Convert to BGR for visualization
+  cv::cvtColor(binary_img, binary_img, cv::COLOR_GRAY2BGR);
+
+  if (it == contours.end()) {
+    return {prior, binary_img};
+  }
+
+  cv::drawContours(binary_img, contours, static_cast<int>(it - contours.begin()),
+                   cv::Scalar(0, 255, 0), 2);
+
+  // Compute center of the contour
+  cv::Point2f center(0, 0);
+  for (const auto & p : *it) center += cv::Point2f(p);
+  center /= static_cast<float>(it->size());
+  center += cv::Point2f(roi.tl());
+
+  return {center, binary_img};
+}
+
 void Buff_Detector::handle_lose()
 {
   lose_++;
@@ -86,15 +180,10 @@ void Buff_Detector::handle_lose()
   status_ = TEM_LOSE;
 }
 
-std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
+std::optional<PowerRune> Buff_Detector::processResults(
+  std::vector<std::vector<cv::Point2f>> & all_kpts, cv::Mat & bgr_img)
 {
-  /// onnx 模型检测
-
-  std::vector<YOLO11_BUFF::Object> results = MODE_.get_multicandidateboxes(bgr_img);
-
-  /// 处理未获得的情况
-
-  if (results.empty()) {
+  if (all_kpts.empty()) {
     handle_lose();
     return std::nullopt;
   }
@@ -102,11 +191,11 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
   /// results转扇叶FanBlade
 
   std::vector<FanBlade> fanblades;
-  for (auto & result : results) fanblades.emplace_back(FanBlade(result.kpt, result.kpt[4], _light));
+  for (auto & kpt : all_kpts) fanblades.emplace_back(FanBlade(kpt, kpt[4], _light));
 
   /// 生成PowerRune
   auto r_center = get_r_center(fanblades, bgr_img);
-  PowerRune powerrune(fanblades, r_center, last_powerrune_);
+  PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
 
   /// handle error
   if (powerrune.is_unsolve()) {
@@ -120,76 +209,496 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
   P.emplace(powerrune);
   last_powerrune_ = P;
   return P;
+}
+
+std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
+{
+#ifdef USE_CUDA
+  if (mode_ == YOLOX_TRT_MODE) {
+    /// YOLOX TRT model detection
+
+    std::vector<YOLOX_BUFF_TRT::Object> results = MODE_YOLOX_TRT_->get_multicandidateboxes(bgr_img);
+
+    /// 处理未获得的情况
+
+    if (results.empty()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    /// 提取原始r_center（用于detectRTag）, 构建FanBlade
+
+    std::vector<cv::Point2f> raw_r_centers;
+    std::vector<std::vector<cv::Point2f>> all_kpts;
+    for (auto & result : results) {
+      raw_r_centers.push_back(result.kpt[5]);
+      all_kpts.push_back(result.kpt);
+    }
+
+    std::vector<FanBlade> fanblades;
+    for (auto & kpt : all_kpts) fanblades.emplace_back(FanBlade(kpt, kpt[4], _light));
+
+    /// 使用ROS版的r_tag机制获取r_center
+
+    cv::Point2f r_center;
+    cv::Mat binary_roi;
+    if (detect_r_tag_ && !raw_r_centers.empty()) {
+      std::tie(r_center, binary_roi) = MODE_YOLOX_TRT_->detectRTag(bgr_img, binary_thresh_, raw_r_centers[0]);
+    } else {
+      r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
+    }
+
+    /// 右下角二值化小窗口（移植自ROS）
+
+    if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
+      cv::Rect roi_rect =
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
+      if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
+          roi_rect.br().y <= bgr_img.rows) {
+        binary_roi.copyTo(bgr_img(roi_rect));
+        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+      }
+    }
+
+    /// 生成PowerRune
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+
+    if (powerrune.is_unsolve()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    status_ = TRACK;
+    lose_ = 0;
+    std::optional<PowerRune> P;
+    P.emplace(powerrune);
+    last_powerrune_ = P;
+    return P;
+
+  }
+#endif
+#ifdef USE_OPENVINO
+  if (mode_ == YOLOX_MODE) {
+    /// YOLOX model detection
+
+    std::vector<YOLOX_BUFF::Object> results = MODE_YOLOX_->get_multicandidateboxes(bgr_img);
+
+    /// 处理未获得的情况
+
+    if (results.empty()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    /// 提取原始r_center（用于detectRTag）, 构建FanBlade
+
+    std::vector<cv::Point2f> raw_r_centers;
+    std::vector<std::vector<cv::Point2f>> all_kpts;
+    for (auto & result : results) {
+      raw_r_centers.push_back(result.kpt[5]);
+      all_kpts.push_back(result.kpt);
+    }
+
+    std::vector<FanBlade> fanblades;
+    for (auto & kpt : all_kpts) fanblades.emplace_back(FanBlade(kpt, kpt[4], _light));
+
+    /// 使用ROS版的r_tag机制获取r_center
+
+    cv::Point2f r_center;
+    cv::Mat binary_roi;
+    if (detect_r_tag_ && !raw_r_centers.empty()) {
+      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, raw_r_centers[0]);
+    } else {
+      r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
+    }
+
+    /// 右下角二值化小窗口（移植自ROS）
+
+    if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
+      cv::Rect roi_rect =
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
+      if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
+          roi_rect.br().y <= bgr_img.rows) {
+        binary_roi.copyTo(bgr_img(roi_rect));
+        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+      }
+    }
+
+    /// 生成PowerRune
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+
+    if (powerrune.is_unsolve()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    status_ = TRACK;
+    lose_ = 0;
+    std::optional<PowerRune> P;
+    P.emplace(powerrune);
+    last_powerrune_ = P;
+    return P;
+
+  } else {
+    /// YOLO11 model detection (original)
+
+    std::vector<YOLO11_BUFF::Object> results = MODE_->get_multicandidateboxes(bgr_img);
+
+    /// 处理未获得的情况
+
+    if (results.empty()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    /// results转扇叶FanBlade
+
+    std::vector<FanBlade> fanblades;
+    for (auto & result : results) fanblades.emplace_back(FanBlade(result.kpt, result.kpt[4], _light));
+
+    /// 生成PowerRune
+    auto r_center = get_r_center(fanblades, bgr_img);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+
+    /// handle error
+    if (powerrune.is_unsolve()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    status_ = TRACK;
+    lose_ = 0;
+    std::optional<PowerRune> P;
+    P.emplace(powerrune);
+    last_powerrune_ = P;
+    return P;
+  }
+#else
+    handle_lose();
+    return std::nullopt;
+#endif
 }
 
 std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
 {
-  /// onnx 模型检测
+#ifdef USE_CUDA
+  if (mode_ == YOLOX_TRT_MODE) {
+    /// YOLOX TRT model detection (use NMS, take top-1)
 
-  std::vector<YOLO11_BUFF::Object> results = MODE_.get_onecandidatebox(bgr_img);
+    std::vector<YOLOX_BUFF_TRT::Object> results = MODE_YOLOX_TRT_->get_multicandidateboxes(bgr_img);
 
-  /// 处理未获得的情况
+    if (results.empty()) {
+      handle_lose();
+      return std::nullopt;
+    }
 
-  if (results.empty()) {
+    /// 取置信度最高的结果
+    std::sort(results.begin(), results.end(),
+              [](const YOLOX_BUFF_TRT::Object & a, const YOLOX_BUFF_TRT::Object & b) {
+                return a.prob > b.prob;
+              });
+
+    /// 提取原始r_center, 构建FanBlade
+
+    cv::Point2f raw_r_center = results[0].kpt[5];
+    std::vector<cv::Point2f> kpt = results[0].kpt;
+
+    std::vector<FanBlade> fanblades;
+    fanblades.emplace_back(FanBlade(kpt, kpt[4], _light));
+
+    /// ROS版r_tag机制获取r_center
+
+    cv::Point2f r_center;
+    cv::Mat binary_roi;
+    if (detect_r_tag_) {
+      std::tie(r_center, binary_roi) = MODE_YOLOX_TRT_->detectRTag(bgr_img, binary_thresh_, raw_r_center);
+    } else {
+      r_center = raw_r_center;
+    }
+
+    /// 右下角二值化小窗口
+
+    if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
+      cv::Rect roi_rect =
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
+      if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
+          roi_rect.br().y <= bgr_img.rows) {
+        binary_roi.copyTo(bgr_img(roi_rect));
+        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+      }
+    }
+
+    /// 生成PowerRune
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+
+    if (powerrune.is_unsolve()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    status_ = TRACK;
+    lose_ = 0;
+    std::optional<PowerRune> P;
+    P.emplace(powerrune);
+    last_powerrune_ = P;
+    return P;
+
+  }
+#endif
+#ifdef USE_OPENVINO
+  if (mode_ == YOLOX_MODE) {
+    /// YOLOX model detection (use NMS, take top-1)
+
+    std::vector<YOLOX_BUFF::Object> results = MODE_YOLOX_->get_multicandidateboxes(bgr_img);
+
+    if (results.empty()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    /// 取置信度最高的结果
+    std::sort(results.begin(), results.end(),
+              [](const YOLOX_BUFF::Object & a, const YOLOX_BUFF::Object & b) {
+                return a.prob > b.prob;
+              });
+
+    /// 提取原始r_center, 构建FanBlade
+
+    cv::Point2f raw_r_center = results[0].kpt[5];
+    std::vector<cv::Point2f> kpt = results[0].kpt;
+
+    std::vector<FanBlade> fanblades;
+    fanblades.emplace_back(FanBlade(kpt, kpt[4], _light));
+
+    /// ROS版r_tag机制获取r_center
+
+    cv::Point2f r_center;
+    cv::Mat binary_roi;
+    if (detect_r_tag_) {
+      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, raw_r_center);
+    } else {
+      r_center = raw_r_center;
+    }
+
+    /// 右下角二值化小窗口
+
+    if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
+      cv::Rect roi_rect =
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
+      if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
+          roi_rect.br().y <= bgr_img.rows) {
+        binary_roi.copyTo(bgr_img(roi_rect));
+        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+      }
+    }
+
+    /// 生成PowerRune
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+
+    if (powerrune.is_unsolve()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    status_ = TRACK;
+    lose_ = 0;
+    std::optional<PowerRune> P;
+    P.emplace(powerrune);
+    last_powerrune_ = P;
+    return P;
+
+  } else {
+    /// YOLO11 model detection (original)
+
+    std::vector<YOLO11_BUFF::Object> results = MODE_->get_onecandidatebox(bgr_img);
+
+    /// 处理未获得的情况
+
+    if (results.empty()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    /// results转扇叶FanBlade
+
+    std::vector<FanBlade> fanblades;
+    auto result = results[0];
+    fanblades.emplace_back(FanBlade(result.kpt, result.kpt[4], _light));
+
+    /// 生成PowerRune
+    auto r_center = get_r_center(fanblades, bgr_img);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+
+    /// handle error
+    if (powerrune.is_unsolve()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    status_ = TRACK;
+    lose_ = 0;
+    std::optional<PowerRune> P;
+    P.emplace(powerrune);
+    last_powerrune_ = P;
+    return P;
+  }
+#else
     handle_lose();
     return std::nullopt;
-  }
-
-  /// results转扇叶FanBlade
-
-  std::vector<FanBlade> fanblades;
-  auto result = results[0];
-  fanblades.emplace_back(FanBlade(result.kpt, result.kpt[4], _light));
-
-  /// 生成PowerRune
-  auto r_center = get_r_center(fanblades, bgr_img);
-  PowerRune powerrune(fanblades, r_center, last_powerrune_);
-
-  /// handle error
-  if (powerrune.is_unsolve()) {
-    handle_lose();
-    return std::nullopt;
-  }
-
-  status_ = TRACK;
-  lose_ = 0;
-  std::optional<PowerRune> P;
-  P.emplace(powerrune);
-  last_powerrune_ = P;
-  return P;
+#endif
 }
 
 std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Point2f v)
 {
-  /// onnx 模型检测
+#ifdef USE_CUDA
+  if (mode_ == YOLOX_TRT_MODE) {
+    /// YOLOX TRT model detection
 
-  std::vector<YOLO11_BUFF::Object> results = MODE_.get_multicandidateboxes(bgr_img);
+    std::vector<YOLOX_BUFF_TRT::Object> results = MODE_YOLOX_TRT_->get_multicandidateboxes(bgr_img);
 
-  /// 处理未获得的情况
+    if (results.empty()) return std::nullopt;
 
-  if (results.empty()) return std::nullopt;
+    /// 提取原始r_center, 构建FanBlades
 
-  /// results转扇叶FanBlade
-
-  std::vector<FanBlade> fanblades_t;
-  for (auto & result : results)
-    fanblades_t.emplace_back(FanBlade(result.kpt, result.kpt[4], _light));
-
-  /// 计算r_center,筛选fanblade
-  auto r_center = get_r_center(fanblades_t, bgr_img);
-  std::vector<FanBlade> fanblades;
-  for (auto & fanblade : fanblades_t) {
-    if (cv::norm((fanblade.center - r_center) - v) < 10 || results.size() == 1) {
-      fanblades.emplace_back(fanblade);
-      break;
+    std::vector<cv::Point2f> raw_r_centers;
+    std::vector<std::vector<cv::Point2f>> all_kpts;
+    for (auto & result : results) {
+      raw_r_centers.push_back(result.kpt[5]);
+      all_kpts.push_back(result.kpt);
     }
-  }
-  if (fanblades.empty()) return std::nullopt;
-  PowerRune powerrune(fanblades, r_center, std::nullopt);
 
-  std::optional<PowerRune> P;
-  P.emplace(powerrune);
-  return P;
+    std::vector<FanBlade> fanblades_t;
+    for (auto & kpt : all_kpts) fanblades_t.emplace_back(FanBlade(kpt, kpt[4], _light));
+
+    /// 计算r_center,筛选fanblade
+
+    cv::Point2f r_center;
+    cv::Mat binary_roi;
+    if (detect_r_tag_ && !raw_r_centers.empty()) {
+      std::tie(r_center, binary_roi) = MODE_YOLOX_TRT_->detectRTag(bgr_img, binary_thresh_, raw_r_centers[0]);
+    } else {
+      r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
+    }
+
+    /// 右下角二值化小窗口
+
+    if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
+      cv::Rect roi_rect =
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
+      if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
+          roi_rect.br().y <= bgr_img.rows) {
+        binary_roi.copyTo(bgr_img(roi_rect));
+        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+      }
+    }
+
+    std::vector<FanBlade> fanblades;
+    for (auto & fanblade : fanblades_t) {
+      if (cv::norm((fanblade.center - r_center) - v) < 10 || results.size() == 1) {
+        fanblades.emplace_back(fanblade);
+        break;
+      }
+    }
+    if (fanblades.empty()) return std::nullopt;
+    PowerRune powerrune(fanblades, r_center, std::nullopt);
+
+    std::optional<PowerRune> P;
+    P.emplace(powerrune);
+    return P;
+
+  }
+#endif
+#ifdef USE_OPENVINO
+  if (mode_ == YOLOX_MODE) {
+    /// YOLOX model detection
+
+    std::vector<YOLOX_BUFF::Object> results = MODE_YOLOX_->get_multicandidateboxes(bgr_img);
+
+    if (results.empty()) return std::nullopt;
+
+    /// 提取原始r_center, 构建FanBlades
+
+    std::vector<cv::Point2f> raw_r_centers;
+    std::vector<std::vector<cv::Point2f>> all_kpts;
+    for (auto & result : results) {
+      raw_r_centers.push_back(result.kpt[5]);
+      all_kpts.push_back(result.kpt);
+    }
+
+    std::vector<FanBlade> fanblades_t;
+    for (auto & kpt : all_kpts) fanblades_t.emplace_back(FanBlade(kpt, kpt[4], _light));
+
+    /// 计算r_center,筛选fanblade
+
+    cv::Point2f r_center;
+    cv::Mat binary_roi;
+    if (detect_r_tag_ && !raw_r_centers.empty()) {
+      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, raw_r_centers[0]);
+    } else {
+      r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
+    }
+
+    /// 右下角二值化小窗口
+
+    if (!binary_roi.empty() && binary_roi.cols > 1 && binary_roi.rows > 1) {
+      cv::Rect roi_rect =
+        cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
+      if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
+          roi_rect.br().y <= bgr_img.rows) {
+        binary_roi.copyTo(bgr_img(roi_rect));
+        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+      }
+    }
+
+    std::vector<FanBlade> fanblades;
+    for (auto & fanblade : fanblades_t) {
+      if (cv::norm((fanblade.center - r_center) - v) < 10 || results.size() == 1) {
+        fanblades.emplace_back(fanblade);
+        break;
+      }
+    }
+    if (fanblades.empty()) return std::nullopt;
+    PowerRune powerrune(fanblades, r_center, std::nullopt);
+
+    std::optional<PowerRune> P;
+    P.emplace(powerrune);
+    return P;
+
+  } else {
+    /// YOLO11 model detection (original)
+
+    std::vector<YOLO11_BUFF::Object> results = MODE_->get_multicandidateboxes(bgr_img);
+
+    /// 处理未获得的情况
+
+    if (results.empty()) return std::nullopt;
+
+    /// results转扇叶FanBlade
+
+    std::vector<FanBlade> fanblades_t;
+    for (auto & result : results)
+      fanblades_t.emplace_back(FanBlade(result.kpt, result.kpt[4], _light));
+
+    /// 计算r_center,筛选fanblade
+    auto r_center = get_r_center(fanblades_t, bgr_img);
+    std::vector<FanBlade> fanblades;
+    for (auto & fanblade : fanblades_t) {
+      if (cv::norm((fanblade.center - r_center) - v) < 10 || results.size() == 1) {
+        fanblades.emplace_back(fanblade);
+        break;
+      }
+    }
+    if (fanblades.empty()) return std::nullopt;
+    PowerRune powerrune(fanblades, r_center, std::nullopt);
+
+    std::optional<PowerRune> P;
+    P.emplace(powerrune);
+    return P;
+  }
+#else
+    handle_lose();
+    return std::nullopt;
+#endif
 }
 
 }  // namespace auto_buff

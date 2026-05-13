@@ -3,21 +3,24 @@
 
 #include <chrono>
 #include <iostream>
+#include <mutex>
 #include <opencv2/opencv.hpp>
 #include <thread>
 
+#include "../camera.hpp"
 #include "tools/thread_safe_queue.hpp"
 
 namespace io
 {
-class USBCamera
+class USBCamera : public CameraBase
 {
 public:
   USBCamera(const std::string & open_name, const std::string & config_path);
   ~USBCamera();
   cv::Mat read();
-  void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp);
-  std::string device_name;
+  void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp) override;
+  bool setExposureMs(double exposure_ms) override;
+  double exposureMs() const override;
 
 private:
   struct CameraData
@@ -26,7 +29,7 @@ private:
     std::chrono::steady_clock::time_point timestamp;
   };
 
-  std::mutex cap_mutex_;
+  mutable std::mutex cap_mutex_;
   cv::VideoCapture cap_;
   cv::Mat img_;
   std::string open_name_;

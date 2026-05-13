@@ -95,9 +95,95 @@
 - **已验证:**
   1.已确认daheng相机帧率不稳定引起云台不稳定的问题并不存在
 ## 
+
+#### Release Candidate 1 DEV9：
+
+- **功能更新:**
+  1.哨兵通信更新
+- **已验证:**
+  1.已确认daheng相机帧率不稳定引起云台不稳定的问题并不存在
+## 
+#### Release Candidate 1 DEV10：
+
+- **功能更新:**
+  1.新增基于YOLOX和传统视觉修正的能量机关识别模型,支持OpenVINO模式与TensorRT模式运行,有aimer(auto_buff_debug_mpc)和mpc(auto_buff_debug_serial)两种模式,demo则启动auto_buff_test即可
+
+## 
+
+#### Release Candidate 1 DEV11：
+
+- **功能更新:**
+  1.能量机关识别根据26赛季规则进行修改,大符模式新增双板选择功能,按选择离图像中心最近的策略选板
+  2.测试启用内录模式
+
+## 
+
+#### Release Candidate 1 DEV12：
+
+- **功能更新:**
+  1.为auto_buff_debug_mpc和auto_buff_debug_serial引入ui_manager调试信息,同步支持web_receiver显示
+  2.正式为auto_aim_debug_mpc的方法为standard_serial,auto_buff_debug_mpc,auto_buff_debug_serial添加内录模式,可以将本次运行的视频连带收到的电控数据录制下来,可以使用test程序重新解算回放
+  3.弹速机制更新,yaml设为auto时保持接受电控弹速,设为数值时使用赋予的数值
+- **质量更新:**
+  1.自启脚本和gimbal已删除已经不再使用的ths串口
+
+## 
+
+#### Release Candidate 1 DEV13：
+
+- **功能更新:**
+  1.能量机关算法改进,引入buff_tracker,使用FSM状态机,连续检测确认才进入TRACKING,超过时间阈值自动回退LOST,观测选择使用多候选+马氏距离门控,避免错误匹配,新增运动补偿PoseBuffer对云台姿态进行延时插值
+
+## 
+
+#### Release Candidate 1 DEV14：
+
+- **功能更新:**
+  1.能量机关算法改进,修改扇叶id获取方式,修改成类似WUST的方法,多扇叶同时进行ekf更新,每个扇叶独立分配 ID,贪心去重避免 ID 冲突,PnP 与 EKF 解耦
+
+## 
+
+#### Release Candidate 1 DEV15：
+
+- **功能更新:**
+  1.能量机关算法改进,4维马氏距离匹配,协方差自适应门控,解决了过0时id可能误匹配的问题
+
+## 
+
+#### Release Candidate 1 DEV16：
+
+- **功能更新:**
+  1.能量机关算法改进,补齐了部分角度跳变缺少的limit_rad,增加了roll残差门限
+  2.R标传统识别ui移到右下角,能量机关相关ui排版优化
+
+## 
+
+#### Release Candidate 1 DEV17：
+
+- **功能更新:**
+  1.引入中南的lenet传统视觉装甲板识别器,yolo_name设置为tra即可启用
+  2.剥离OpenVINO,现在可以单独启用和关闭OpenVINO和TensorRT,实现可选无OpenVINO依赖,实现Jetson纯粹的TensorRT模式
+
+## 
+
+#### Release Candidate 1 DEV18：
+
+- **功能更新:**
+  1.NOVA_OUTPOST_V2机制更新,修法NIS无条件运行和temp_lost未即使重置计数的问题
+  2.全向感知相机扩展,引入odin1相机支持,现可以接收odin1的官方ROS驱动发送的图像进行全向感知,可以设置缩放分辨率以降低开销,可与普通USB相机共存,并可以单独运行test程序进行图像收发测试
+  3.将原带全向感知的sentry系程序(sentry_bp.cpp sentry_debug.cpp sentry_multithread.cpp sentry.cpp)改为串口通信,并基于sentry.cpp编写sentry_odin.cpp,支持调用odin1进行全向感知并设置相对主相机的位置
+  4.SPSREMU更新,支持最新哨兵通信协议
+
+## 
+
+#### Release Candidate 1 DEV19：
+
+- **功能更新:**
+  1.web_ui_receiver支持收发原始图像
+  2.plotter支持绘制多坐标轴子图曲线
+
+## 
 待开发任务：
 1.TRT推理性能进一步优化
 2.NANO简化代码模式（对应代码内的宏LIM_CODE），启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销（尤其是JETSON）,目前已将src里不需要的几个程序和DM_IMU部分的代码屏蔽
 3.分析bullet_count对火控的影响
-4.新版前哨站机制
-5.打符子程序

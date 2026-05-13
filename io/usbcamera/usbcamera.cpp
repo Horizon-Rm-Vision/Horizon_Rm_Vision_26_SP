@@ -90,6 +90,24 @@ void USBCamera::read(cv::Mat & img, std::chrono::steady_clock::time_point & time
   timestamp = data.timestamp;
 }
 
+bool USBCamera::setExposureMs(double exposure_ms)
+{
+  std::lock_guard<std::mutex> lock(cap_mutex_);
+  if (!cap_.isOpened()) return false;
+
+  const bool ok = cap_.set(cv::CAP_PROP_EXPOSURE, exposure_ms);
+  if (ok) {
+    usb_exposure_ = static_cast<int>(exposure_ms);
+  }
+  return ok;
+}
+
+double USBCamera::exposureMs() const
+{
+  std::lock_guard<std::mutex> lock(cap_mutex_);
+  return static_cast<double>(usb_exposure_);
+}
+
 void USBCamera::open()
 {
   std::lock_guard<std::mutex> lock(cap_mutex_);

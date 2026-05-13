@@ -2,6 +2,7 @@
 #define IO__DAHENG_CAMERA_HPP
 
 #include <chrono>
+#include <mutex>
 #include <opencv2/opencv.hpp>
 #include <thread>
 #include <string>
@@ -19,6 +20,8 @@ public:
   DaHengCamera(double exposure_ms, double gamma, const std::string & vid_pid);
   ~DaHengCamera() override;
   void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp) override;
+  bool setExposureMs(double exposure_ms) override;
+  double exposureMs() const override;
 
   // 白平衡相关功能
   bool set_white_balance_auto(bool enable);
@@ -59,6 +62,7 @@ private:
 
   // 白平衡参数
   bool auto_white_balance_ = true;  // 默认自动白平衡
+  mutable std::mutex control_mutex_;
 
   void open();
   void try_open();

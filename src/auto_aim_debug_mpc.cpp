@@ -21,6 +21,7 @@
 #include "tools/thread_safe_queue.hpp"
 #include "tools/ui_manager.hpp"
 #include "tools/yaml.hpp"
+#include "tools/recorder.hpp"
 
 #ifdef SENTRY_SR
 #include "io/ros2/publish2nav.hpp"
@@ -36,8 +37,10 @@ const std::string keys =
 
 int main(int argc, char * argv[])
 {
-  tools::Exiter exiter;
+  // 初始化绘图器、录制器、退出器
   tools::Plotter plotter;
+  tools::Recorder recorder;
+  tools::Exiter exiter;
 
   cv::CommandLineParser cli(argc, argv, keys);
   auto config_path = cli.get<std::string>(0);
@@ -45,6 +48,9 @@ int main(int argc, char * argv[])
     cli.printMessage();
     return 0;
   }
+
+  auto recorder_config = tools::load(config_path);
+  bool enable_recorder = recorder_config["recorder"] ? recorder_config["recorder"].as<bool>() : false;
 
   // 终端 FPS 显示变量
   auto last_fps_time = std::chrono::steady_clock::now();
@@ -71,6 +77,9 @@ int main(int argc, char * argv[])
 
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
+  ui_web_stream.setExposureHandler([&camera](double exposure_ms) {
+    camera.setExposureMs(exposure_ms);
+  });
 
   auto_aim::YOLO yolo(config_path, true);
   auto_aim::Solver solver(config_path);
@@ -169,15 +178,16 @@ int main(int argc, char * argv[])
       }
 
       //plotter.plot(data);
-
-      // outpost mode flag: 1 when tracking outpost, else 0
-      const double outpost_mode_flag =
-        (target.has_value() && target->name == auto_aim::ArmorName::outpost) ? 1.0 : 0.0;
-
-      // 同一帧内把所有曲线一起推送，避免曲线刷新互相覆盖/冲突
-      plotter.drawData(
-        {gs.yaw * 180 / M_PI, plan.target_yaw * 180 / M_PI, plan.yaw * 180 / M_PI, outpost_mode_flag},
-        {"gimbal_yaw", "target_yaw", "plann_yaw", "outpost_mode"});
+      plotter.setWindowName("MPC Debug");
+      plotter.subplot("Yaw", {gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI},
+                      {"gimbal_yaw", "target_yaw", "plan_yaw"});
+      plotter.subplot("Pitch", {gs.pitch * 180/M_PI, plan.target_pitch * 180/M_PI, plan.pitch * 180/M_PI},
+                      {"gimbal_pitch", "target_pitch", "plan_pitch"});
+      //plotter.subplot("Yaw Vel", {gs.yaw_vel, plan.yaw_vel},
+                      //{"gimbal_yaw_vel", "plan_yaw_vel"});
+      //plotter.subplot("Acc", {plan.yaw_acc, plan.pitch_acc},
+                      //{"plan_yaw_acc", "plan_pitch_acc"});
+      // plotter.draw();
 
       std::this_thread::sleep_for(10ms);
     }
@@ -207,53 +217,14 @@ int main(int argc, char * argv[])
     }
     
     camera.read(img, t);
-    ui_web_stream.beginFrame(img.cols, img.rows);
+    ui_web_stream.sendImage(img);
     ui_web_stream.beginFrame(img.cols, img.rows);
     auto q = gimbal.q(t);
+    if (enable_recorder) recorder.record(img, q, t);
 
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
-
-    // hero 弹道：只在“当前帧看得到前哨站 z 最低装甲板”时才跟随
-    bool hero_ballistic = false;
-    try {
-      auto yaml_cfg = YAML::LoadFile(config_path);
-      if (yaml_cfg["ballistic_model"].IsDefined()) {
-        auto s = yaml_cfg["ballistic_model"].as<std::string>();
-        hero_ballistic = (s == "hero");
-      }
-    } catch (...) {
-      hero_ballistic = false;
-    }
-
-    if (hero_ballistic) {
-      // 仅对 outpost 做限制：如果当前帧没检测到 outpost 的最低 z 装甲板（即不在视野/不在正面），则不跟随预测
-      double min_outpost_z = std::numeric_limits<double>::infinity();
-      bool has_outpost_det = false;
-      bool has_bottom_outpost_det = false;
-
-      for (const auto & a : armors) {
-        if (a.name != auto_aim::ArmorName::outpost) continue;
-        has_outpost_det = true;
-        min_outpost_z = std::min(min_outpost_z, static_cast<double>(a.xyz_in_world[2]));
-      }
-
-      if (has_outpost_det) {
-        constexpr double kBottomZEps = 0.02;  // 2cm 容差，避免抖动导致频繁丢跟随
-        for (const auto & a : armors) {
-          if (a.name != auto_aim::ArmorName::outpost) continue;
-          if (static_cast<double>(a.xyz_in_world[2]) <= min_outpost_z + kBottomZEps) {
-            has_bottom_outpost_det = true;
-            break;
-          }
-        }
-
-        if (!has_bottom_outpost_det) {
-          targets.clear();
-        }
-      }
-    }
 
     #ifdef AIM_CENTER
     if(tracker.aim_strategy_ == "follow") {
@@ -300,33 +271,6 @@ int main(int argc, char * argv[])
       }
 
       Eigen::Vector4d aim_xyza = planner.debug_xyza;
-
-      // hero 模式下：前哨站红色预测点只显示 z 最低的那块装甲板
-      if (target.name == auto_aim::ArmorName::outpost) {
-        bool is_hero = false;
-        try {
-          auto yaml_cfg = YAML::LoadFile(config_path);
-          if (yaml_cfg["ballistic_model"].IsDefined()) {
-            auto s = yaml_cfg["ballistic_model"].as<std::string>();
-            is_hero = (s == "hero");
-          }
-        } catch (...) {
-          is_hero = false;
-        }
-
-        if (is_hero && !armor_xyza_list.empty()) {
-          int bottom_id = 0;
-          double min_z = armor_xyza_list[0][2];
-          for (int i = 1; i < static_cast<int>(armor_xyza_list.size()); i++) {
-            if (armor_xyza_list[i][2] < min_z) {
-              min_z = armor_xyza_list[i][2];
-              bottom_id = i;
-            }
-          }
-          aim_xyza = armor_xyza_list[bottom_id];
-        }
-      }
-
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
       #ifndef AIM_CENTER
@@ -347,7 +291,7 @@ int main(int argc, char * argv[])
     
     #ifdef SENTRY_SR
     //发布导航的信息
-    ros2.publish_status(gs.game_progress,gs.stage_remain_time,gs.current_hp,gs.ally_outpost_hp,gs.x,gs.y,gs.angle,gs.state,gs.energy_state);
+    ros2.publish_status(gs.game_progress,gs.stage_remain_time,gs.current_hp,gs.ally_outpost_hp,gs.state,gs.energy_state,gs.bullets);
     #endif
 
     // UI初始化和配置
@@ -369,10 +313,9 @@ int main(int argc, char * argv[])
     ui_manager.addLeftText("game_progress", fmt::format("Game Status: {} ", (int)gs.game_progress));
     ui_manager.addLeftText("current_hp", fmt::format("Blood: {} ", (int)gs.current_hp));
     ui_manager.addLeftText("ally_outpost_hp", fmt::format("Bullet: {} ", (int)gs.ally_outpost_hp));
-    ui_manager.addLeftText("position", fmt::format("Position X: {:.2f}  Y: {:.2f}", gs.x, gs.y));
-    ui_manager.addLeftText("angle", fmt::format("Angle: {:.2f}", gs.angle));
     ui_manager.addLeftText("state", fmt::format("State: {} ", (int)gs.state));
     ui_manager.addLeftText("energy_state", fmt::format("  Energy State: {} ", (int)gs.energy_state));
+    ui_manager.addLeftText("bullets", fmt::format("  Bullets: {} ", (int)gs.bullets));
     #endif
     
     // 目标信息
@@ -405,8 +348,6 @@ int main(int argc, char * argv[])
     
     // 应用UI绘制
     ui_manager.render(img);
-    ui_web_stream.capturePanels(ui_manager);
-    ui_web_stream.sendFrame();
     ui_web_stream.capturePanels(ui_manager);
     ui_web_stream.sendFrame();
 

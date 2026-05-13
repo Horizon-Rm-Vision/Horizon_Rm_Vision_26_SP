@@ -69,10 +69,6 @@ public:
 
   bool checkinit();
 
-  // hero 模式：前哨站重投影后，仅当预测打到“下面那块装甲板”才允许 fire
-  // 说明：以装甲板世界坐标 z 最小者作为“下面装甲板”。
-  bool is_outpost_predicted_bottom_armor() const;
-
 private:
 #ifndef NOVA_OUTPOST_V2
   int armor_num_;

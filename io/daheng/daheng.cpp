@@ -73,6 +73,25 @@ void DaHengCamera::read(cv::Mat & img, std::chrono::steady_clock::time_point & t
   timestamp = data.timestamp;
 }
 
+bool DaHengCamera::setExposureMs(double exposure_ms)
+{
+  std::lock_guard<std::mutex> lock(control_mutex_);
+  if (hDevice_ == nullptr) return false;
+
+  if (!set_exposure_time(exposure_ms)) {
+    return false;
+  }
+
+  exposure_ms_ = exposure_ms;
+  return true;
+}
+
+double DaHengCamera::exposureMs() const
+{
+  std::lock_guard<std::mutex> lock(control_mutex_);
+  return exposure_ms_;
+}
+
 void DaHengCamera::open()
 {
   uint32_t nDeviceNum = 0;

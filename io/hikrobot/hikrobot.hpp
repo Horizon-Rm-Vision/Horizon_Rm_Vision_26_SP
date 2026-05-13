@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <mutex>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <thread>
@@ -19,6 +20,8 @@ public:
   HikRobot(double exposure_ms, double gain, const std::string & vid_pid);
   ~HikRobot() override;
   void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp) override;
+  bool setExposureMs(double exposure_ms) override;
+  double exposureMs() const override;
 
 private:
   struct CameraData
@@ -40,6 +43,7 @@ private:
   tools::ThreadSafeQueue<CameraData> queue_;
 
   int vid_, pid_;
+  mutable std::mutex control_mutex_;
 
   void capture_start();
   void capture_stop();
