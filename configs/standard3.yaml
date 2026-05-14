@@ -93,6 +93,14 @@ gyro_speed_threshold: 2 # rad/s
 gimbal_yaw_threshold: 30 # degree, 云台yaw角度约束阈值
 target_distance_threshold: 5 # meter, 目标距离约束阈值
 
+#####-----锁中心参数-----#####
+track_center: 0  # 是否启用锁中心模式
+track_center_outpost: 0  # 是否对前哨站启用锁中心模式
+aim_center_palstance_threshold: 6.5  # 锁中心角速度阈值，弧度制
+switch_trackmode_threshold: 1.2  # 切换锁中心模式的角速度偏移，弧度制
+aim_center_angle_tolerance: 1  # 锁中心自动击发角度容差，角度制
+aim_center_angle_tolerance_outpost: 3  # 前哨站锁中心自动击发角度容差，角度制
+
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree
 second_tolerance: 2 # 远距离射击容差，degree
@@ -237,10 +245,6 @@ ballistic_model: "hero"
 #####-----nav速度倍数（仅用于哨兵模式，导航相关）-----#####
 velocity_n: 30
 
-#####-----锁车中心参数-----#####
-aim_center: false # 锁车中心
-aim_center_min_distance: 100 # 触发锁车中心机制的最小距离，单位m，当装甲板距离车中心大于该值时优先锁定车中心点
-armor_yaw_threshold: 10 # 锁车时装甲板yaw角度阈值，degree
 
 # #####-----UI显示配置-----#####
 ui:
@@ -253,12 +257,6 @@ ui:
     send_image: true
     image_quality: 75
     max_image_dim: 640
-
-plotter:
-  web:
-    enabled: true
-    host: "192.168.1.241"
-    port: 9876
 
 #####-----recorder参数-----#####
 recorder: false

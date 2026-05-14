@@ -19,10 +19,6 @@ Planner::Planner(const std::string & config_path)
   decision_speed_ = tools::read<double>(yaml, "decision_speed");
   high_speed_delay_time_ = tools::read<double>(yaml, "high_speed_delay_time");
   low_speed_delay_time_ = tools::read<double>(yaml, "low_speed_delay_time");
-  #ifdef AIM_CENTER
-  aim_center_ = tools::read<bool>(yaml, "aim_center");
-  armor_yaw_threshold_ = tools::read<double>(yaml, "armor_yaw_threshold");
-  #endif
   // 读取弹道模型配置
   if (yaml["ballistic_model"]) {
     auto str = yaml["ballistic_model"].as<std::string>();
@@ -36,6 +32,20 @@ Planner::Planner(const std::string & config_path)
 
   setup_yaw_solver(config_path);
   setup_pitch_solver(config_path);
+
+  #ifdef NOVA_AIM_CENTER
+  track_center_ = tools::read<bool>(yaml, "track_center");
+  track_center_outpost_ =
+    yaml["track_center_outpost"] ? yaml["track_center_outpost"].as<bool>() : false;
+  aim_center_palstance_threshold_ = tools::read<double>(yaml, "aim_center_palstance_threshold");
+  switch_trackmode_threshold_ = tools::read<double>(yaml, "switch_trackmode_threshold");
+  aim_center_angle_tolerance_ = tools::read<double>(yaml, "aim_center_angle_tolerance") / 57.3;
+  aim_center_angle_tolerance_outpost_ =
+    (yaml["aim_center_angle_tolerance_outpost"]
+       ? yaml["aim_center_angle_tolerance_outpost"].as<double>()
+       : 3.0) /
+    57.3;
+    #endif
 }
 
 Plan Planner::plan(Target target, double bullet_speed)
@@ -45,7 +55,44 @@ Plan Planner::plan(Target target, double bullet_speed)
     bullet_speed = 22;
   }
 
+  #ifdef NOVA_AIM_CENTER
+  // 0.5 判断是否锁中心
+  auto ekf_x = target.ekf_x();
+  if (track_center_ && (track_center_outpost_ || target.name != ArmorName::outpost)) {
+    if (target.name == ArmorName::outpost && track_center_outpost_) {
+      // 前哨站: EKF收敛后直接进入锁中心, 不依赖转速阈值
+      center_tracked_ = target.convergened() ||
+        ((std::abs(ekf_x[7]) - switch_trackmode_threshold_) > aim_center_palstance_threshold_);
+    } else {
+      // 普通目标: 必须超过转速阈值
+      center_tracked_ =
+        ((std::abs(ekf_x[7]) - switch_trackmode_threshold_) > aim_center_palstance_threshold_);
+    }
+  } else {
+    center_tracked_ = false;
+  }
+  #endif
+
   // 1. Predict fly_time
+  #ifdef NOVA_AIM_CENTER
+  Eigen::Vector3d xyz;
+  auto min_dist = 1e10;
+  if (center_tracked_) {
+    auto facing = compute_facing_armor(target);
+    xyz = facing.head<3>();
+    min_dist = xyz.head<2>().norm();
+  } else {
+    for (auto & xyza : target.armor_xyza_list()) {
+      auto dist = xyza.head<2>().norm();
+      if (dist < min_dist) {
+        min_dist = dist;
+        xyz = xyza.head<3>();
+      }
+    }
+  }
+  #endif
+
+  #ifndef NOVA_AIM_CENTER
   Eigen::Vector3d xyz;
   auto min_dist = 1e10;
   for (auto & xyza : target.armor_xyza_list()) {
@@ -55,6 +102,8 @@ Plan Planner::plan(Target target, double bullet_speed)
       xyz = xyza.head<3>();
     }
   }
+  #endif
+
   auto bullet_traj = tools::Trajectory(
     bullet_speed, min_dist, xyz.z(),
     ballistic_model_ == BallisticModel::kHero ? tools::Trajectory::Model::kHero
@@ -111,6 +160,26 @@ Plan Planner::plan(Target target, double bullet_speed)
       traj(0, HALF_HORIZON + shoot_offset_) - yaw_solver_->work->x(0, HALF_HORIZON + shoot_offset_),
       traj(2, HALF_HORIZON + shoot_offset_) -
         pitch_solver_->work->x(0, HALF_HORIZON + shoot_offset_)) < fire_thresh_;
+
+  #ifdef NOVA_AIM_CENTER
+  // 锁中心模式下必须装甲板接近中心才开火（与WMJ逻辑一致）
+  if (plan.fire && center_tracked_) {
+    Eigen::VectorXd x = target.ekf_x();
+    auto center_yaw = std::atan2(x[2], x[0]);
+    auto armor_xyza_list = target.armor_xyza_list();
+    double min_delta = 1e10;
+    for (const auto & xyza : armor_xyza_list) {
+      auto delta = std::abs(tools::limit_rad(xyza[3] - center_yaw));
+      if (delta < min_delta) min_delta = delta;
+    }
+    double tolerance = (target.name == ArmorName::outpost) ? aim_center_angle_tolerance_outpost_
+                                                         : aim_center_angle_tolerance_;
+    if (min_delta >= tolerance) {
+      plan.fire = false;
+    }
+  }
+  #endif
+
   return plan;
 }
 
@@ -125,17 +194,8 @@ Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 
   target->predict(future);
 
-  #ifdef AIM_CENTER
-  if (aim_center_) {
-    return aim_at_center(*target, bullet_speed);
-  } else {
-    return plan(*target, bullet_speed);
-  }
-  #endif
 
-  #ifndef AIM_CENTER
   return plan(*target, bullet_speed);
-  #endif
 }
 
 void Planner::setup_yaw_solver(const std::string & config_path)
@@ -190,7 +250,26 @@ Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_sp
   double yaw;
   auto min_dist = 1e10;
 
-  for (auto & xyza : target.armor_xyza_list()) {
+  #ifdef NOVA_AIM_CENTER
+  if (center_tracked_) {
+    auto facing = compute_facing_armor(target);
+    xyz = facing.head<3>();
+    yaw = facing[3];
+    min_dist = xyz.head<2>().norm();
+  } else {
+    for (auto & xyza : target.armor_xyza_list()) {
+      auto dist = xyza.head<2>().norm();
+      if (dist < min_dist) {
+        min_dist = dist;
+        xyz = xyza.head<3>();
+        yaw = xyza[3];
+      }
+    }
+  }
+  #endif
+
+  #ifndef NOVA_AIM_CENTER
+    for (auto & xyza : target.armor_xyza_list()) {
     auto dist = xyza.head<2>().norm();
     if (dist < min_dist) {
       min_dist = dist;
@@ -198,6 +277,7 @@ Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_sp
       yaw = xyza[3];
     }
   }
+  #endif
   debug_xyza = Eigen::Vector4d(xyz.x(), xyz.y(), xyz.z(), yaw);
 
   auto azim = std::atan2(xyz.y(), xyz.x());
@@ -236,102 +316,44 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
   return traj;
 }
 
-#ifdef AIM_CENTER
-Plan Planner::aim_at_center(Target target, double bullet_speed)
+#ifdef NOVA_AIM_CENTER
+Eigen::Vector4d Planner::compute_facing_armor(const Target & target) const
 {
-  target.v1 = 20;
-  Plan plan;
+  Eigen::VectorXd x = target.ekf_x();
+  auto center_yaw = std::atan2(x[2], x[0]);
+  auto armor_list = target.armor_xyza_list();
+  auto armor_num = static_cast<int>(armor_list.size());
 
-  double azim_;
-
-  // 整车中心坐标
-  Eigen::Vector3d xyz;
-  xyz = {target.ekf_x()[0] - target.ekf_x()[8], target.ekf_x()[2], target.ekf_x()[4]};
-
-  // 存储世界坐标系中的目标位置，仅重投影用
-  if ((target.ekf_x()[0] == 0 && target.ekf_x()[2] == 0) || target.armor_xyza_list().empty()) {
-    center_points = Eigen::Vector3d(0, 0, 0);
-  } else {
-    center_points = Eigen::Vector3d(target.ekf_x()[0], target.ekf_x()[2], target.ekf_x()[4]);
+  // Step 1: 找出正对相机的装甲板 (yaw最接近center_yaw的板)
+  int facing_id = 0;
+  double min_delta = 1e10;
+  for (int i = 0; i < armor_num; i++) {
+    auto delta = std::abs(tools::limit_rad(armor_list[i][3] - center_yaw));
+    if (delta < min_delta) {
+      min_delta = delta;
+      facing_id = i;
+    }
   }
 
-  // 距离
-  double center_dist = xyz.head<2>().norm();
-
-  float yaw, pitch;
-
-  // 计算弹道
-  auto bullet_traj = tools::Trajectory(
-      bullet_speed, center_dist, xyz.z(),
-      ballistic_model_ == BallisticModel::kHero
-          ? tools::Trajectory::Model::kHero
-          : tools::Trajectory::Model::kNoDrag);
-
-  if (bullet_traj.unsolvable) {
-    tools::logger()->warn("Unsolvable bullet trajectory (center dist={:.2f}, z={:.2f})", center_dist, xyz.z());
-    plan.control = false;
-    plan.fire = false;
-    return plan;
-  }
-
-  // 根据飞行时间预测
-  target.predict(bullet_traj.fly_time);
-
-  if (bullet_traj.unsolvable)
-    throw std::runtime_error("Unsolvable bullet trajectory!");
-
-  // 云台指向目标中心方向
-  auto azim = std::atan2(xyz.y(), xyz.x());
-  azim_ = azim;
-
-  yaw = tools::limit_rad(azim + yaw_offset_);
-  pitch = -bullet_traj.pitch - pitch_offset_;
-
-  // 开火条件
-
-  if (target.armor_xyza_list().empty()) {
-    plan.control = false;
-    plan.fire = false;
-  } else {
-
-    double best_diff = 1e9;
-
-    // 找最正对云台的装甲板
-    for (auto &xyza : target.armor_xyza_list()) {
-
-      double armor_yaw = xyza[3];
-
-      double diff = tools::limit_rad(armor_yaw - azim_);
-
-      if (std::abs(diff) < best_diff) {
-        best_diff = std::abs(diff);
+  // Step 2: 角度超前 (仅标准4板目标，对齐WMJ StandardModel::getFacingArmor)
+  if (armor_num == 4) {
+    auto palstance = x[7];
+    if (std::abs(palstance) > 1e-6) {
+      auto leading_angle = (palstance > 0 ? -1.0 : 1.0) * (-50.0 / 57.3);
+      if (std::abs(tools::limit_rad(armor_list[facing_id][3] + leading_angle - center_yaw)) <
+          min_delta) {
+        facing_id = (facing_id + 1) % 2;
       }
     }
-
-    double armor_yaw_threshold = armor_yaw_threshold_ / 57.3; // deg → rad
-
-    if (best_diff < armor_yaw_threshold) {
-      plan.control = true;
-      plan.fire = true;
-    } else {
-      plan.control = false;
-      plan.fire = false;
-    }
   }
 
-  plan.target_yaw = yaw;
-  plan.target_pitch = pitch;
+  // Step 3: 用该装甲板的实际半径和高度计算 facing point
+  auto r = std::hypot(x[0] - armor_list[facing_id][0], x[2] - armor_list[facing_id][1]);
+  auto facing_x = x[0] - r * std::cos(center_yaw);
+  auto facing_y = x[2] - r * std::sin(center_yaw);
+  auto facing_z = armor_list[facing_id][2];
 
-  plan.yaw = yaw;
-  plan.yaw_vel = 0;
-  plan.yaw_acc = 0;
-
-  plan.pitch = pitch;
-  plan.pitch_vel = 0;
-  plan.pitch_acc = 0;
-
-  return plan;
+  return {facing_x, facing_y, facing_z, center_yaw};
 }
 #endif
-
 }  // namespace auto_aim

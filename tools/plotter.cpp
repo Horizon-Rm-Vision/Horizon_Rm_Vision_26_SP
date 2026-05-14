@@ -48,28 +48,6 @@ void Plotter::configureWebStreamFromConfig(const std::string & config_path)
       }
     }
 
-    if (config["plotter"] && config["plotter"]["web"]) {
-      auto plot_web = config["plotter"]["web"];
-      if (plot_web["enabled"]) {
-        enabled = plot_web["enabled"].as<bool>();
-      }
-      if (plot_web["host"]) {
-        host = plot_web["host"].as<std::string>();
-      }
-      if (plot_web["port"]) {
-        port = static_cast<uint16_t>(plot_web["port"].as<int>());
-      }
-      if (plot_web["width"]) {
-        width_ = plot_web["width"].as<int>();
-      }
-      if (plot_web["height"]) {
-        height_ = plot_web["height"].as<int>();
-      }
-      if (plot_web["max_points"]) {
-        max_points_ = plot_web["max_points"].as<int>();
-      }
-    }
-
     setWebStream(host, port, enabled);
   } catch (const std::exception &) {
     setWebStream(web_host_, web_port_, false);

@@ -223,15 +223,6 @@ int main(int argc, char * argv[])
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
 
-    #ifdef AIM_CENTER
-    if(tracker.aim_strategy_ == "follow") {
-      planner.aim_center_ = false;
-    }
-    else {
-      planner.aim_center_ = true;
-    }
-    #endif
-
     if (!targets.empty())
       target_queue.push(targets.front());
     else
@@ -249,13 +240,6 @@ int main(int argc, char * argv[])
       tools::draw_text(img, fmt::format("armor_z: {:.2f}", armor.xyz_in_world[2]), {10, 660}, {0, 255, 0});
 
     }
-    #ifdef AIM_CENTER
-    // 绘制锁定中心
-    if (planner.aim_center_) {
-      auto center_image_points = solver.reproject_point(planner.center_points);
-      tools::draw_points(img, center_image_points, {0, 0, 255}, 10);
-    }
-    #endif
 
     if (!targets.empty()) {
       auto target = targets.front();
@@ -270,13 +254,12 @@ int main(int argc, char * argv[])
       Eigen::Vector4d aim_xyza = planner.debug_xyza;
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
-      #ifndef AIM_CENTER
+      #ifndef NOVA_AIM_CENTER
       tools::draw_points(img, image_points, {0, 0, 255});
       #endif
-      #ifdef AIM_CENTER
-      if(planner.aim_center_ == false){
-        tools::draw_points(img, image_points, {0, 0, 255});
-      }
+      #ifdef NOVA_AIM_CENTER
+        auto aim_color = planner.center_tracked() ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 0, 255);
+      tools::draw_points(img, image_points, aim_color);
       #endif
     }
     
@@ -319,11 +302,27 @@ int main(int argc, char * argv[])
     if (has_target) {
       auto& target = target_opt.value();
       ui_manager.addLeftText("target_info", fmt::format("Target Z: {:.2f}  Vz: {:.2f}", target.ekf_x()[4], target.ekf_x()[5]), cv::Scalar(255, 255, 0));
-      
+
       if (target.ekf_x().size() > 7) {
         ui_manager.addLeftText("target_w", fmt::format("Target W: {:.2f}", target.ekf_x()[7]), cv::Scalar(255, 255, 0));
       }
-      
+
+      #ifdef NOVA_AIM_CENTER
+      // 锁中心状态
+      bool is_center_locked = planner.center_tracked();
+      ui_manager.addLeftText("center_lock", fmt::format("Center Lock: {}", is_center_locked ? "ON" : "OFF"),
+                            is_center_locked ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 255, 0));
+      if (is_center_locked) {
+        auto ekf_x = target.ekf_x();
+        auto center_yaw = std::atan2(ekf_x[2], ekf_x[0]);
+        auto r = ekf_x[8];
+        auto lock_x = ekf_x[0] - r * std::cos(center_yaw);
+        auto lock_y = ekf_x[2] - r * std::sin(center_yaw);
+        ui_manager.addLeftText("lock_point", fmt::format("Lock Pt: ({:.2f}, {:.2f})", lock_x, lock_y),
+                              cv::Scalar(0, 255, 255));
+      }
+      #endif
+
       // Eigen::Vector4d aim_xyza = planner.debug_xyza;
       // ui_manager.addLeftText("armor_xyz", fmt::format("Armor X: {:.2f}  Y: {:.2f}  Z: {:.2f}", aim_xyza[0], aim_xyza[1], aim_xyza[2]), cv::Scalar(255, 255, 0));
     }
@@ -338,10 +337,6 @@ int main(int argc, char * argv[])
                            targets.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
     ui_manager.addRightText("armor_count", fmt::format("Armors: {}", armors.size()), 
                            armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
-    
-    #ifdef AIM_CENTER
-    ui_manager.addRightText("aim_strategy", fmt::format("Aim Strategy: {}", tracker.aim_strategy_));
-    #endif
     
     // 应用UI绘制
     ui_manager.render(img);

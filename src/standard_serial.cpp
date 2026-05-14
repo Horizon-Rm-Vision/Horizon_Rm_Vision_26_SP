@@ -145,7 +145,7 @@ int main(int argc, char * argv[])
 
     auto command = aimer.aim(targets, t, bullet_speed);
 
-    // 使用Shooter决定开火
+    // 使用Shooter决定开火（锁中心约束已集成在Shooter内部）
     Eigen::Vector3d gimbal_pos = ypr;
     command.shoot = shooter.shoot(command, aimer, targets, gimbal_pos);
 
@@ -177,7 +177,17 @@ int main(int argc, char * argv[])
       Eigen::Vector4d aim_xyza = aim_point.xyza;
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
+      #ifndef NOVA_AIM_CENTER
       if (aim_point.valid) tools::draw_points(img, image_points, {0, 0, 255});
+      #endif
+
+      #ifdef NOVA_AIM_CENTER
+      if (aim_point.valid) {
+        // 锁中心模式用不同颜色绘制瞄准点
+        auto aim_color = aimer.center_tracked() ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 0, 255);
+        tools::draw_points(img, image_points, aim_color);
+      }
+      #endif
     }
 
     // UI初始化
@@ -187,9 +197,28 @@ int main(int argc, char * argv[])
     bool has_target = !targets.empty();
     ui_manager.addLeftText("detect", fmt::format("Detect: {}", has_target ? "YES" : "NO"), 
                           has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
-    ui_manager.addLeftText("fire", fmt::format("Fire: {}", command.shoot ? "YES" : "NO"), 
+    ui_manager.addLeftText("fire", fmt::format("Fire: {}", command.shoot ? "YES" : "NO"),
                           command.shoot ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
-    
+
+    #ifdef NOVA_AIM_CENTER
+    // 锁中心状态
+    if (!targets.empty()) {
+      auto target = targets.front();
+      bool is_center_locked = aimer.center_tracked();
+      ui_manager.addLeftText("center_lock", fmt::format("Center Lock: {}", is_center_locked ? "ON" : "OFF"),
+                            is_center_locked ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 255, 0));
+      if (is_center_locked) {
+        auto ekf_x = target.ekf_x();
+        auto center_yaw = std::atan2(ekf_x[2], ekf_x[0]);
+        auto r = ekf_x[8];
+        auto lock_x = ekf_x[0] - r * std::cos(center_yaw);
+        auto lock_y = ekf_x[2] - r * std::sin(center_yaw);
+        ui_manager.addLeftText("lock_point", fmt::format("Lock Pt: ({:.2f}, {:.2f})", lock_x, lock_y),
+                              cv::Scalar(0, 255, 255));
+      }
+    }
+    #endif
+
     // 云台状态 - 接收到的数据
     auto gs = gimbal.state();
     #ifdef SENTRY_SR

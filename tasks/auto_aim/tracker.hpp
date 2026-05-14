@@ -17,9 +17,6 @@ namespace auto_aim
 class Tracker
 {
 public:
-#ifdef AIM_CENTER
-  std::string aim_strategy_; // "center" or "follow"
-#endif
   Tracker(const std::string & config_path, Solver & solver);
 
   std::string state() const;
@@ -53,10 +50,6 @@ private:
   int outpost_correction_cancel_count_;
   int outpost_seen_streak_;
   int non_outpost_seen_streak_;
-
-  #ifdef AIM_CENTER
-  float aim_center_min_distance_;
-  #endif
 
   #ifdef NOVA_OUTPOST_V2
   int outpost_min_detect_count_;

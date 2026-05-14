@@ -77,9 +77,6 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
     outpost_correction_cancel_count_;
 
   normal_temp_lost_count_ = max_temp_lost_count_;
-  #ifdef AIM_CENTER
-  aim_center_min_distance_ = yaml["aim_center_min_distance"].as<float>();
-  #endif
 }
 
 std::string Tracker::state() const { return state_; }
@@ -305,16 +302,7 @@ void Tracker::state_machine(bool found)
   else if (state_ == "detecting") {
     if (found) {
       detect_count_++;
-      #ifdef AIM_CENTER
-      if (detect_count_ >= min_detect_count_){
-        state_ = "tracking";
-        if(target_.ekf_x()[0] <= aim_center_min_distance_) aim_strategy_ = "follow";
-        else aim_strategy_ = "center";
-      }
-      #endif
-      #ifndef AIM_CENTER
       if (detect_count_ >= min_detect_count_) state_ = "tracking";
-      #endif
     } else {
       detect_count_ = 0;
       state_ = "lost";
@@ -326,20 +314,9 @@ void Tracker::state_machine(bool found)
     if (found) {
       detect_count_++;
       detect_fail_count_ = 0;
-      #ifdef AIM_CENTER
-      auto required_count =
-        (target_.name == ArmorName::outpost) ? outpost_min_detect_count_ : min_detect_count_;
-      if (detect_count_ >= required_count){
-        state_ = "tracking";
-        if(target_.ekf_x()[0] <= aim_center_min_distance_) aim_strategy_ = "follow";
-        else aim_strategy_ = "center";
-      }
-      #endif
-      #ifndef AIM_CENTER
       auto required_count =
         (target_.name == ArmorName::outpost) ? outpost_min_detect_count_ : min_detect_count_;
       if (detect_count_ >= required_count) state_ = "tracking";
-      #endif
     } else {
       if (target_.name == ArmorName::outpost) {
         detect_fail_count_++;
