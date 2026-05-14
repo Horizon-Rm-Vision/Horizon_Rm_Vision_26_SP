@@ -11,7 +11,7 @@ message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}-------
 
 # 编译模式选项：控制是否使用CUDA/TensorRT和OpenVINO
 option(USE_CUDA "Enable CUDA/TensorRT support" ON)
-option(USE_OPENVINO "Enable OpenVINO support" OFF)
+option(USE_OPENVINO "Enable OpenVINO support" ON)
 
 if(NOT USE_CUDA AND NOT USE_OPENVINO)
     message(FATAL_ERROR "At least one of USE_CUDA or USE_OPENVINO must be enabled.")
@@ -28,8 +28,7 @@ add_compile_definitions(SR_VEL) # 带前馈角速度的串口收发模式(哨兵
 add_compile_definitions(LIM_CODE) #简化代码模式，启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销
 add_compile_definitions(NOVA_Q) #基于peek2的四元数取数方式,待多几个版本测试以验证可靠性
 add_compile_definitions(FIRE_CONSTRAINT) # 开火约束
-#add_compile_definitions(NOVA_OUTPOST_V1) # 新版前哨站识别方案1
-#add_compile_definitions(NOVA_OUTPOST_V2) # 新版前哨站识别方案2,二者不能同时启用
+add_compile_definitions(NOVA_OUTPOST_V2) # 新版前哨站识别方案2
 add_compile_definitions(NOVA_AIM_CENTER) # 新版锁中心模式
 
 if(BUILD_SENTRY)

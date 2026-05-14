@@ -27,6 +27,7 @@ if(USE_CUDA)
     list(APPEND AUTO_AIM_SRCS
         yolos/yolov5_trt.cpp
         yolos/yolov5_trt_gpu_kernel.cu
+        yolos/yolox_trt.cpp
         trt_engine.cpp
     )
 endif()
@@ -37,6 +38,7 @@ if(USE_OPENVINO)
         yolos/yolov5_ov.cpp
         yolos/yolov8.cpp
         yolos/yolo11.cpp
+        yolos/yolox_ov.cpp
     )
 endif()
 

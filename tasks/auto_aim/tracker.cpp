@@ -384,13 +384,9 @@ bool Tracker::set_target(std::list<Armor> & armors, std::chrono::steady_clock::t
   }
 
   else if (armor.name == ArmorName::outpost) {
-    #ifdef NOVA_OUTPOST_V1
-    Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 81, 0.4, 100, 1, 1, 1}};
-    #else
     // h1(9)和h2(10)初始协方差设为0.1，允许滤波器在初始化后快速学习Z轴高度差
     // 参照Auto_Aim OutpostTarget的初始化逻辑，避免P=0导致Kalman增益为0无法更新
     Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 81, 0.4, 100, 1e-4, 0.1, 0.1}};
-    #endif
     target_ = Target(armor, t, 0.2765, 3, P0_dig);
   }
 

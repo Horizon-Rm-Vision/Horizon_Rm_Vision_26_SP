@@ -223,7 +223,7 @@ AimPoint Aimer::choose_aim_point(const Target & target)
   if (track_center_ && (track_center_outpost_ || target.name != ArmorName::outpost)) {
     if (target.name == ArmorName::outpost && track_center_outpost_) {
       // 前哨站: EKF收敛后直接进入锁中心, 不依赖转速阈值
-      center_tracked_ = target.convergened() ||
+      center_tracked_ = const_cast<Target&>(target).convergened() ||
         ((std::abs(ekf_x[7]) - switch_trackmode_threshold_) > aim_center_palstance_threshold_);
     } else {
       // 普通目标: 必须超过转速阈值

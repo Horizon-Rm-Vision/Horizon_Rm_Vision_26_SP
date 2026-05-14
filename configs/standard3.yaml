@@ -3,7 +3,7 @@ enemy_color: "red"
 #enemy_color: "blue"
 
 #####-----自瞄神经网络模式参数-----#####
-yolo_name: yolov5_trt
+yolo_name: yolox_ov
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
@@ -11,9 +11,36 @@ yolov5_model_path: ../assets/yolov5.xml
 yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
+yolox_ov_model_path: ../assets/best_06_02.xml
+yolox_trt_model_path: ../assets/yolox-fp16.engine
+yolox_svm_model_path: ../assets/svm_numbers_rbf.xml
 device: CPU
-min_confidence: 0.8
+min_confidence: 0.6
 use_traditional: true
+
+#####-----yolox_ov参数-----#####
+yolox_ov:
+  use_svm: true
+  # 标签修正模式: "svm" (原HOG+SVM), "lenet" (tra模式LeNet), "resnet" (traditional_cv模式ResNet)
+  label_correction_mode: "svm"
+  # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
+  lenet_model_path: "../assets/lenet.onnx"
+  lenet_label_path: "../assets/label.txt"
+  lenet_threshold: 0.7
+  # ResNet模式参数 (label_correction_mode: "resnet" 时生效)
+  resnet_model_path: "../assets/tiny_resnet.onnx"
+
+#####-----yolox_trt参数-----#####
+yolox_trt:
+  use_svm: true
+  # 标签修正模式: "svm" (原HOG+SVM), "lenet" (tra模式LeNet), "resnet" (traditional_cv模式ResNet)
+  label_correction_mode: "svm"
+  # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
+  lenet_model_path: "../assets/lenet.onnx"
+  lenet_label_path: "../assets/label.txt"
+  lenet_threshold: 0.7
+  # ResNet模式参数 (label_correction_mode: "resnet" 时生效)
+  resnet_model_path: "../assets/tiny_resnet.onnx"
 
 #####-----ROI-----#####
 roi: 
@@ -24,7 +51,7 @@ roi:
 
 use_roi: false
 
-#####-----自瞄神经网络模式传统方法参数-----#####
+#####-----自瞄神经网络模式传统方法参数(仅yolov5_trt yolov5_ov和yolox_trt yolox_ov可用)-----#####
 threshold: 150
 max_angle_error: 45 # degree
 min_lightbar_ratio: 1.5
@@ -94,8 +121,8 @@ gimbal_yaw_threshold: 30 # degree, 云台yaw角度约束阈值
 target_distance_threshold: 5 # meter, 目标距离约束阈值
 
 #####-----锁中心参数-----#####
-track_center: 0  # 是否启用锁中心模式
-track_center_outpost: 0  # 是否对前哨站启用锁中心模式
+track_center: false  # 是否启用锁中心模式
+track_center_outpost: false  # 是否对前哨站启用锁中心模式
 aim_center_palstance_threshold: 6.5  # 锁中心角速度阈值，弧度制
 switch_trackmode_threshold: 1.2  # 切换锁中心模式的角速度偏移，弧度制
 aim_center_angle_tolerance: 1  # 锁中心自动击发角度容差，角度制

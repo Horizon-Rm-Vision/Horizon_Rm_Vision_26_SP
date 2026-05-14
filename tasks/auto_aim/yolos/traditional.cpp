@@ -135,9 +135,10 @@ void NumberClassifier::eraseIgnoreClasses(std::vector<TraArmor> &armors) {
 
         bool mismatch = false;
         if (a.type == ArmorType::big) {
-          mismatch = a.number == "outpost" || a.number == "2" || a.number == "sentry";
+          mismatch = a.number == "outpost" || a.number == "2" || a.number == "sentry" ||
+                     a.number == "base";
         } else if (a.type == ArmorType::small) {
-          mismatch = a.number == "1" || a.number == "base";
+          mismatch = a.number == "1";
         }
         return mismatch;
       }),
@@ -380,6 +381,8 @@ std::list<Armor> TraditionalDetector::detect(const cv::Mat &img, int frame_count
     for (auto &armor : armors_) {
       armor.number_img = classifier_->extractNumber(rgb_img, armor);
       classifier_->classify(rgb_img, armor);
+      // if (armor.number == "base") armor.type = ArmorType::small;
+      // if (armor.number == "1") armor.type = ArmorType::big;
       if (corner_corrector_ != nullptr && use_pca_) {
         corner_corrector_->correctCorners(armor, gray_img_);
       }

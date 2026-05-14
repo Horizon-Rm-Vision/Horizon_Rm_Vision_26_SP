@@ -263,9 +263,10 @@ bool Detector::check_name(const Armor & armor) const
 
 bool Detector::check_type(const Armor & armor) const
 {
-  auto name_ok = armor.type == ArmorType::small
-                   ? (armor.name != ArmorName::one && armor.name != ArmorName::base)
-                   : (armor.name == ArmorName::one || armor.name == ArmorName::base);
+  auto name_ok = (armor.type == ArmorType::small)
+                   ? (armor.name != ArmorName::one)
+                   : (armor.name != ArmorName::two && armor.name != ArmorName::sentry &&
+                      armor.name != ArmorName::outpost && armor.name != ArmorName::base);
 
   // 保存异常的图案，用于分类器的迭代
   if (!name_ok) {
@@ -328,8 +329,7 @@ ArmorType Detector::get_type(const Armor & armor)
 
   // tools::logger()->debug("[Detector] get armor type by name: {}", ARMOR_NAMES[armor.name]);
 
-  // 英雄、基地只能是大装甲板
-  if (armor.name == ArmorName::one || armor.name == ArmorName::base) {
+  if (armor.name == ArmorName::one) {
     return ArmorType::big;
   }
 
