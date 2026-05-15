@@ -1,3 +1,4 @@
+//c板通信,aimer模式多线程自瞄/打符
 #include <chrono>
 #include <opencv2/opencv.hpp>
 #include <thread>

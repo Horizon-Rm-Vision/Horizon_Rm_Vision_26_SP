@@ -1,3 +1,4 @@
+//串口通信,mpc模式多线程自瞄/打符
 #include <chrono>
 #include <opencv2/opencv.hpp>
 #include <thread>

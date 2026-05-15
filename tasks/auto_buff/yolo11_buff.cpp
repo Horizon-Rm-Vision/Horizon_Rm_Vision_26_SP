@@ -134,9 +134,9 @@ std::vector<YOLO11_BUFF::Object> YOLO11_BUFF::get_multicandidateboxes(cv::Mat & 
   }
   /// 计算FPS
   const float t = (cv::getTickCount() - start) / static_cast<float>(cv::getTickFrequency());
-  cv::putText(
-    image, cv::format("FPS: %.2f", 1.0 / t), cv::Point(20, 40), cv::FONT_HERSHEY_PLAIN, 2.0,
-    cv::Scalar(255, 0, 0), 2, 8);
+  // cv::putText(
+  //   image, cv::format("FPS: %.2f", 1.0 / t), cv::Point(20, 40), cv::FONT_HERSHEY_PLAIN, 2.0,
+  //   cv::Scalar(255, 0, 0), 2, 8);
 
   // #ifdef SAVE
   //         save("save", image);
@@ -224,9 +224,9 @@ std::vector<YOLO11_BUFF::Object> YOLO11_BUFF::get_onecandidatebox(cv::Mat & imag
 
   /// 计算FPS
   const float t = (cv::getTickCount() - start) / static_cast<float>(cv::getTickFrequency());
-  cv::putText(
-    image, cv::format("FPS: %.2f", 1.0 / t), cv::Point(20, 40), cv::FONT_HERSHEY_PLAIN, 2.0,
-    cv::Scalar(255, 0, 0), 2, 8);
+  // cv::putText(
+  //   image, cv::format("FPS: %.2f", 1.0 / t), cv::Point(20, 40), cv::FONT_HERSHEY_PLAIN, 2.0,
+  //   cv::Scalar(255, 0, 0), 2, 8);
   return object_result;
 }
 

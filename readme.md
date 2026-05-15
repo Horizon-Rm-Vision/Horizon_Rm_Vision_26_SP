@@ -262,7 +262,7 @@ Horizon_Rm_Vision_26_SP
 │   ├── auto_aim_debug_mpc.cpp
 │   ├── auto_buff_debug.cpp
 │   ├── auto_buff_debug_mpc.cpp
-│   ├── auto_buff_debug_serial.cpp
+│   ├── auto_buff_debug_aimer.cpp
 │   ├── mt_auto_aim_debug.cpp
 │   ├── mt_standard.cpp
 │   ├── sentry.cpp
@@ -271,7 +271,7 @@ Horizon_Rm_Vision_26_SP
 │   ├── sentry_multithread.cpp
 │   ├── standard.cpp
 │   ├── standard_mpc.cpp
-│   ├── standard_serial.cpp
+│   ├── auto_aim_debug_aimer.cpp
 │   ├── uav.cpp
 │   └── uav_debug.cpp
 ├── tasks              // 功能层，见3.4软件架构

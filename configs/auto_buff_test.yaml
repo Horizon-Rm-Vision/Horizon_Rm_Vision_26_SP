@@ -1,13 +1,16 @@
 # auto_buff_test.cpp 配置文件
-# 用于能量机关（大符）测试
+# 用于能量机关测试，通过 buff_mode 区分大符/小符模式
+
+#####-----能量机关模式-----#####
+buff_mode: "big"  # "big" = 大符 (2026 双目标激活), "small" = 小符 (单目标)
 
 #####-----神经网络参数-----#####
 model: ../assets/yolo11_buff_int8.xml  # YOLO11 buff检测模型路径
 yolox_model: ../assets/yolox_rune_3.6m.xml  # YOLOX buff检测模型路径（移植ROS版）
-yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-ampere.engine  # YOLOX TRT buff检测模型路径（TensorRT引擎文件）
+buff_yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-ampere.engine  # YOLOX TRT buff检测模型路径（TensorRT引擎文件）
 
 #####-----检测器模式-----#####
-detector_mode: "yolox_trt"  # 检测器模式: "yolo11" / "yolox" / "yolox_trt"
+detector_mode: "yolox_ov"  # 检测器模式: "yolo11" / "yolox_ov" / "yolox_trt"
 
 #####-----相机参数-----#####
 image_width: 1280

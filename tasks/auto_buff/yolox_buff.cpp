@@ -258,8 +258,8 @@ std::vector<YOLOX_BUFF::Object> YOLOX_BUFF::get_multicandidateboxes(cv::Mat & im
   }
 
   const float t = (cv::getTickCount() - start) / static_cast<float>(cv::getTickFrequency());
-  cv::putText(image, cv::format("FPS: %.2f", 1.0 / t), cv::Point(20, 40),
-              cv::FONT_HERSHEY_PLAIN, 2.0, cv::Scalar(255, 0, 0), 2, 8);
+  // cv::putText(image, cv::format("FPS: %.2f", 1.0 / t), cv::Point(20, 40),
+  //             cv::FONT_HERSHEY_PLAIN, 2.0, cv::Scalar(255, 0, 0), 2, 8);
 
   return results;
 }

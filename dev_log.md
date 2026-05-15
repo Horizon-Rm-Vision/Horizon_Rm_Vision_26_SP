@@ -202,7 +202,23 @@
   3.合并了NOVA_OUTPOST_V1和V2
 
 ## 
+
+#### Release Candidate 1 DEV22：
+
+- **功能更新:**
+  1.buff机制更新,yolox模式过滤已激活的扇叶
+  2.standard_serial改名为auto_aim_debug_aimer,auto_buff_debug_serial改名为auto_buff_debug_aimer
+  3.为auto_buff_debug_mpc和auto_buff_debug_aimer引入完整的新版大符支持,使用串口收发大小符模式切换,ui同步更新
+  4.为auto_buff_test引入完整新版大符支持,使用yaml控制模式
+  5.全新auto_vision_mpc模式,支持步兵/哨兵通过串口收发动态切换mpc模式的自瞄/大符/小符,为步兵/哨兵上场的标准程序
+  6.SPSREMU升级至v10版本,支持制定发送模式,支持按周期切换发送模式
+  7.cmakelists为能量机关所用识别机制引入独立开关(BUILD_BUFF),支持英雄/飞机禁用能量机关识别代码加快编译速度
+  8.修复了buff的yolox模型和aim的yolox模型重名的问题
+
+## 
+
 待开发任务：
 1.TRT推理性能进一步优化
 2.NANO简化代码模式（对应代码内的宏LIM_CODE），启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销（尤其是JETSON）,目前已将src里不需要的几个程序和DM_IMU部分的代码屏蔽
 3.分析bullet_count对火控的影响
+4.为不同的车型(英雄/哨兵/飞机/麦步/全向)设计了不同的一键编译脚本,可以不修改cmakelists直接按车型所需组件一键编译

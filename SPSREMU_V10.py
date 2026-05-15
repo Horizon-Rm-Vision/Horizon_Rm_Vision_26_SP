@@ -25,10 +25,17 @@
   扩展数据填0
 
 新的使用方法：
-python3 SPSREMU_V9.py --mode 0  --p=/dev/ttyUSB0 # 普通模式
-python3 SPSREMU_V9.py --mode 1  --p=/dev/ttyUSB0 # 只启用SR_VEL
-python3 SPSREMU_V9.py --mode 2  --p=/dev/ttyUSB0 # 只启用SENTRY_SR
-python3 SPSREMU_V9.py --mode 3  --p=/dev/ttyUSB0 # 同时启用两者
+python3 SPSREMU_V10.py --mode 0  --p=/dev/ttyUSB0 # 普通模式
+python3 SPSREMU_V10.py --mode 1  --p=/dev/ttyUSB0 # 只启用SR_VEL
+python3 SPSREMU_V10.py --mode 2  --p=/dev/ttyUSB0 # 只启用SENTRY_SR
+python3 SPSREMU_V10.py --mode 3  --p=/dev/ttyUSB0 # 同时启用两者
+
+--s 参数控制云台电控回复的 mode 字段:
+python3 SPSREMU_V10.py --s 0              # 恒定发送自瞄模式(mode=0)，默认行为
+python3 SPSREMU_V10.py --s 1              # 恒定发送小符模式(mode=1)
+python3 SPSREMU_V10.py --s 2              # 恒定发送大符模式(mode=2)
+python3 SPSREMU_V10.py --s 3              # 恒定发送空闲模式(mode=3)
+python3 SPSREMU_V10.py --s 4 -a 5         # 模式切换调试实验: 每5秒在自瞄/小符/大符之间循环切换
 """
 #除了可以两个实体串口自收自发，也可以用虚拟串口 socat -d -d pty,b115200 pty,b115200
 
@@ -79,7 +86,7 @@ class GimbalToVision:
     head: int = 0xCD
     pitch: float = 0.0
     yaw: float = 0.0
-    mode: int = 1  # 固定为自瞄模式
+    mode: int = 0  # 0=自瞄, 1=小符, 2=大符, 3=空闲
     bullet_speed: int = 150  # 模拟弹速
     # SR_VEL扩展字段
     pitch_vel: float = 0.0
@@ -94,20 +101,33 @@ class GimbalToVision:
     bullets: int = 0         # 子弹数量（uint16_t，与 gimbal.hpp 一致）
     tail: int = 0xDC
 
+# mode数值到名称的映射
+MODE_NAMES = {0: "AUTO_AIM", 1: "SMALL_BUFF", 2: "BIG_BUFF", 3: "IDLE"}
+# --s 4 循环切换的模式序列
+CYCLE_MODES = [0, 1, 2]  # 自瞄 -> 小符 -> 大符
+
 class GimbalSimulator:
     """云台模拟器"""
 
-    def __init__(self, serial_port: str = "/dev/ttyUSB0", baudrate: int = 115200, comm_mode: CommunicationMode = CommunicationMode.NORMAL):
+    def __init__(self, serial_port: str = "/dev/ttyUSB0", baudrate: int = 115200,
+                 comm_mode: CommunicationMode = CommunicationMode.NORMAL,
+                 send_mode: int = 0, switch_interval: float = 5.0):
         self.serial_port = serial_port
         self.baudrate = baudrate
         self.comm_mode = comm_mode
+        self.send_mode = send_mode  # --s 参数: 0=自瞄, 1=小符, 2=大符, 3=空闲, 4=循环切换
+        self.switch_interval = switch_interval  # 模式切换间隔(秒), 仅 send_mode=4 时有效
 
         self.ser: Optional[serial.Serial] = None
 
         # 云台状态
         self.current_pitch = 0.0
         self.current_yaw = 0.0
-        self.mode = 0  # 自瞄模式
+        self.mode = 0  # 当前实际发送的mode
+
+        # 模式切换相关 (send_mode=4)
+        self._cycle_index = 0       # 当前在 CYCLE_MODES 中的索引
+        self._cycle_start_time = 0.0  # 当前模式开始的时间
 
         # 线程控制
         self.running = False
@@ -118,7 +138,42 @@ class GimbalSimulator:
         self.rx_packet_size = self._calculate_rx_packet_size()
         self.tx_packet_size = self._calculate_tx_packet_size()
 
-        logger.info(f"初始化云台模拟器，串口: {serial_port}, 波特率: {baudrate}, 通信模式: {comm_mode.name}")
+        # 初始化 mode
+        self._init_mode()
+
+        mode_desc = MODE_NAMES.get(self.mode, "UNKNOWN")
+        if send_mode == 4:
+            logger.info(f"初始化云台模拟器，串口: {serial_port}, 波特率: {baudrate}, "
+                        f"通信模式: {comm_mode.name}, 发送模式: 循环切换(间隔{switch_interval}s)")
+        else:
+            logger.info(f"初始化云台模拟器，串口: {serial_port}, 波特率: {baudrate}, "
+                        f"通信模式: {comm_mode.name}, 发送模式: 恒定{mode_desc}")
+
+    def _init_mode(self):
+        """根据 send_mode 初始化 self.mode"""
+        if self.send_mode == 4:
+            self.mode = CYCLE_MODES[0]  # 从自瞄开始
+            self._cycle_index = 0
+            self._cycle_start_time = time.time()
+        elif self.send_mode in (0, 1, 2, 3):
+            self.mode = self.send_mode
+        else:
+            self.mode = 0  # 默认自瞄模式
+
+    def _update_cycle_mode(self):
+        """检查并更新循环模式 (仅 send_mode=4 时调用)"""
+        if self.send_mode != 4:
+            return
+
+        elapsed = time.time() - self._cycle_start_time
+        if elapsed >= self.switch_interval:
+            # 切换到下一个模式
+            self._cycle_index = (self._cycle_index + 1) % len(CYCLE_MODES)
+            old_mode = self.mode
+            self.mode = CYCLE_MODES[self._cycle_index]
+            self._cycle_start_time = time.time()
+            logger.info(f"模式切换: {MODE_NAMES[old_mode]} -> {MODE_NAMES[self.mode]} "
+                        f"(间隔{self.switch_interval}s)")
 
     def _calculate_rx_packet_size(self) -> int:
         """计算接收数据包大小（VisionToGimbal）"""
@@ -236,7 +291,7 @@ class GimbalSimulator:
                 0xCD,  # head
                 self.current_pitch,
                 self.current_yaw,
-                self.mode,  # 固定为自瞄模式
+                self.mode,  # 当前mode (由send_mode控制)
                 150,  # bullet_speed
             ]
 
@@ -345,11 +400,16 @@ class GimbalSimulator:
                 continue
 
             try:
+                # 循环切换模式下检查是否需要切换
+                self._update_cycle_mode()
+
                 # 创建并发送云台数据包
                 packet = self.create_gimbal_packet()
                 if packet:
                     self.ser.write(packet)
-                    logger.debug(f"发送云台数据 - Pitch: {self.current_pitch:.3f}, Yaw: {self.current_yaw:.3f}, 模式: {self.mode}")
+                    mode_name = MODE_NAMES.get(self.mode, "UNKNOWN")
+                    logger.debug(f"发送云台数据 - Pitch: {self.current_pitch:.3f}, Yaw: {self.current_yaw:.3f}, "
+                                 f"模式: {self.mode}({mode_name})")
 
                 # 控制发送频率
                 time.sleep(send_interval)
@@ -365,6 +425,8 @@ class GimbalSimulator:
             return False
 
         self.running = True
+        # 重置循环切换计时起点
+        self._cycle_start_time = time.time()
 
         # 启动接收线程
         self.receive_thread = threading.Thread(target=self.receive_data, daemon=True)
@@ -395,14 +457,19 @@ class GimbalSimulator:
         try:
             self.start()
 
+            mode_name = MODE_NAMES.get(self.mode, "UNKNOWN")
             print("云台模拟器运行中...")
             print("当前状态:")
             print(f"  Pitch: {self.current_pitch:.3f}")
             print(f"  Yaw: {self.current_yaw:.3f}")
-            print(f"  模式: {self.mode} (自瞄模式)")
+            print(f"  模式: {self.mode} ({mode_name})")
             print(f"  通信模式: {self.comm_mode.name}")
             print(f"  RX数据包大小: {self.rx_packet_size} 字节")
             print(f"  TX数据包大小: {self.tx_packet_size} 字节")
+            if self.send_mode == 4:
+                print(f"  发送模式: 循环切换 (间隔 {self.switch_interval}s, 序列: 自瞄->小符->大符)")
+            else:
+                print(f"  发送模式: 恒定 {mode_name}")
             print("按Ctrl+C停止")
 
             # 主循环
@@ -426,6 +493,10 @@ def main():
                        help='波特率 (默认: 115200)')
     parser.add_argument('--mode', '-m', type=int, default=0, choices=[0, 1, 2, 3],
                        help='通信模式: 0=普通模式, 1=只启用SR_VEL, 2=只启用SENTRY_SR, 3=同时启用两者 (默认: 0)')
+    parser.add_argument('--s', type=int, default=0, choices=[0, 1, 2, 3, 4],
+                       help='发送mode控制: 0=自瞄(默认), 1=小符, 2=大符, 3=空闲, 4=循环切换(需配合-a使用)')
+    parser.add_argument('-a', type=float, default=5.0,
+                       help='模式切换间隔(秒), 仅--s 4时有效 (默认: 5.0)')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='详细日志输出')
 
@@ -439,7 +510,8 @@ def main():
     comm_mode = CommunicationMode(args.mode)
 
     # 创建并运行模拟器
-    simulator = GimbalSimulator(args.port, args.baudrate, comm_mode)
+    simulator = GimbalSimulator(args.port, args.baudrate, comm_mode,
+                                send_mode=args.s, switch_interval=args.a)
     simulator.run_interactive()
 
 if __name__ == "__main__":

@@ -29,9 +29,9 @@ class Buff_Detector
 public:
   Buff_Detector(const std::string & config);
 
-  std::optional<PowerRune> detect_24(cv::Mat & bgr_img);
+  std::optional<PowerRune> detect_24(cv::Mat & bgr_img); //支持多目标的检测接口
 
-  std::optional<PowerRune> detect(cv::Mat & bgr_img);
+  std::optional<PowerRune> detect(cv::Mat & bgr_img); //只支持单目标的检测接口
 
 std::optional<PowerRune> detect_debug(cv::Mat & bgr_img, cv::Point2f v);
 

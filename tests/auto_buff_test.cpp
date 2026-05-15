@@ -7,6 +7,7 @@
 
 #include "tasks/auto_buff/buff_aimer.hpp"
 #include "tasks/auto_buff/buff_detector.hpp"
+#include "tasks/auto_buff/buff_director.hpp"
 #include "tasks/auto_buff/buff_solver.hpp"
 #include "tasks/auto_buff/buff_tracker.hpp"
 #include "tasks/auto_buff/buff_type.hpp"
@@ -46,14 +47,25 @@ int main(int argc, char * argv[])
 
   auto_buff::Buff_Detector detector(config_path);
   auto_buff::Solver solver(config_path);
-  auto_buff::BuffTracker tracker(config_path, auto_buff::BIG);
+
+  auto yaml = YAML::LoadFile(config_path);
+  std::string buff_mode_str = yaml["buff_mode"].as<std::string>("big");
+  bool is_big = (buff_mode_str == "big");
+  auto_buff::PowerRune_type buff_type = is_big ? auto_buff::BIG : auto_buff::SMALL;
+  tools::logger()->info("[auto_buff_test] buff_mode = {}", buff_mode_str);
+
+  detector.setBig2026Mode(is_big);
+
+  auto_buff::BuffTracker tracker(config_path, buff_type);
   auto_buff::Aimer aimer(config_path);
+  auto_buff::Buff2026Director director;
 
   cv::Mat img, drawing;
   auto t0 = std::chrono::steady_clock::now();
 
   io::Command last_command;
   double last_t = -1;
+  auto last_frame_time = std::chrono::steady_clock::now();
 
   video.set(cv::CAP_PROP_POS_FRAMES, start_index);
   for (int i = 0; i < start_index; i++) {
@@ -75,20 +87,36 @@ int main(int argc, char * argv[])
 
     solver.set_R_gimbal2world({w, x, y, z});
 
-    auto power_runes = detector.detect(img);
+    auto detector_start = std::chrono::steady_clock::now();
+    auto power_runes = detector.detect_24(img);
 
+    auto tracker_start = std::chrono::steady_clock::now();
     auto found = tracker.update(power_runes, timestamp, solver);
 
     auto target_copy = tracker.clone_target();
 
+    auto director_start = std::chrono::steady_clock::now();
     io::Command command = {false, false, 0, 0};
+    int blade_id = 0;
     if (found && target_copy) {
-      command = aimer.aim(*target_copy, timestamp, 22, false);
+      if (is_big) {
+        cv::Point2f image_center(img.cols / 2.0f, img.rows / 2.0f);
+        director.update(power_runes, timestamp, tracker.target(), image_center);
+        blade_id = director.getAimBladeId();
+        if (blade_id < 0) blade_id = 0;
+      }
+      command = aimer.aim(*target_copy, timestamp, 22, false, blade_id);
     }
 
-    // cboard.send(command);
+    auto finish = std::chrono::steady_clock::now();
 
     // -------------- 调试输出 --------------
+
+    tools::logger()->info(
+      "[{}] detector: {:.1f}ms, tracker: {:.1f}ms, director+aimer: {:.1f}ms", frame_count,
+      tools::delta_time(tracker_start, detector_start) * 1e3,
+      tools::delta_time(director_start, tracker_start) * 1e3,
+      tools::delta_time(finish, director_start) * 1e3);
 
     nlohmann::json data;
 
@@ -110,8 +138,15 @@ int main(int argc, char * argv[])
       auto & p = selected.value();
 
       // 显示
-      for (int i = 0; i < 4; i++) tools::draw_point(img, p.target().points[i]);
-      tools::draw_point(img, p.target().center, {0, 0, 255}, 3);
+      if (is_big) {
+        for (auto * blade : p.get_targets()) {
+          for (int i = 0; i < 4; i++) tools::draw_point(img, blade->points[i]);
+          tools::draw_point(img, blade->center, {0, 0, 255}, 3);
+        }
+      } else {
+        for (int i = 0; i < 4; i++) tools::draw_point(img, p.target().points[i]);
+        tools::draw_point(img, p.target().center, {0, 0, 255}, 3);
+      }
       tools::draw_point(img, p.r_center, {0, 0, 255}, 3);
 
       // 当前帧target更新后buff
@@ -151,6 +186,12 @@ int main(int argc, char * argv[])
         data["fi"] = x[9];
         data["spd0"] = target_ref.spd;
       }
+
+      if (is_big) {
+        data["director_state"] = static_cast<int>(director.getState());
+        data["director_completed"] = director.getCompletedGroups();
+        data["director_blade_id"] = blade_id;
+      }
     }
 
     // 云台响应情况
@@ -164,6 +205,12 @@ int main(int argc, char * argv[])
     }
 
     plotter.plot(data);
+
+    auto now = std::chrono::steady_clock::now();
+    double fps = 1.0 / tools::delta_time(now, last_frame_time);
+    last_frame_time = now;
+    tools::draw_text(
+      img, fmt::format("FPS: {:.1f}", fps), {10, 30}, {255, 0, 0});
 
     cv::imshow("result", img);
 

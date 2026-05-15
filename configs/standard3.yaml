@@ -3,7 +3,7 @@ enemy_color: "red"
 #enemy_color: "blue"
 
 #####-----自瞄神经网络模式参数-----#####
-yolo_name: yolox_ov
+yolo_name: yolov5_trt
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
@@ -12,7 +12,7 @@ yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
 yolox_ov_model_path: ../assets/best_06_02.xml
-yolox_trt_model_path: ../assets/yolox-fp16.engine
+yolox_trt_model_path: ../assets/best_06_02-fp16-ampere.engine
 yolox_svm_model_path: ../assets/svm_numbers_rbf.xml
 device: CPU
 min_confidence: 0.6
@@ -20,25 +20,25 @@ use_traditional: true
 
 #####-----yolox_ov参数-----#####
 yolox_ov:
-  use_svm: true
-  # 标签修正模式: "svm" (原HOG+SVM), "lenet" (tra模式LeNet), "resnet" (traditional_cv模式ResNet)
+  use_svm: false #此行不生效,但先不要动
+  # 标签修正模式: "svm" (华科原版HOG+SVM,目前看效果最好), "lenet" (中南传统的LeNet,效果不行), "resnet" (traditional_cv模式ResNet,效果也不行)
   label_correction_mode: "svm"
   # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
   lenet_model_path: "../assets/lenet.onnx"
   lenet_label_path: "../assets/label.txt"
-  lenet_threshold: 0.7
+  lenet_threshold: 0.5
   # ResNet模式参数 (label_correction_mode: "resnet" 时生效)
   resnet_model_path: "../assets/tiny_resnet.onnx"
 
 #####-----yolox_trt参数-----#####
 yolox_trt:
-  use_svm: true
-  # 标签修正模式: "svm" (原HOG+SVM), "lenet" (tra模式LeNet), "resnet" (traditional_cv模式ResNet)
+  use_svm: false #此行不生效,但先不要动
+  # 标签修正模式: "svm" (华科原版HOG+SVM,目前看效果最好), "lenet" (中南传统的LeNet,效果不行), "resnet" (traditional_cv模式ResNet,效果也不行)
   label_correction_mode: "svm"
   # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
   lenet_model_path: "../assets/lenet.onnx"
   lenet_label_path: "../assets/label.txt"
-  lenet_threshold: 0.7
+  lenet_threshold: 0.5
   # ResNet模式参数 (label_correction_mode: "resnet" 时生效)
   resnet_model_path: "../assets/tiny_resnet.onnx"
 
@@ -242,12 +242,22 @@ t_camera2gimbal: [0.14536664794108903, 0.047210792174469635, 0.10461993940789979
 # #R_camera2gimbal: [0.010227926370181439, -0.068247836370815107, 0.99761596937542485, -0.9997325295038072, -0.021393318744386436, 0.0087860892904833964, 0.020742684833102345, -0.99743900001143104, -0.068448391377088358]
 # #t_camera2gimbal: [0.13581761689413138, 0.012348126218333725, 0.066730865526566735]
 
-#####-----能量机关神经网络参数-----#####
+#####-----BUFF神经网络参数-----#####
 model: ../assets/yolo11_buff_int8.xml  # YOLO11 buff检测模型路径
 yolox_model: ../assets/yolox_rune_3.6m.xml  # YOLOX buff检测模型路径（移植ROS版）
+buff_yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-ampere.engine  # YOLOX TRT buff检测模型路径（TensorRT引擎文件）
 
-#####-----能量机关检测器模式-----#####
-detector_mode: "yolox"  # 检测器模式: "yolo11" 或 "yolox"
+#####-----检测器模式-----#####
+detector_mode: "yolox_ov"  # 检测器模式: "yolo11" / "yolox_ov" / "yolox_trt"
+
+#####-----buff检测参数-----#####
+confidence_threshold: 0.7  # 置信度阈值
+iou_threshold: 0.4  # NMS的IOU阈值
+lose_max: 20  # 最大丢失帧数
+
+#####-----R标签检测参数（移植自ROS版）-----#####
+detect_r_tag: true  # 是否使用传统视觉方法检测R标中心
+binary_thresh: 100  # 二值化阈值（用于R标检测）
 
 #####-----buff tracker参数-----#####
 buff_tracker:
@@ -279,7 +289,7 @@ ui:
   imshow: true
   web:
     enabled: true
-    host: "192.168.1.241"
+    host: "192.168.1.167"
     port: 9876
     send_image: true
     image_quality: 75

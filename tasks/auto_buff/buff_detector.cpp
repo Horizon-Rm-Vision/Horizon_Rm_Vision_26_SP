@@ -9,13 +9,13 @@ Buff_Detector::Buff_Detector(const std::string & config)
 {
   auto yaml = YAML::LoadFile(config);
   std::string mode_str = yaml["detector_mode"].as<std::string>("yolo11");
-  if (mode_str == "yolox") {
+  if (mode_str == "yolox_ov") {
 #ifdef USE_OPENVINO
     mode_ = YOLOX_MODE;
-    tools::logger()->info("[Buff_Detector] Using YOLOX mode");
+    tools::logger()->info("[Buff_Detector] Using YOLOX OV mode");
     MODE_YOLOX_ = std::make_unique<YOLOX_BUFF>(config);
 #else
-    tools::logger()->error("[Buff_Detector] YOLOX mode requires OpenVINO (USE_OPENVINO=OFF)");
+    tools::logger()->error("[Buff_Detector] YOLOX OV mode requires OpenVINO (USE_OPENVINO=OFF)");
 #endif
   } else if (mode_str == "yolox_trt") {
 #ifdef USE_CUDA
@@ -226,6 +226,15 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
       return std::nullopt;
     }
 
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    results.erase(std::remove_if(results.begin(), results.end(),
+                                 [](const auto & obj) { return obj.label == 1; }),
+                  results.end());
+    if (results.empty()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
     /// 提取原始r_center（用于detectRTag）, 构建FanBlade
 
     std::vector<cv::Point2f> raw_r_centers;
@@ -285,6 +294,15 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
 
     /// 处理未获得的情况
 
+    if (results.empty()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    results.erase(std::remove_if(results.begin(), results.end(),
+                                 [](const auto & obj) { return obj.label == 1; }),
+                  results.end());
     if (results.empty()) {
       handle_lose();
       return std::nullopt;
@@ -392,6 +410,15 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
       return std::nullopt;
     }
 
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    results.erase(std::remove_if(results.begin(), results.end(),
+                                 [](const auto & obj) { return obj.label == 1; }),
+                  results.end());
+    if (results.empty()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
     /// 取置信度最高的结果
     std::sort(results.begin(), results.end(),
               [](const YOLOX_BUFF_TRT::Object & a, const YOLOX_BUFF_TRT::Object & b) {
@@ -451,6 +478,15 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
 
     std::vector<YOLOX_BUFF::Object> results = MODE_YOLOX_->get_multicandidateboxes(bgr_img);
 
+    if (results.empty()) {
+      handle_lose();
+      return std::nullopt;
+    }
+
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    results.erase(std::remove_if(results.begin(), results.end(),
+                                 [](const auto & obj) { return obj.label == 1; }),
+                  results.end());
     if (results.empty()) {
       handle_lose();
       return std::nullopt;
@@ -558,6 +594,12 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
 
     if (results.empty()) return std::nullopt;
 
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    results.erase(std::remove_if(results.begin(), results.end(),
+                                 [](const auto & obj) { return obj.label == 1; }),
+                  results.end());
+    if (results.empty()) return std::nullopt;
+
     /// 提取原始r_center, 构建FanBlades
 
     std::vector<cv::Point2f> raw_r_centers;
@@ -614,6 +656,12 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
 
     std::vector<YOLOX_BUFF::Object> results = MODE_YOLOX_->get_multicandidateboxes(bgr_img);
 
+    if (results.empty()) return std::nullopt;
+
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    results.erase(std::remove_if(results.begin(), results.end(),
+                                 [](const auto & obj) { return obj.label == 1; }),
+                  results.end());
     if (results.empty()) return std::nullopt;
 
     /// 提取原始r_center, 构建FanBlades

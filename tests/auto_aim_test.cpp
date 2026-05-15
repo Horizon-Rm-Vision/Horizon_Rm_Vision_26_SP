@@ -57,6 +57,7 @@ int main(int argc, char * argv[])
   auto_aim::Target last_target;
   io::Command last_command;
   double last_t = -1;
+  auto last_frame_time = std::chrono::steady_clock::now();
 
   video.set(cv::CAP_PROP_POS_FRAMES, start_index);
   for (int i = 0; i < start_index; i++) {
@@ -202,6 +203,13 @@ int main(int argc, char * argv[])
   
 
     cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
+
+    auto now = std::chrono::steady_clock::now();
+    double fps = 1.0 / tools::delta_time(now, last_frame_time);
+    last_frame_time = now;
+    tools::draw_text(
+      img, fmt::format("FPS: {:.1f}", fps), {10, 30}, {255, 0, 0});
+
     cv::imshow("reprojection", img);
     auto key = cv::waitKey(30);
     if (key == 'q') break;

@@ -7,7 +7,7 @@ namespace auto_buff
 YOLOX_BUFF_TRT::YOLOX_BUFF_TRT(const std::string & config)
 {
   auto yaml = YAML::LoadFile(config);
-  std::string model_path = yaml["yolox_trt_model_path"].as<std::string>();
+  std::string model_path = yaml["buff_yolox_trt_model_path"].as<std::string>();
   conf_threshold_ = yaml["confidence_threshold"].as<float>(0.7f);
   nms_threshold_ = yaml["iou_threshold"].as<float>(0.4f);
 
@@ -313,8 +313,8 @@ std::vector<YOLOX_BUFF_TRT::Object> YOLOX_BUFF_TRT::get_multicandidateboxes(cv::
   }
 
   const float t = (cv::getTickCount() - start) / static_cast<float>(cv::getTickFrequency());
-  cv::putText(image, cv::format("FPS: %.2f", 1.0 / t), cv::Point(20, 40),
-              cv::FONT_HERSHEY_PLAIN, 2.0, cv::Scalar(255, 0, 0), 2, 8);
+  // cv::putText(image, cv::format("FPS: %.2f", 1.0 / t), cv::Point(20, 40),
+  //             cv::FONT_HERSHEY_PLAIN, 2.0, cv::Scalar(255, 0, 0), 2, 8);
 
   return results;
 }
