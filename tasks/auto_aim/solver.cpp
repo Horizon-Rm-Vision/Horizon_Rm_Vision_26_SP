@@ -28,15 +28,18 @@ Solver::Solver(const std::string & config_path) : R_gimbal2world_(Eigen::Matrix3
 {
   auto yaml = YAML::LoadFile(config_path);
 
-  auto R_gimbal2imubody_data = yaml["R_gimbal2imubody"].as<std::vector<double>>();
-  auto R_camera2gimbal_data = yaml["R_camera2gimbal"].as<std::vector<double>>();
-  auto t_camera2gimbal_data = yaml["t_camera2gimbal"].as<std::vector<double>>();
+  auto camera_param_path = yaml["camera_param_path"].as<std::string>("");
+  auto calib_yaml = camera_param_path.empty() ? yaml : YAML::LoadFile(camera_param_path);
+
+  auto R_gimbal2imubody_data = calib_yaml["R_gimbal2imubody"].as<std::vector<double>>();
+  auto R_camera2gimbal_data = calib_yaml["R_camera2gimbal"].as<std::vector<double>>();
+  auto t_camera2gimbal_data = calib_yaml["t_camera2gimbal"].as<std::vector<double>>();
   R_gimbal2imubody_ = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>(R_gimbal2imubody_data.data());
   R_camera2gimbal_ = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>(R_camera2gimbal_data.data());
   t_camera2gimbal_ = Eigen::Matrix<double, 3, 1>(t_camera2gimbal_data.data());
 
-  auto camera_matrix_data = yaml["camera_matrix"].as<std::vector<double>>();
-  auto distort_coeffs_data = yaml["distort_coeffs"].as<std::vector<double>>();
+  auto camera_matrix_data = calib_yaml["camera_matrix"].as<std::vector<double>>();
+  auto distort_coeffs_data = calib_yaml["distort_coeffs"].as<std::vector<double>>();
   Eigen::Matrix<double, 3, 3, Eigen::RowMajor> camera_matrix(camera_matrix_data.data());
   Eigen::Matrix<double, 1, 5> distort_coeffs(distort_coeffs_data.data());
   cv::eigen2cv(camera_matrix, camera_matrix_);

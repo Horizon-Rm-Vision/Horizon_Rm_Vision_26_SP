@@ -57,16 +57,14 @@ private:
 
   #ifdef NOVA_AIM_CENTER
   bool track_center_;
-  bool track_center_outpost_ = false;
   bool center_tracked_ = false;
   double aim_center_palstance_threshold_;
   double switch_trackmode_threshold_;
   double aim_center_angle_tolerance_;
-  double aim_center_angle_tolerance_outpost_;
   #endif
 
   AimPoint choose_aim_point(const Target & target);
-
+  
   #ifdef NOVA_AIM_CENTER
   Eigen::Vector4d compute_facing_armor(const Target & target) const;
   #endif

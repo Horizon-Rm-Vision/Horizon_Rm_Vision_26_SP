@@ -27,7 +27,7 @@ ui:
   web:
     enabled: true
     host: "<接收端电脑IP>" #在接收端使用命令:ip -4 addr 获得接收端ip,示例:"192.168.1.75"
-    port: 9876
+    port: 9878
 ```
 
 > 说明：`enabled: false` 可关闭本机UI绘制与窗口显示，仅保留数据采集与发送。

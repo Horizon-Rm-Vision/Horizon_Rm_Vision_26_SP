@@ -193,22 +193,9 @@ void Target::predict(double dt)
     return x_prior;
   };
 
-  #ifndef NOVA_AIM_CENTER
   // 前哨站转速特判
   if (this->convergened() && this->name == ArmorName::outpost && std::abs(this->ekf_.x[7]) > 2)
     this->ekf_.x[7] = this->ekf_.x[7] > 0 ? 2.51 : -2.51;
-  #endif
-
-  #ifdef NOVA_AIM_CENTER
-  // 前哨站转速分级钳位 (WMJ-style tiered clamping)
-  if (this->convergened() && this->name == ArmorName::outpost) {
-    double abs_w = std::abs(this->ekf_.x[7]);
-    if (abs_w < 1.65)
-      this->ekf_.x[7] = (this->ekf_.x[7] > 0) ? 1.25 : -1.25;
-    else if (abs_w > 2.1)
-      this->ekf_.x[7] = (this->ekf_.x[7] > 0) ? 2.5 : -2.5;
-  }
-  #endif
 
   ekf_.predict(F, Q, f);
 }

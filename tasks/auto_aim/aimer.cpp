@@ -40,16 +40,9 @@ Aimer::Aimer(const std::string & config_path)
 
   #ifdef NOVA_AIM_CENTER
   track_center_ = yaml["track_center"].as<bool>();
-  track_center_outpost_ =
-    yaml["track_center_outpost"] ? yaml["track_center_outpost"].as<bool>() : false;
   aim_center_palstance_threshold_ = yaml["aim_center_palstance_threshold"].as<double>();
   switch_trackmode_threshold_ = yaml["switch_trackmode_threshold"].as<double>();
   aim_center_angle_tolerance_ = yaml["aim_center_angle_tolerance"].as<double>() / 57.3;  // degree to rad
-  aim_center_angle_tolerance_outpost_ =
-    (yaml["aim_center_angle_tolerance_outpost"]
-       ? yaml["aim_center_angle_tolerance_outpost"].as<double>()
-       : 3.0) /
-    57.3;  // degree to rad
   #endif
 }
 
@@ -219,17 +212,10 @@ AimPoint Aimer::choose_aim_point(const Target & target)
   auto center_yaw = std::atan2(ekf_x[2], ekf_x[0]);
 
   #ifdef NOVA_AIM_CENTER
-  // 判断是否锁中心
-  if (track_center_ && (track_center_outpost_ || target.name != ArmorName::outpost)) {
-    if (target.name == ArmorName::outpost && track_center_outpost_) {
-      // 前哨站: EKF收敛后直接进入锁中心, 不依赖转速阈值
-      center_tracked_ = const_cast<Target&>(target).convergened() ||
-        ((std::abs(ekf_x[7]) - switch_trackmode_threshold_) > aim_center_palstance_threshold_);
-    } else {
-      // 普通目标: 必须超过转速阈值
-      center_tracked_ =
-        ((std::abs(ekf_x[7]) - switch_trackmode_threshold_) > aim_center_palstance_threshold_);
-    }
+  // 判断是否锁中心（前哨站禁用锁中心）
+  if (track_center_ && target.name != ArmorName::outpost &&
+      ((std::abs(ekf_x[7]) - switch_trackmode_threshold_) > aim_center_palstance_threshold_)) {
+    center_tracked_ = true;
   } else {
     center_tracked_ = false;
   }
@@ -311,9 +297,7 @@ bool Aimer::check_center_fire(const Target & target) const
     if (delta < min_delta) min_delta = delta;
   }
 
-  double tolerance = (target.name == ArmorName::outpost) ? aim_center_angle_tolerance_outpost_
-                                                       : aim_center_angle_tolerance_;
-  return min_delta < tolerance;
+  return min_delta < aim_center_angle_tolerance_;
 }
 #endif
 

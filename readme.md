@@ -62,7 +62,7 @@ ui:
     web:
         enabled: true
         host: "<接收端电脑IP>" #在接收端使用命令:ip -4 addr 获得接收端ip,示例:"192.168.1.75"
-        port: 9876
+        port: 9878
 ```
 
 调试端启动接收程序：
@@ -70,7 +70,7 @@ ui:
 ```bash
 cd web_ui_receiver
 pip install -r requirements.txt
-python receiver.py --host 0.0.0.0 --port 9876
+python3 receiver.py --host 0.0.0.0 --port 9878
 ```
 
 Plotter 曲线也会通过同一端口发送并在调试端额外打开 `Plotter` 窗口。

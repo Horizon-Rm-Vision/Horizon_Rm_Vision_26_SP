@@ -297,9 +297,10 @@ int main(int argc, char * argv[])
                           gs.ally_outpost_hp, gs.state, gs.energy_state, gs.bullets);
       #endif
 
-      // ---- Plotter (自瞄) ----
+      // ---- Plotter + UI (自瞄, 合并以消除重复 planner.plan() 调用) ----
       {
         std::optional<auto_aim::Target> target_opt = target_queue.front();
+        bool has_target = target_opt.has_value();
         auto plan = planner.plan(target_opt, gs.bullet_speed);
 
         plotter.subplot("Yaw", {gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI},
@@ -307,13 +308,6 @@ int main(int argc, char * argv[])
         plotter.subplot("Pitch", {gs.pitch * 180/M_PI, plan.target_pitch * 180/M_PI, plan.pitch * 180/M_PI},
                         {"gimbal_pitch", "target_pitch", "plan_pitch"});
         plotter.draw();
-      }
-
-      // ---- UI (自瞄) ----
-      {
-        std::optional<auto_aim::Target> target_opt = target_queue.front();
-        bool has_target = target_opt.has_value();
-        auto plan = planner.plan(target_opt, gs.bullet_speed);
 
         ui_manager.initialize(img);
 

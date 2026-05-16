@@ -21,7 +21,7 @@ use_traditional: true
 yolox_ov:
   use_svm: false #此行不生效,但先不要动
   # 标签修正模式: "svm" (华科原版HOG+SVM,目前看效果最好), "lenet" (中南传统的LeNet,效果不行), "resnet" (traditional_cv模式ResNet,效果也不行)
-  label_correction_mode: "svm"
+  label_correction_mode: "lenet"
   # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
   lenet_model_path: "../assets/lenet.onnx"
   lenet_label_path: "../assets/label.txt"
@@ -194,12 +194,10 @@ predict_time: 0.150     # s
 ballistic_model: "no_drag"
 
 #####-----锁中心参数-----#####
-track_center: true  # 是否启用锁中心模式
-track_center_outpost: false  # 是否对前哨站启用锁中心模式
+track_center: false  # 是否启用锁中心模式
 aim_center_palstance_threshold: 6.5  # 锁中心角速度阈值，弧度制
 switch_trackmode_threshold: 1.2  # 切换锁中心模式的角速度偏移，弧度制
 aim_center_angle_tolerance: 1  # 锁中心自动击发角度容差，角度制
-aim_center_angle_tolerance_outpost: 3  # 前哨站锁中心自动击发角度容差，角度制
 
 #####-----UI显示配置-----#####
 ui:

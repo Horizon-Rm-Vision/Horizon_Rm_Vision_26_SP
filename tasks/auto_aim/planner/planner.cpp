@@ -35,17 +35,10 @@ Planner::Planner(const std::string & config_path)
 
   #ifdef NOVA_AIM_CENTER
   track_center_ = tools::read<bool>(yaml, "track_center");
-  track_center_outpost_ =
-    yaml["track_center_outpost"] ? yaml["track_center_outpost"].as<bool>() : false;
   aim_center_palstance_threshold_ = tools::read<double>(yaml, "aim_center_palstance_threshold");
   switch_trackmode_threshold_ = tools::read<double>(yaml, "switch_trackmode_threshold");
   aim_center_angle_tolerance_ = tools::read<double>(yaml, "aim_center_angle_tolerance") / 57.3;
-  aim_center_angle_tolerance_outpost_ =
-    (yaml["aim_center_angle_tolerance_outpost"]
-       ? yaml["aim_center_angle_tolerance_outpost"].as<double>()
-       : 3.0) /
-    57.3;
-    #endif
+  #endif
 }
 
 Plan Planner::plan(Target target, double bullet_speed)
@@ -56,18 +49,11 @@ Plan Planner::plan(Target target, double bullet_speed)
   }
 
   #ifdef NOVA_AIM_CENTER
-  // 0.5 判断是否锁中心
+  // 0.5 判断是否锁中心（前哨站禁用锁中心）
   auto ekf_x = target.ekf_x();
-  if (track_center_ && (track_center_outpost_ || target.name != ArmorName::outpost)) {
-    if (target.name == ArmorName::outpost && track_center_outpost_) {
-      // 前哨站: EKF收敛后直接进入锁中心, 不依赖转速阈值
-      center_tracked_ = target.convergened() ||
-        ((std::abs(ekf_x[7]) - switch_trackmode_threshold_) > aim_center_palstance_threshold_);
-    } else {
-      // 普通目标: 必须超过转速阈值
-      center_tracked_ =
-        ((std::abs(ekf_x[7]) - switch_trackmode_threshold_) > aim_center_palstance_threshold_);
-    }
+  if (track_center_ && target.name != ArmorName::outpost &&
+      ((std::abs(ekf_x[7]) - switch_trackmode_threshold_) > aim_center_palstance_threshold_)) {
+    center_tracked_ = true;
   } else {
     center_tracked_ = false;
   }
@@ -172,9 +158,7 @@ Plan Planner::plan(Target target, double bullet_speed)
       auto delta = std::abs(tools::limit_rad(xyza[3] - center_yaw));
       if (delta < min_delta) min_delta = delta;
     }
-    double tolerance = (target.name == ArmorName::outpost) ? aim_center_angle_tolerance_outpost_
-                                                         : aim_center_angle_tolerance_;
-    if (min_delta >= tolerance) {
+    if (min_delta >= aim_center_angle_tolerance_) {
       plan.fire = false;
     }
   }

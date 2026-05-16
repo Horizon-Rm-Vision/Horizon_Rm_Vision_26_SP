@@ -558,7 +558,7 @@ def run_receiver(host: str, port: int, window_name: str, shm_path: Optional[str]
 def main() -> None:
     parser = argparse.ArgumentParser(description="Web UI receiver for Horizon_Rm_Vision_26_SP")
     parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=9876)
+    parser.add_argument("--port", type=int, default=9878)
     parser.add_argument("--window", default="Web UI Receiver")
     parser.add_argument("--shm-path", default=None,
                         help="Path to shared memory frame (default: /dev/shm/nova_cam_frame)")

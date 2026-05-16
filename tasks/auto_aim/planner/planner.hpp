@@ -54,14 +54,12 @@ private:
   enum class BallisticModel { kNoDrag, kHero };
   BallisticModel ballistic_model_ = BallisticModel::kNoDrag;
 
-  #ifdef NOVA_AIM_CENTER
+#ifdef NOVA_AIM_CENTER
   bool track_center_;
-  bool track_center_outpost_ = false;
   bool center_tracked_ = false;
   double aim_center_palstance_threshold_;
   double switch_trackmode_threshold_;
   double aim_center_angle_tolerance_;
-  double aim_center_angle_tolerance_outpost_;
   #endif
 
   TinySolver * yaw_solver_;

@@ -57,7 +57,7 @@ private:
   sockaddr_in web_destination_{};
   bool web_enabled_{false};
   std::string web_host_{"127.0.0.1"};
-  uint16_t web_port_{9876};
+  uint16_t web_port_{9878};
 
   // 曲线绘制相关函数和变量
   void setPlotSize(int width, int height, int max_points);
