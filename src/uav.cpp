@@ -63,6 +63,7 @@ int main(int argc, char * argv[])
 
   auto mode = io::Mode::idle;
   auto last_mode = io::Mode::idle;
+  auto last_t = std::chrono::steady_clock::now();
 
   while (!exiter.exit()) {
     camera.read(img, t);
@@ -114,6 +115,11 @@ int main(int argc, char * argv[])
 
     else
       continue;
+
+    auto now = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration<double>(now - last_t).count();
+    last_t = now;
+    tools::logger()->info("[FPS] {:.1f}", 1.0 / dt);
   }
 
   return 0;

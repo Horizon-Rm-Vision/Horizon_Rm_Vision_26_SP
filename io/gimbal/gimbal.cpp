@@ -262,16 +262,16 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
     return;
   }
   
-  // 使用局部变量记录发送的数据内容
-  tools::logger()->debug("[Gimbal] Sending data - Mode: {}, Pitch: {:.3f}, Yaw: {:.3f}",
-                        mode, pitch, yaw);
+  // // 使用局部变量记录发送的数据内容
+  // tools::logger()->debug("[Gimbal] Sending data - Mode: {}, Pitch: {:.3f}, Yaw: {:.3f}",
+  //                       mode, pitch, yaw);
   
   ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
   if (bytes_written != sizeof(tx_data_)) {
     tools::logger()->warn("[Gimbal] Failed to write serial, expected {} bytes, got {} bytes, error: {}",
                          sizeof(tx_data_), bytes_written, strerror(errno));
   } else {
-    tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
+    //tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
   }
 }
 
@@ -316,15 +316,15 @@ void Gimbal::send(
   
   // 使用局部变量记录发送的数据内容
   std::string mode_str = control ? (fire ? "CONTROL_FIRE" : "CONTROL_NO_FIRE") : "NO_CONTROL";
-  tools::logger()->debug("[Gimbal] Sending data - Mode: {} ({}), Pitch: {:.3f}, Yaw: {:.3f}",
-                        mode_str, mode, -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI));
+  // tools::logger()->debug("[Gimbal] Sending data - Mode: {} ({}), Pitch: {:.3f}, Yaw: {:.3f}",
+  //                       mode_str, mode, -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI));
   
   ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
   if (bytes_written != sizeof(tx_data_)) {
     tools::logger()->warn("[Gimbal] Failed to write serial, expected {} bytes, got {} bytes, error: {}",
                          sizeof(tx_data_), bytes_written, strerror(errno));
   } else {
-    tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
+    //tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
     
     // // 记录发送原始数据
     // tools::logger()->trace("[Gimbal] Raw TX data: {}", 
@@ -381,15 +381,15 @@ void Gimbal::send(
   
   // 使用局部变量记录发送的数据内容
   std::string mode_str = control ? (fire ? "CONTROL_FIRE" : "CONTROL_NO_FIRE") : "NO_CONTROL";
-  tools::logger()->debug("[Gimbal] Sending data - Mode: {} ({}), Pitch: {:.3f}, Yaw: {:.3f}",
-                        mode_str, mode, -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI));
+  // tools::logger()->debug("[Gimbal] Sending data - Mode: {} ({}), Pitch: {:.3f}, Yaw: {:.3f}",
+  //                       mode_str, mode, -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI));
   
   ssize_t bytes_written = write(fd_, &tx_data_, sizeof(tx_data_));
   if (bytes_written != sizeof(tx_data_)) {
     tools::logger()->warn("[Gimbal] Failed to write serial, expected {} bytes, got {} bytes, error: {}",
                          sizeof(tx_data_), bytes_written, strerror(errno));
   } else {
-    tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
+    //tools::logger()->debug("[Gimbal] Successfully sent {} bytes to gimbal", bytes_written);
     
     // // 记录发送原始数据
     // tools::logger()->trace("[Gimbal] Raw TX data: {}", 
@@ -402,9 +402,9 @@ void Gimbal::send(
 // 自瞄从电控读取数据
 void Gimbal::read_thread()
 {
-  // 统计接收fps,用不到时注释上
-  auto fps_start = std::chrono::steady_clock::now();
-  int fps_count = 0;
+  // // 统计接收fps,用不到时注释上
+  // auto fps_start = std::chrono::steady_clock::now();
+  // int fps_count = 0;
   
   tools::logger()->info("[Gimbal] read_thread started.");
   int error_count = 0;
@@ -450,9 +450,9 @@ void Gimbal::read_thread()
       continue;
     }
     
-    // 记录原始接收数据
-    tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}", 
-                          bytes_read, packet_to_hex(buffer + data_index, bytes_read));
+    // // 记录原始接收数据
+    // tools::logger()->trace("[Gimbal] Received {} bytes raw data: {}", 
+    //                       bytes_read, packet_to_hex(buffer + data_index, bytes_read));
     
     data_index += bytes_read;
     
@@ -477,9 +477,9 @@ void Gimbal::read_thread()
       // Copy valid packet
       std::memcpy(&rx_data_, buffer + i, packet_size);
       
-      // 记录原始数据包
-      tools::logger()->debug("[Gimbal] Found complete packet at offset {}, raw: {}",
-                            i, packet_to_hex(buffer + i, packet_size));
+      // // 记录原始数据包
+      // tools::logger()->debug("[Gimbal] Found complete packet at offset {}, raw: {}",
+      //                       i, packet_to_hex(buffer + i, packet_size));
       
       // 复制到局部变量以避免packed结构体引用问题
       uint8_t mode_raw = rx_data_.mode;
@@ -507,6 +507,7 @@ void Gimbal::read_thread()
       uint8_t state = rx_data_.state;
       uint8_t energy_state = rx_data_.energy_state;
       uint16_t bullets = rx_data_.bullets;
+      uint8_t judge = rx_data_.judge;
       #endif
       // 使用yaw和pitch计算四元数（roll设为0）
       //单位转换
@@ -525,15 +526,15 @@ void Gimbal::read_thread()
       if (mode <= 3) {
         queue_.push({q, t});
         
-        //fps统计,用不到时注释上
-        fps_count++;
-        auto fps_now = std::chrono::steady_clock::now();
-        std::chrono::duration<double> fps_elapsed = fps_now - fps_start;
-        if (fps_elapsed.count() >= 1.0) {
-          tools::logger()->warn("[Gimbal] push fps: {}", fps_count);
-          fps_count = 0;
-          fps_start = fps_now;
-        }
+        // //fps统计,用不到时注释上
+        // fps_count++;
+        // auto fps_now = std::chrono::steady_clock::now();
+        // std::chrono::duration<double> fps_elapsed = fps_now - fps_start;
+        // if (fps_elapsed.count() >= 1.0) {
+        //   tools::logger()->warn("[Gimbal] push fps: {}", fps_count);
+        //   fps_count = 0;
+        //   fps_start = fps_now;
+        // }
         
         //传入数值给state_，供外部调用
         {
@@ -562,6 +563,7 @@ void Gimbal::read_thread()
             state_.state = state;
             state_.energy_state = energy_state;
             state_.bullets = bullets;
+            state_.judge = judge;
             #endif
         }
             //本次接收前后模式变化记录日志
@@ -584,12 +586,12 @@ void Gimbal::read_thread()
                 break;
             }
         
-            // 使用局部变量记录解析后的数据内容
-            tools::logger()->info("[Gimbal] Parsed read data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
-                                 "BulletSpeed: {}, SelfColor: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
-                                 str(old_mode), str(mode_), -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI), bullet_speed, 
-                                 static_cast<int>(g_last_self_color.load(std::memory_order_relaxed)),
-                                 q.w(), q.x(), q.y(), q.z());
+            // // 使用局部变量记录解析后的数据内容
+            // tools::logger()->info("[Gimbal] Parsed read data - Mode: {}->{}, Pitch: {:.3f}, Yaw: {:.3f}, "
+            //                      "BulletSpeed: {}, SelfColor: {}, Quaternion: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
+            //                      str(old_mode), str(mode_), -pitch * (180.0 / M_PI), -yaw * (180.0 / M_PI), bullet_speed, 
+            //                      static_cast<int>(g_last_self_color.load(std::memory_order_relaxed)),
+            //                      q.w(), q.x(), q.y(), q.z());
         
         error_count = 0;
       } else {

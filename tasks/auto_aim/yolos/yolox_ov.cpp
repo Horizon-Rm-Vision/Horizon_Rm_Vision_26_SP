@@ -695,9 +695,9 @@ YOLOX_OV::YOLOX_OV(const std::string & config_path, bool debug)
   device_ = yaml["device"].as<std::string>();
   min_confidence_ = yaml["min_confidence"].as<double>();
 
-  // Optional YOLOX-specific params
-  if (yaml["yolox_ov"]) {
-    auto yx = yaml["yolox_ov"];
+  // Optional YOLOX-specific params (shared yolox section for both ov and trt)
+  if (yaml["yolox"]) {
+    auto yx = yaml["yolox"];
     if (yx["input_width"]) input_w_ = yx["input_width"].as<int>();
     if (yx["input_height"]) input_h_ = yx["input_height"].as<int>();
     if (yx["num_classes"]) num_classes_ = yx["num_classes"].as<int>();
@@ -707,7 +707,6 @@ YOLOX_OV::YOLOX_OV(const std::string & config_path, bool debug)
     if (yx["nms_thresh"]) nms_thresh_ = yx["nms_thresh"].as<float>();
     if (yx["merge_conf_error"]) merge_conf_error_ = yx["merge_conf_error"].as<float>();
     if (yx["merge_min_iou"]) merge_min_iou_ = yx["merge_min_iou"].as<float>();
-    if (yx["use_svm"]) use_svm_ = yx["use_svm"].as<bool>();
     if (yx["label_correction_mode"])
       label_correction_mode_ = yx["label_correction_mode"].as<std::string>();
     if (yx["lenet_model_path"])
@@ -720,9 +719,9 @@ YOLOX_OV::YOLOX_OV(const std::string & config_path, bool debug)
       resnet_model_path_ = yx["resnet_model_path"].as<std::string>();
   }
 
-  // If no label_correction_mode specified, derive from use_svm_ for backward compat
-  if (label_correction_mode_.empty()) {
-    label_correction_mode_ = use_svm_ ? "svm" : "none";
+  // "none" or empty/missing disables label correction
+  if (label_correction_mode_.empty() || label_correction_mode_ == "none") {
+    label_correction_mode_.clear();
   }
 
   // ROI
@@ -839,17 +838,26 @@ std::list<Armor> YOLOX_OV::parse(
   // Class ID to YOLOV5-style num_id mapping.
   // SVM: 0=Undef, 1=Hero, 2=Eng, 3/4/5=Inf, 6=Sentry, 7=Outpost, 8=Base
   // YOLOX cls: 0=Sentry, 1=Hero, 2=Eng, 3/4/5=Inf, 6=Outpost, 7=Base
-  // num_id: -1=skip, 0=Sentry, 1=Hero, 2=Eng, 3/4/5=Inf, 6=Outpost, 7=Base
+  // num_id encoding (YOLOV5 constructor): 0=Sentry, 1=Hero, 2=Eng,
+  //   3/4/5=Inf, 6=Outpost, 7=Base
+  // ArmorName enum: one=0, two=1, three=2, four=3, five=4,
+  //   sentry=5, outpost=6, base=7, not_armor=8
   static const int svm_to_num_id[] = {-1, 1, 2, 3, 4, 5, 0, 6, 7};
   static const int yolox_cls_to_num_id[] = {0, 1, 2, 3, 4, 5, 6, 7};
+  // ArmorName enum → YOLOV5 num_id (reverse of constructor's name mapping)
+  static const int armor_name_to_num_id[] = {1, 2, 3, 4, 5, 0, 6, 7, -1};
+  //                                          one two thr fou fiv sen out bas not_armor
 
   std::list<Armor> armors;
 
   for (auto & object : objects) {
-    // Build sorted keypoints from apex (TL, TR, BR, BL order)
+    // Build keypoints from apex in TL, TR, BR, BL order.
+    // YOLOX model outputs corners clockwise from TL:
+    //   apex[0]=TL, apex[1]=BL, apex[2]=BR, apex[3]=TR
+    // Reorder via Hero_Aim convention (swap apex[1]↔apex[3]):
+    //   {apex[0], apex[3], apex[2], apex[1]} = {TL, TR, BR, BL}
     std::vector<cv::Point2f> keypoints = {
-      object.apex[0], object.apex[1], object.apex[2], object.apex[3]};
-    sort_keypoints(keypoints);
+      object.apex[0], object.apex[3], object.apex[2], object.apex[1]};
 
     int num_id = -1, svm_class = -1;
     double cls_confidence = object.prob;
@@ -870,18 +878,20 @@ std::list<Armor> YOLOX_OV::parse(
       if (name == ArmorName::not_armor) continue;
       if (conf < lenet_classifier_->threshold) continue;
 
-      // Type-matching rules from NumberClassifier::eraseIgnoreClasses
-      ArmorType determined_type = ArmorType::small;
+      // Type-matching rules from NumberClassifier::eraseIgnoreClasses.
+      // Determine expected type from LeNet-predicted name (Hero→big, others→small),
+      // matching the type override logic applied downstream.
+      ArmorType determined_type =
+        (name == ArmorName::one) ? ArmorType::big : ArmorType::small;
       if (determined_type == ArmorType::big) {
-        if (name == ArmorName::outpost || name == ArmorName::two || name == ArmorName::sentry || name == ArmorName::base)
+        if (name == ArmorName::outpost || name == ArmorName::two ||
+            name == ArmorName::sentry || name == ArmorName::base)
           continue;
       } else {
-        if (name == ArmorName::one)
-          continue;
+        if (name == ArmorName::one) continue;
       }
 
-      num_id = static_cast<int>(name);
-      svm_class = (name == ArmorName::base) ? 8 : 1;
+      num_id = armor_name_to_num_id[static_cast<int>(name)];
       cls_confidence = conf;
     } else if (label_correction_mode_ == "resnet") {
       // ---- ResNet label correction (traditional_cv mode) ----
@@ -890,8 +900,18 @@ std::list<Armor> YOLOX_OV::parse(
 
       if (name == ArmorName::not_armor) continue;
 
-      num_id = static_cast<int>(name);
-      svm_class = (name == ArmorName::base) ? 8 : 1;
+      // Type-matching rules (same as LeNet path for consistency)
+      ArmorType determined_type =
+        (name == ArmorName::one) ? ArmorType::big : ArmorType::small;
+      if (determined_type == ArmorType::big) {
+        if (name == ArmorName::outpost || name == ArmorName::two ||
+            name == ArmorName::sentry || name == ArmorName::base)
+          continue;
+      } else {
+        if (name == ArmorName::one) continue;
+      }
+
+      num_id = armor_name_to_num_id[static_cast<int>(name)];
       cls_confidence = conf;
     } else {
       // ---- No label correction (use YOLOX built-in class) ----
@@ -933,8 +953,12 @@ std::list<Armor> YOLOX_OV::parse(
       armor.class_id = -1;
     }
 
-    // Override type: only Base (svm_class 8) is big in SP convention
-    armor.type = (svm_class == 1) ? ArmorType::big : ArmorType::small;
+    // Type based on armor name, matching check_type expectations.
+    // Hero is treated as "big" for ballistics (legacy Hero_Aim convention);
+    // all other classes default to small. The Armor constructor may have
+    // already set type, but we override here for consistency across modes.
+    armor.type =
+      (armor.name == ArmorName::one) ? ArmorType::big : ArmorType::small;
   }
 
   // Filter

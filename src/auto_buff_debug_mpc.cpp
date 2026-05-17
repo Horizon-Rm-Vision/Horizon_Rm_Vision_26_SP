@@ -52,10 +52,7 @@ int main(int argc, char * argv[])
   plotter.configureWebStreamFromConfig(config_path);
   ui_manager.setProgramMode("AutoBuff MPC");
 
-  // 终端 FPS 显示变量
-  auto last_fps_time = std::chrono::steady_clock::now();
-  int frame_count = 0;
-  float terminal_fps = 0.0f;
+  auto last_t = std::chrono::steady_clock::now();
 
   // 初始化云台、相机
   io::Gimbal gimbal(config_path);
@@ -106,16 +103,10 @@ int main(int argc, char * argv[])
     // UI FPS更新
     ui_manager.updateFPS();
 
-    // 终端 FPS 计算和显示
-    frame_count++;
-    auto current_time = std::chrono::steady_clock::now();
-    auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_fps_time).count();
-    if (elapsed_time >= 1000) {
-      terminal_fps = static_cast<float>(frame_count) * 1000.0f / static_cast<float>(elapsed_time);
-      frame_count = 0;
-      last_fps_time = current_time;
-      fmt::print("[FPS] {:.1f}\n", terminal_fps);
-    }
+    auto now = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration<double>(now - last_t).count();
+    last_t = now;
+    tools::logger()->info("[FPS] {:.1f}", 1.0 / dt);
 
     ui_web_stream.beginFrame(img.cols, img.rows);
 

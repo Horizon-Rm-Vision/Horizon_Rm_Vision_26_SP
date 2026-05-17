@@ -146,7 +146,7 @@ private:
   std::string lenet_model_path_, lenet_label_path_;
   double lenet_threshold_ = 0.7;
   std::string resnet_model_path_;
-  bool debug_, use_roi_, use_svm_ = true, use_traditional_;
+  bool debug_, use_roi_, use_traditional_;
   double min_confidence_;
 
   // ---- SVM classifier ----

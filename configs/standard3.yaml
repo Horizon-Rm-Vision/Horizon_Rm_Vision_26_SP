@@ -13,27 +13,18 @@ yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
 yolox_ov_model_path: ../assets/best_06_02.xml
 yolox_trt_model_path: ../assets/best_06_02-fp16-ampere.engine
+#yolox_trt_model_path: ../assets/best_06_02-fp16-orin.engine
 yolox_svm_model_path: ../assets/svm_numbers_rbf.xml
 device: CPU
 min_confidence: 0.6
 use_traditional: true
 
-#####-----yolox_ov参数-----#####
-yolox_ov:
-  use_svm: false #此行不生效,但先不要动
-  # 标签修正模式: "svm" (华科原版HOG+SVM,目前看效果最好), "lenet" (中南传统的LeNet,效果不行), "resnet" (traditional_cv模式ResNet,效果也不行)
-  label_correction_mode: "svm"
-  # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
-  lenet_model_path: "../assets/lenet.onnx"
-  lenet_label_path: "../assets/label.txt"
-  lenet_threshold: 0.5
-  # ResNet模式参数 (label_correction_mode: "resnet" 时生效)
-  resnet_model_path: "../assets/tiny_resnet.onnx"
-
-#####-----yolox_trt参数-----#####
-yolox_trt:
-  use_svm: false #此行不生效,但先不要动
-  # 标签修正模式: "svm" (华科原版HOG+SVM,目前看效果最好), "lenet" (中南传统的LeNet,效果不行), "resnet" (traditional_cv模式ResNet,效果也不行)
+#####-----yolox模式标签修正(ov/trt)-----#####
+yolox:
+  # 标签修正模式: "svm" (华科原版HOG+SVM,目前看效果最好)
+  #"lenet" (中南传统的LeNet)
+  #"resnet" (traditional_cv模式ResNet) 
+  #"none" 或不填则禁用标签修正
   label_correction_mode: "svm"
   # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
   lenet_model_path: "../assets/lenet.onnx"
@@ -102,6 +93,13 @@ outpost_q_h: 0.0006
 outpost_h_converged_variance: 0.05
 outpost_converged_pos_p_max: 0.5
 outpost_converged_vel_p_max: 10.0
+#####-----outpost 顶部装甲板过滤机制(仅用于无人机)-----#####
+#该机制用于前哨站顶部装甲板,过滤大于outpost_top_pitch的装甲板,保留小于outpost_front_pitch的装甲板
+#而介于outpost_top_pitch和outpost_front_pitch之间的装甲板为模糊地带
+#取两个角度的中间位置为分界,靠近哪个角度就归类为那个角度的行为,所有角度为世界坐标系下角度
+#大致可以简化理解为:被过滤的角度<(outpost_top_pitch+outpost_front_pitch)/2<不被过滤的角度
+outpost_top_pitch: 27.5 
+outpost_front_pitch: -15.0 
 
 #####-----弹道手动校正参数-----#####
 yaw_offset: 0 # degree -2.5 #正值枪口向左
@@ -145,7 +143,7 @@ Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----gimbal参数-----#####
-com_port: /dev/pts/3
+com_port: /dev/pts/4
 
 # #####-----相机参数-----#####
 #camera_name: "mindvision"
@@ -166,8 +164,9 @@ camera_param_path: ../configs/camera_param/MD_HERO_UL_8MM.yaml
 
 #####-----BUFF神经网络参数-----#####
 model: ../assets/yolo11_buff_int8.xml  # YOLO11 buff检测模型路径
-yolox_model: ../assets/yolox_rune_3.6m.xml  # YOLOX buff检测模型路径（移植ROS版）
-buff_yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-ampere.engine  # YOLOX TRT buff检测模型路径（TensorRT引擎文件）
+yolox_model: ../assets/yolox_rune_3.6m.xml  
+buff_yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-ampere.engine  
+#buff_yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-orin.engine  
 
 #####-----检测器模式-----#####
 detector_mode: "yolox_ov"  # 检测器模式: "yolo11" / "yolox_ov" / "yolox_trt"
@@ -208,10 +207,10 @@ velocity_n: 30
 # #####-----UI显示配置-----#####
 ui:
   enabled: true
-  imshow: true
+  imshow: false
   web:
     enabled: true
-    host: "192.168.1.167"
+    host: "192.168.1.49"
     port: 9878
     send_image: true
     image_quality: 75
