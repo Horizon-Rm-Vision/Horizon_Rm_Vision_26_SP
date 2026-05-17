@@ -267,7 +267,7 @@ int main(int argc, char * argv[])
     
     #ifdef SENTRY_SR
     //发布导航的信息
-    ros2.publish_status(gs.game_progress,gs.stage_remain_time,gs.current_hp,gs.ally_outpost_hp,gs.state,gs.energy_state,gs.bullets);
+    ros2.publish_status(gs.game_progress,gs.stage_remain_time,gs.current_hp,gs.ally_outpost_hp,gs.state,gs.energy_state,gs.bullets,gs.judge);
     #endif
 
     // UI初始化和配置

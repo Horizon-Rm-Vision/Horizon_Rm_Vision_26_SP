@@ -191,7 +191,7 @@ int main(int argc, char * argv[])
     auto form = ros2.subscribe_form();
     int8_t gimbal_form_value = gimbal_form ? gimbal_form->data : 0;
     //发布导航的信息
-    ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.state, gs.energy_state,gs.bullets);
+    ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.state, gs.energy_state,gs.bullets,gs.judge);
     #endif
     ui_manager.addLeftText("gimbal_status", fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", -gs.yaw * 180.0 / M_PI, -gs.pitch * 180.0 / M_PI));
     
