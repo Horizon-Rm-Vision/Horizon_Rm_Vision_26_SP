@@ -40,12 +40,6 @@ public:
   ArmorPriority priority;
   bool jumped;
   int last_id;  // debug only
-  #ifdef AIM_CENTER
-  double v1, v2;
-  #endif
-  #ifdef NOVA_OUTPOST_V1
-  int ID;       // debug only
-  #endif
 
   Target() = default;
   Target(

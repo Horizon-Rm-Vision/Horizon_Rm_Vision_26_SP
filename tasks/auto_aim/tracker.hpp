@@ -17,9 +17,6 @@ namespace auto_aim
 class Tracker
 {
 public:
-#ifdef AIM_CENTER
-  std::string aim_strategy_; // "center" or "follow"
-#endif
   Tracker(const std::string & config_path, Solver & solver);
 
   std::string state() const;
@@ -47,9 +44,12 @@ private:
   std::chrono::steady_clock::time_point last_timestamp_;
   ArmorPriority omni_target_priority_;
 
-  #ifdef AIM_CENTER
-  float aim_center_min_distance_;
-  #endif
+  bool outpost_correction_enable_;
+  bool outpost_correction_active_;
+  int outpost_correction_min_detect_count_;
+  int outpost_correction_cancel_count_;
+  int outpost_seen_streak_;
+  int non_outpost_seen_streak_;
 
   #ifdef NOVA_OUTPOST_V2
   int outpost_min_detect_count_;
@@ -64,6 +64,8 @@ private:
   bool update_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t);
 
   void refresh_enemy_color_from_serial();
+
+  void apply_outpost_correction(std::list<Armor> & armors);
 };
 
 }  // namespace auto_aim

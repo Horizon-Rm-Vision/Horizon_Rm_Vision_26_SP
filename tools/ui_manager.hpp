@@ -70,6 +70,15 @@ public:
     
     // 检查imshow是否启用
     bool isImshowEnabled() const { return imshow_enabled_; }
+
+    const std::vector<UIElement> & leftElements() const { return left_elements_; }
+    const std::vector<UIElement> & rightElements() const { return right_elements_; }
+    const std::string & programMode() const { return program_mode_; }
+    int leftYOffset() const { return left_y_offset_; }
+    int rightYOffset() const { return right_y_offset_; }
+    int lineHeight() const { return line_height_; }
+    double fontScale() const { return font_scale_; }
+    int thickness() const { return thickness_; }
     
     // 静态方法：获取全局UI启用状态（供img_tools使用）
     static bool isUIEnabled() { return global_ui_enabled_; }
@@ -77,12 +86,18 @@ public:
     // 静态方法：设置全局UI启用状态
     static void setGlobalUIEnabled(bool enabled) { global_ui_enabled_ = enabled; }
 
+    // 静态方法：设置全局UI采集状态（供web发送使用）
+    static void setGlobalCaptureEnabled(bool enabled) { global_capture_enabled_ = enabled; }
+
 private:
     bool enabled_;
     bool imshow_enabled_;
     
     // 静态全局UI启用状态（供img_tools使用）
     static bool global_ui_enabled_;
+
+    // 静态全局UI采集状态（供web发送使用）
+    static bool global_capture_enabled_;
     
     // FPS计算
     std::chrono::steady_clock::time_point last_fps_time_;

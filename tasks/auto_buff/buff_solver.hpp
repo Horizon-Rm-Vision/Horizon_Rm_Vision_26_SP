@@ -25,6 +25,14 @@ public:
 
   void solve(std::optional<PowerRune> & ps) const;
 
+  /// 对任意扇叶的 4 个角点做 PnP, 填充输出姿态 (不依赖 PowerRune 结构)
+  void solveFanBladeCorners(
+    const std::vector<cv::Point2f> & corners,
+    Eigen::Vector3d & ypd_in_world,
+    Eigen::Vector3d & ypr_in_world,
+    Eigen::Vector3d & blade_xyz_in_world,
+    Eigen::Vector3d & blade_ypd_in_world) const;
+
   // 调试用
   cv::Point2f point_buff2pixel(cv::Point3f x);
 

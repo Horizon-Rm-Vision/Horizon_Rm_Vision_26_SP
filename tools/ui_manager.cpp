@@ -1,10 +1,12 @@
 #include "ui_manager.hpp"
+#include "ui_stream_recorder.hpp"
 #include "yaml.hpp"
 
 namespace tools {
 
 // 初始化静态成员变量
 bool UIManager::global_ui_enabled_ = true;
+bool UIManager::global_capture_enabled_ = false;
 
 UIManager::UIManager(const std::string& config_path)
     : UIManager(true) {  // 默认启用，后面会根据配置调整
@@ -47,7 +49,7 @@ UIManager::UIManager(bool enabled)
 }
 
 void UIManager::initialize(cv::Mat& img) {
-    if (!enabled_) return;
+    if (!enabled_ && !global_capture_enabled_) return;
     
     resetForFrame();
     
@@ -67,17 +69,17 @@ void UIManager::initialize(cv::Mat& img) {
 }
 
 void UIManager::addLeftText(const std::string& key, const std::string& text, cv::Scalar color) {
-    if (!enabled_) return;
+    if (!enabled_ && !global_capture_enabled_) return;
     left_elements_.push_back({key, text, color, true});
 }
 
 void UIManager::addRightText(const std::string& key, const std::string& text, cv::Scalar color) {
-    if (!enabled_) return;
+    if (!enabled_ && !global_capture_enabled_) return;
     right_elements_.push_back({key, text, color, true});
 }
 
 void UIManager::updateFPS() {
-    if (!enabled_) return;
+    if (!enabled_ && !global_capture_enabled_) return;
     
     frame_count_++;
     auto current_time = std::chrono::steady_clock::now();
@@ -98,7 +100,7 @@ void UIManager::setProgramMode(const std::string& mode) {
 }
 
 void UIManager::render(cv::Mat& img) {
-    if (!enabled_) return;
+    if (!enabled_ && !global_capture_enabled_) return;
     
     // 更新FPS显示（直接使用缓存）
     for (auto& elem : left_elements_) {
@@ -108,6 +110,8 @@ void UIManager::render(cv::Mat& img) {
         }
     }
     
+    if (!enabled_) return;
+
     drawLeftPanel(img);
     drawRightPanel(img);
     drawCommonElements(img);
@@ -184,16 +188,23 @@ void UIManager::resetForFrame() {
 //原img_tools中的绘制函数，添加UI启用检查
 void draw_point(cv::Mat & img, const cv::Point & point, const cv::Scalar & color, int radius)
 {
-  // 检查UI是否启用
-  if (!UIManager::isUIEnabled()) return;
+    auto & recorder = UIStreamRecorder::instance();
+    if (recorder.isEnabled()) {
+        recorder.recordPoint(point, color, radius);
+    }
+    if (!UIManager::isUIEnabled()) return;
   cv::circle(img, point, radius, color, -1);
 }
 
 void draw_points(
   cv::Mat & img, const std::vector<cv::Point> & points, const cv::Scalar & color, int thickness)
 {
-  // 检查UI是否启用
-  if (!UIManager::isUIEnabled()) return;
+    auto & recorder = UIStreamRecorder::instance();
+    if (recorder.isEnabled()) {
+        std::vector<cv::Point2f> float_points(points.begin(), points.end());
+        recorder.recordPoints(float_points, color, thickness);
+    }
+    if (!UIManager::isUIEnabled()) return;
   std::vector<std::vector<cv::Point>> contours = {points};
   cv::drawContours(img, contours, -1, color, thickness);
 }
@@ -201,26 +212,36 @@ void draw_points(
 void draw_points(
   cv::Mat & img, const std::vector<cv::Point2f> & points, const cv::Scalar & color, int thickness)
 {
-  // 检查UI是否启用
-  if (!UIManager::isUIEnabled()) return;
-  std::vector<cv::Point> int_points(points.begin(), points.end());
-  draw_points(img, int_points, color, thickness);
+    auto & recorder = UIStreamRecorder::instance();
+    if (recorder.isEnabled()) {
+        recorder.recordPoints(points, color, thickness);
+    }
+    if (!UIManager::isUIEnabled()) return;
+    std::vector<cv::Point> int_points(points.begin(), points.end());
+    std::vector<std::vector<cv::Point>> contours = {int_points};
+    cv::drawContours(img, contours, -1, color, thickness);
 }
 
 void draw_text(
   cv::Mat & img, const std::string & text, const cv::Point & point, const cv::Scalar & color,
   double font_scale, int thickness)
 {
-  // 检查UI是否启用
-  if (!UIManager::isUIEnabled()) return;
+    auto & recorder = UIStreamRecorder::instance();
+    if (recorder.isEnabled()) {
+        recorder.recordText(text, point, color, font_scale, thickness);
+    }
+    if (!UIManager::isUIEnabled()) return;
   cv::putText(img, text, point, cv::FONT_HERSHEY_SIMPLEX, font_scale, color, thickness);
 }
 
 void draw_line(
   cv::Mat & img, const cv::Point & pt1, const cv::Point & pt2, const cv::Scalar & color, int thickness)
 {
-  // 检查UI是否启用
-  if (!UIManager::isUIEnabled()) return;
+    auto & recorder = UIStreamRecorder::instance();
+    if (recorder.isEnabled()) {
+        recorder.recordLine(pt1, pt2, color, thickness);
+    }
+    if (!UIManager::isUIEnabled()) return;
   cv::line(img, pt1, pt2, color, thickness);
 }
 

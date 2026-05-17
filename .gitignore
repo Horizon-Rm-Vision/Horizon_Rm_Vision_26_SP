@@ -13,3 +13,12 @@ testvideos/
 watchdog.sh
 records_24/
 records_25/
+__pycache__/
+install/
+log/
+sp_msgs/build/
+sp_msgs/install/
+**/build/
+**/install/
+**/log/
+**/devel/

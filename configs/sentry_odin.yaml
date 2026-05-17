@@ -1,0 +1,115 @@
+# enemy_color: "red"
+enemy_color: "blue"
+
+
+#####-----神经网络参数-----#####
+yolo_name: yolov5_ov
+classify_model: ../assets/tiny_resnet.onnx
+yolo11_model_path: ../assets/yolo11.xml
+yolov8_model_path: ../assets/yolov8.xml
+yolov5_model_path: ../assets/yolov5.xml
+device: CPU
+min_confidence: 0.8
+use_traditional: true
+
+#####-----ROI-----#####
+roi:
+  x: 420
+  y: 50
+  width: 600
+  height: 600
+
+use_roi: false
+
+
+#####-----Odin相机参数 (全向感知) -----#####
+# Odin 模组通过 ROS2 话题发布图像，与普通 USB 相机不同。
+# odin_camera 段配置 OdinCamera 驱动的行为。
+# 每个 Odin 模组对应 1 路 camera_position。
+#
+# 如需改变 Odin 模组的安装方位（如从 left 改为 right/front/back），
+# 只需修改下方 camera_position 字段即可，无需改动 C++ 代码。
+odin_camera:
+  topic: "/odin1_0/image/undistorted"    # Odin 驱动发布的去畸变图像话题
+  camera_position: "left"                 # 安装方位: left / right / front / back
+                                          # ↑ 修改方位请改此处 ↑
+  enable_resize: false                     # 是否缩放图像（鱼眼去畸变后 1600x1296 → 1280x720）
+  resize_width: 1280                      # 目标宽度
+  resize_height: 720                      # 目标高度
+
+#####-----USB相机参数 (补充其他方向)-----#####
+# 如果你有额外的 USB 相机用于其他方位，保持下面的配置。
+# 用不到的相机位置可在 sentry_odin.cpp 中传 nullptr。
+image_width: 1280
+image_height: 720
+fov_h: 57.7                   # 水平视场角 (degree)
+fov_v: 56.7                   # 垂直视场角 (degree)
+new_fov_h: 27                 # Decider 中用于角度计算的有效水平 FOV
+new_fov_v: 40.9               # Decider 中用于角度计算的有效垂直 FOV
+usb_frame_rate: 120
+usb_exposure: 500
+usb_gamma: 160
+usb_gain: 10
+
+#####-----工业相机参数 (主云台相机)-----#####
+#camera_name: "hikrobot"
+#exposure_ms: 0.8
+#gain: 16.9
+#vid_pid: "2bdf:0001"
+camera_name: "daheng"
+exposure_ms: 10
+gamma: 2.85
+vid_pid: "KE0200010097"
+#####-----传统方法参数-----#####
+threshold: 150
+max_angle_error: 45
+min_lightbar_ratio: 1.5
+max_lightbar_ratio: 20
+min_lightbar_length: 8
+min_armor_ratio: 1
+max_armor_ratio: 5
+max_side_ratio: 1.5
+max_rectangular_error: 25
+min_confidence: 0.8
+
+#####-----gimbal参数-----#####
+com_port: /dev/pts/7
+
+#####-----tracker参数-----#####
+min_detect_count: 5
+max_temp_lost_count: 25
+outpost_max_temp_lost_count: 75
+outpost_correction_enable: true
+outpost_correction_min_detect_count: 3
+outpost_correction_cancel_count: 5
+
+#####-----aimer参数-----#####
+yaw_offset: -0.8
+pitch_offset: -1
+comming_angle: 60
+leaving_angle: 20
+left_yaw_offset: -1
+right_yaw_offset: -0.6
+decision_speed: 10
+high_speed_delay_time: 0.026
+low_speed_delay_time: 0.010
+gyro_angle_threshold: 60
+gyro_speed_threshold: 2
+
+#####-----shooter参数-----#####
+first_tolerance: 5
+second_tolerance: 2
+judge_distance: 3
+auto_fire: true
+
+#####-----decider参数-----#####
+mode: 1
+
+#####-----工业相机标定参数-----#####
+R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+
+camera_matrix: [2414.9359264386621, 0, 717.26243105567414, 0, 2418.0489262208148, 582.68540529942845, 0, 0, 1]
+distort_coeffs: [-0.0209453389287673, 0.15028138841073832, -0.0006517722113234505, -0.0016861906197686788, 0]
+
+R_camera2gimbal: [0.01928451708725664, 0.00012696140743255463, 0.99981402834802846, -0.99981344688553653, -0.0010834913551969569, 0.019284643459122196, 0.0010857382619952124, -0.99999940496346484, 0.00010604311483339372]
+t_camera2gimbal: [0.13089617453251859, 0.0038468007459533785, 0.094139945222010288]

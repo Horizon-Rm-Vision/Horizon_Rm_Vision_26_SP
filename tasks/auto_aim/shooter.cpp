@@ -28,6 +28,8 @@ bool Shooter::shoot(
                      ? second_tolerance_
                      : first_tolerance_;
   // tools::logger()->debug("d(command.yaw) is {:.4f}", std::abs(last_command_.yaw - command.yaw));
+
+  #ifndef NOVA_AIM_CENTER
   if (
     std::abs(last_command_.yaw - command.yaw) < tolerance * 2 &&  //此时认为command突变不应该射击
     std::abs(gimbal_pos[0] - last_command_.yaw) < tolerance &&    //应该减去上一次command的yaw值
@@ -35,6 +37,18 @@ bool Shooter::shoot(
     last_command_ = command;
     return true;
   }
+  #endif
+
+  #ifdef NOVA_AIM_CENTER
+  if (
+    std::abs(last_command_.yaw - command.yaw) < tolerance * 2 &&  //此时认为command突变不应该射击
+    std::abs(gimbal_pos[0] - last_command_.yaw) < tolerance &&    //应该减去上一次command的yaw值
+    aimer.debug_aim_point.valid &&
+    aimer.check_center_fire(targets.front())) {                   //锁中心模式下必须装甲板接近中心才开火
+    last_command_ = command;
+    return true;
+  }
+  #endif
 
   last_command_ = command;
   return false;

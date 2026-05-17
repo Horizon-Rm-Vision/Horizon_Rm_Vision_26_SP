@@ -1,6 +1,8 @@
 #ifndef AUTO_AIM__YOLOV5_HPP
 #define AUTO_AIM__YOLOV5_HPP
 
+#ifdef USE_OPENVINO
+
 #include <list>
 #include <opencv2/opencv.hpp>
 #include <openvino/openvino.hpp>
@@ -57,4 +59,5 @@ private:
 
 }  // namespace auto_aim
 
+#endif  // USE_OPENVINO
 #endif  //AUTO_AIM__YOLOV5_HPP

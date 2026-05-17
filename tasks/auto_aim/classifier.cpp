@@ -9,9 +9,11 @@ Classifier::Classifier(const std::string & config_path)
   auto yaml = YAML::LoadFile(config_path);
   auto model = yaml["classify_model"].as<std::string>();
   net_ = cv::dnn::readNetFromONNX(model);
+#ifdef USE_OPENVINO
   auto ovmodel = core_.read_model(model);
   compiled_model_ = core_.compile_model(
     ovmodel, "AUTO", ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY));
+#endif
 }
 
 void Classifier::classify(Armor & armor)
@@ -58,6 +60,7 @@ void Classifier::classify(Armor & armor)
   armor.name = static_cast<ArmorName>(label_id);
 }
 
+#ifdef USE_OPENVINO
 void Classifier::ovclassify(Armor & armor)
 {
   if (armor.pattern.empty()) {
@@ -110,5 +113,6 @@ void Classifier::ovclassify(Armor & armor)
   armor.confidence = confidence;
   armor.name = static_cast<ArmorName>(label_id);
 }
+#endif
 
 }  // namespace auto_aim

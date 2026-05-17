@@ -1,3 +1,4 @@
+//c板通信,aimer模式多线程自瞄/打符
 #include <chrono>
 #include <opencv2/opencv.hpp>
 #include <thread>
@@ -12,6 +13,7 @@
 #include "tasks/auto_aim/tracker.hpp"
 #include "tasks/auto_buff/buff_aimer.hpp"
 #include "tasks/auto_buff/buff_detector.hpp"
+#include "tasks/auto_buff/buff_director.hpp"
 #include "tasks/auto_buff/buff_solver.hpp"
 #include "tasks/auto_buff/buff_target.hpp"
 #include "tasks/auto_buff/buff_type.hpp"
@@ -55,6 +57,7 @@ int main(int argc, char * argv[])
   auto_buff::SmallTarget buff_small_target;
   auto_buff::BigTarget buff_big_target;
   auto_buff::Aimer buff_aimer(config_path);
+  auto_buff::Buff2026Director buff_director;
 
   auto_aim::multithread::CommandGener commandgener(shooter, aimer, cboard, plotter);
 
@@ -112,7 +115,10 @@ int main(int argc, char * argv[])
 
       buff_solver.set_R_gimbal2world(q);
 
-      auto power_runes = buff_detector.detect(img);
+      /// 大符启用 2026 双目标模式
+      buff_detector.setBig2026Mode(mode.load() == io::Mode::big_buff);
+
+      auto power_runes = buff_detector.detect_24(img);
 
       buff_solver.solve(power_runes);
 
@@ -123,8 +129,11 @@ int main(int argc, char * argv[])
         buff_command = buff_aimer.aim(target_copy, t, cboard.bullet_speed, true);
       } else if (mode.load() == io::Mode::big_buff) {
         buff_big_target.get_target(power_runes, t);
+        buff_director.update(power_runes, t, buff_big_target, cv::Point2f(img.cols / 2.0f, img.rows / 2.0f));
+        int blade_id = buff_director.getAimBladeId();
+        if (blade_id < 0) blade_id = 0;
         auto target_copy = buff_big_target;
-        buff_command = buff_aimer.aim(target_copy, t, cboard.bullet_speed, true);
+        buff_command = buff_aimer.aim(target_copy, t, cboard.bullet_speed, true, blade_id);
       }
       cboard.send(buff_command);
 

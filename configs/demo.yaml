@@ -2,7 +2,7 @@
 enemy_color: "blue"
 
 #####-----神经网络参数-----#####
-yolo_name: yolov5_trt
+yolo_name: yolox_trt
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
@@ -10,9 +10,36 @@ yolov5_model_path: ../assets/yolov5.xml
 yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
+yolox_ov_model_path: ../assets/best_06_02.xml
+yolox_trt_model_path: ../assets/best_06_02-fp16-ampere.engine
+yolox_svm_model_path: ../assets/svm_numbers_rbf.xml
 device: CPU
 min_confidence: 0.8
 use_traditional: true
+
+#####-----yolox_ov参数-----#####
+yolox_ov:
+  use_svm: false #此行不生效,但先不要动
+  # 标签修正模式: "svm" (华科原版HOG+SVM,目前看效果最好), "lenet" (中南传统的LeNet,效果不行), "resnet" (traditional_cv模式ResNet,效果也不行)
+  label_correction_mode: "lenet"
+  # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
+  lenet_model_path: "../assets/lenet.onnx"
+  lenet_label_path: "../assets/label.txt"
+  lenet_threshold: 0.5
+  # ResNet模式参数 (label_correction_mode: "resnet" 时生效)
+  resnet_model_path: "../assets/tiny_resnet.onnx"
+
+#####-----yolox_trt参数-----#####
+yolox_trt:
+  use_svm: false #此行不生效,但先不要动
+  # 标签修正模式: "svm" (华科原版HOG+SVM,目前看效果最好), "lenet" (中南传统的LeNet,效果不行), "resnet" (traditional_cv模式ResNet,效果也不行)
+  label_correction_mode: "svm"
+  # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
+  lenet_model_path: "../assets/lenet.onnx"
+  lenet_label_path: "../assets/label.txt"
+  lenet_threshold: 0.5
+  # ResNet模式参数 (label_correction_mode: "resnet" 时生效)
+  resnet_model_path: "../assets/tiny_resnet.onnx"
 
 #####-----ROI-----#####
 roi: 
@@ -35,6 +62,30 @@ max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
 min_confidence: 0.8
 
+#####-----自瞄传统视觉模式识别参数 (yolo_name: tra)-----#####
+traditional:
+  binary_thres: 90
+  use_pca: true      # 使用PCA算法矫正灯条角点
+  light:
+    min_ratio: 0.0001
+    max_ratio: 1.0
+    max_angle: 40.0
+    color_diff_thresh: 20
+  armor:
+    min_light_ratio: 0.8
+    min_small_center_distance: 0.8
+    max_small_center_distance: 3.5
+    min_large_center_distance: 3.5
+    max_large_center_distance: 8.0
+    max_angle: 35.0
+  classifier:
+    model_path: ../assets/lenet.onnx
+    label_path: ../assets/label.txt
+    threshold: 0.7
+    ignore_classes: ["negative"]
+
+
+
 #####-----tracker参数-----#####
 min_detect_count: 5
 max_temp_lost_count: 15
@@ -43,6 +94,9 @@ max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 outpost_min_detect_count: 3
 outpost_detect_fail_tolerance: 8
+outpost_correction_enable: true
+outpost_correction_min_detect_count: 3
+outpost_correction_cancel_count: 5
 outpost_h_max_reasonable: 0.25
 outpost_match_gate: 10.0
 outpost_q_h: 0.0006
@@ -139,10 +193,11 @@ predict_time: 0.150     # s
 # 弹道模型: "no_drag" 或 "hero"（可选）
 ballistic_model: "no_drag"
 
-#####-----锁车中心参数-----#####
-aim_center: false # 锁车中心
-aim_center_min_distance: 4 # 触发锁车中心机制的最小距离，单位m，当装甲板距离车中心大于该值时优先锁定车中心点
-armor_yaw_threshold: 10 # 锁车时装甲板yaw角度阈值，degree
+#####-----锁中心参数-----#####
+track_center: false  # 是否启用锁中心模式
+aim_center_palstance_threshold: 6.5  # 锁中心角速度阈值，弧度制
+switch_trackmode_threshold: 1.2  # 切换锁中心模式的角速度偏移，弧度制
+aim_center_angle_tolerance: 1  # 锁中心自动击发角度容差，角度制
 
 #####-----UI显示配置-----#####
 ui:

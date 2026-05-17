@@ -3,6 +3,7 @@
 
 #include <Eigen/Dense>
 #include <opencv2/opencv.hpp>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -40,11 +41,22 @@ public:
 
   virtual void predict(double dt) = 0;  // 纯虚函数
 
+  virtual std::unique_ptr<Target> clone() const = 0;
+
+  void reset();
+
   Eigen::Vector3d point_buff2world(const Eigen::Vector3d & point_in_buff) const;
+
+  /// blade_id 重载: blade_id=0..4 对应 fanblades 中的 5 个位置偏移
+  Eigen::Vector3d point_buff2world(
+    const Eigen::Vector3d & point_in_buff, int blade_id) const;
 
   bool is_unsolve() const;
 
   Eigen::VectorXd ekf_x() const;
+
+  /// 获取 EKF 估计的 roll 角, 供 Director 做叶片 ID 匹配
+  double get_roll() const { return ekf_.x[5]; }
 
   double spd = 0;  //调试用
 
@@ -73,6 +85,8 @@ class SmallTarget : public Target
 public:
   SmallTarget();
 
+  std::unique_ptr<Target> clone() const override;
+
   void get_target(
     const std::optional<PowerRune> & p, std::chrono::steady_clock::time_point & timestamp) override;
 
@@ -83,7 +97,8 @@ private:
 
   void update(double nowtime, const PowerRune & p) override;
 
-  Eigen::MatrixXd h_jacobian() const;
+  /// blade_id 参量化雅可比: 在 roll 上叠加 blade_id * 2π/5
+  Eigen::MatrixXd h_jacobian(int blade_id = 0) const;
 
   const double SMALL_W = CV_PI / 3;
   // const double SMALL_W = 0;
@@ -96,6 +111,8 @@ class BigTarget : public Target
 public:
   BigTarget();
 
+  std::unique_ptr<Target> clone() const override;
+
   void get_target(
     const std::optional<PowerRune> & p, std::chrono::steady_clock::time_point & timestamp) override;
 
@@ -106,7 +123,8 @@ private:
 
   void update(double nowtime, const PowerRune & p) override;
 
-  Eigen::MatrixXd h_jacobian() const;
+  /// blade_id 参量化雅可比: 在 roll 上叠加 blade_id * 2π/5
+  Eigen::MatrixXd h_jacobian(int blade_id = 0) const;
 
   tools::RansacSineFitter spd_fitter_;
 

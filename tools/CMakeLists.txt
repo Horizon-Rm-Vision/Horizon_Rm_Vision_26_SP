@@ -11,6 +11,8 @@ add_library(tools OBJECT
     pid.cpp
     crc.cpp
     ui_manager.cpp
+    ui_stream_recorder.cpp
+    ui_web_stream.cpp
 )
 
 # 链接yaml-cpp库，因为ui_manager.cpp使用了YAML功能

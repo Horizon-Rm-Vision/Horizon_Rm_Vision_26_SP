@@ -39,6 +39,7 @@ int main(int argc, char * argv[])
   tools::Plotter plotter;
   tools::Exiter exiter;
   tools::UIManager ui_manager(config_path);
+  //plotter.setWindowName("MPC Debug");
 
   auto video_path = fmt::format("{}.avi", input_path);
   auto text_path = fmt::format("{}.txt", input_path);
@@ -56,6 +57,7 @@ int main(int argc, char * argv[])
   auto_aim::Target last_target;
   io::Command last_command;
   double last_t = -1;
+  auto last_frame_time = std::chrono::steady_clock::now();
 
   video.set(cv::CAP_PROP_POS_FRAMES, start_index);
   for (int i = 0; i < start_index; i++) {
@@ -191,11 +193,23 @@ int main(int argc, char * argv[])
 
           //plotter.drawData({ command.pitch * 180/M_PI}, {"target_pitch"});
     }
-plotter.drawData({ command.yaw * 180/M_PI,yaw * 180/M_PI}, {"target_yaw","gimbal_yaw"});
+//plotter.drawData({ command.yaw * 180/M_PI,yaw * 180/M_PI}, {"target_yaw","gimbal_yaw"});
+      plotter.subplot("Yaw", {yaw * 180/M_PI, command.yaw * 180/M_PI},
+                      {"gimbal_yaw", "target_yaw"});
+      plotter.subplot("Pitch", {command.pitch * 180/M_PI},
+                      {"target_pitch"});
+      plotter.draw();
     //plotter.plot(data);
   
 
     cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
+
+    auto now = std::chrono::steady_clock::now();
+    double fps = 1.0 / tools::delta_time(now, last_frame_time);
+    last_frame_time = now;
+    tools::draw_text(
+      img, fmt::format("FPS: {:.1f}", fps), {10, 30}, {255, 0, 0});
+
     cv::imshow("reprojection", img);
     auto key = cv::waitKey(30);
     if (key == 'q') break;

@@ -1,6 +1,8 @@
 #ifndef AUTO_AIM__MT_DETECTOR_HPP
 #define AUTO_AIM__MT_DETECTOR_HPP
 
+#ifdef USE_OPENVINO
+
 #include <chrono>
 #include <opencv2/opencv.hpp>
 #include <openvino/openvino.hpp>
@@ -41,4 +43,22 @@ private:
 
 }  // namespace auto_aim
 
+#else  // !USE_OPENVINO
+
+#include <string>
+
+namespace auto_aim
+{
+namespace multithread
+{
+// Stub when OpenVINO is disabled
+class MultiThreadDetector
+{
+public:
+  MultiThreadDetector(const std::string &, bool = false) {}
+};
+}  // namespace multithread
+}  // namespace auto_aim
+
+#endif  // USE_OPENVINO
 #endif  // AUTO_AIM__MT_DETECTOR_HPP

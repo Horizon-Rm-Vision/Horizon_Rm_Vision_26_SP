@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "tools/extended_kalman_filter.hpp"
+#include "tools/math_tools.hpp"
 #include "tools/ui_manager.hpp"
 #include "tools/plotter.hpp"
 const double SMALL_W = CV_PI / 3;
@@ -80,8 +81,8 @@ public:
       unsolvable = true;
     }
 
-    // 处理扇叶跳变
-    if (abs(angle - lastangle) > CV_PI / 12) {
+    // 处理扇叶跳变 (先将差值归一化到 [-π,π] 再比较)
+    if (std::fabs(tools::limit_rad(angle - lastangle)) > CV_PI / 12) {
       for (int i = -5; i <= 5; i++) {
         double angle_c = lastangle + i * 2 * CV_PI / 5;
         if (std::fabs(angle_c - angle) < CV_PI / 5) {
@@ -200,8 +201,8 @@ public:
       return;
     }
 
-    // 处理扇叶跳变
-    if (abs(angle - lastangle) > CV_PI / 12) {
+    // 处理扇叶跳变 (先将差值归一化到 [-π,π] 再比较)
+    if (std::fabs(tools::limit_rad(angle - lastangle)) > CV_PI / 12) {
       for (int i = -5; i <= 5; i++) {
         double angle_c = lastangle + i * 2 * CV_PI / 5;
         if (std::fabs(angle_c - angle) < CV_PI / 5) {

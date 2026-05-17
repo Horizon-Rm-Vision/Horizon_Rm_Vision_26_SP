@@ -1,0 +1,619 @@
+// 串口通信, MPC模式多类型切换: 自瞄 / 小符 / 大符
+// 基于 auto_aim_debug_mpc.cpp 为基底, 融合 auto_buff_debug_mpc.cpp 打符逻辑
+// 参考 standard_mpc.cpp 的 gimbal.mode() 切换机制
+#include <fmt/core.h>
+
+#include <atomic>
+#include <chrono>
+#include <nlohmann/json.hpp>
+#include <opencv2/opencv.hpp>
+#include <thread>
+
+#include "io/camera.hpp"
+#include "io/gimbal/gimbal.hpp"
+#include "tasks/auto_aim/planner/planner.hpp"
+#include "tasks/auto_aim/solver.hpp"
+#include "tasks/auto_aim/tracker.hpp"
+#include "tasks/auto_aim/yolo.hpp"
+#ifndef NO_AUTO_BUFF
+#include "tasks/auto_buff/buff_aimer.hpp"
+#include "tasks/auto_buff/buff_detector.hpp"
+#include "tasks/auto_buff/buff_director.hpp"
+#include "tasks/auto_buff/buff_solver.hpp"
+#include "tasks/auto_buff/buff_tracker.hpp"
+#include "tasks/auto_buff/buff_type.hpp"
+#endif
+#include "tools/exiter.hpp"
+#include "tools/logger.hpp"
+#include "tools/math_tools.hpp"
+#include "tools/plotter.hpp"
+#include "tools/pose_buffer.hpp"
+#include "tools/recorder.hpp"
+#include "tools/thread_safe_queue.hpp"
+#include "tools/trajectory.hpp"
+#include "tools/ui_manager.hpp"
+#include "tools/ui_web_stream.hpp"
+#include "tools/yaml.hpp"
+
+#ifdef SENTRY_SR
+#include "io/ros2/publish2nav.hpp"
+#include "io/ros2/ros2.hpp"
+#endif
+
+using namespace std::chrono_literals;
+
+const std::string keys =
+  "{help h usage ? |                        | 输出命令行参数说明}"
+  "{@config-path   | ../configs/standard3.yaml | 位置参数，yaml配置文件路径 }";
+
+int main(int argc, char * argv[])
+{
+  // 初始化绘图器、录制器、退出器
+  tools::Plotter plotter;
+  tools::Recorder recorder;
+  tools::Exiter exiter;
+
+  cv::CommandLineParser cli(argc, argv, keys);
+  auto config_path = cli.get<std::string>(0);
+  if (cli.has("help") || config_path.empty()) {
+    cli.printMessage();
+    return 0;
+  }
+
+  auto recorder_config = tools::load(config_path);
+  bool enable_recorder = recorder_config["recorder"] ? recorder_config["recorder"].as<bool>() : false;
+
+  // 终端 FPS 显示变量
+  auto last_fps_time = std::chrono::steady_clock::now();
+  int frame_count = 0;
+  float terminal_fps = 0.0f;
+
+  #ifdef SENTRY_SR
+  auto yaml = YAML::LoadFile(config_path);
+  auto velocity_n = yaml["velocity_n"].as<int>();
+  io::ROS2 ros2;
+  #endif
+
+  #ifdef FIRE_CONSTRAINT
+  // 读取开火约束配置
+  auto yaml_config = YAML::LoadFile(config_path);
+  double gimbal_yaw_threshold = yaml_config["gimbal_yaw_threshold"].as<double>() / 180.0 * M_PI;
+  double target_distance_threshold = yaml_config["target_distance_threshold"].as<double>();
+  #endif
+
+  tools::UIManager ui_manager(config_path);
+  tools::UIWebStream ui_web_stream(config_path);
+  plotter.configureWebStreamFromConfig(config_path);
+  plotter.setWindowName("AutoVision MPC");
+
+  io::Gimbal gimbal(config_path);
+  io::Camera camera(config_path);
+
+  // ======================== 自瞄模块 ========================
+  auto_aim::YOLO yolo(config_path, true);
+  auto_aim::Solver solver(config_path);
+  auto_aim::Tracker tracker(config_path, solver);
+  auto_aim::Planner planner(config_path);
+
+  tools::ThreadSafeQueue<std::optional<auto_aim::Target>, true> target_queue(1);
+  target_queue.push(std::nullopt);
+
+  #ifdef FIRE_CONSTRAINT
+  auto initial_gimbal_state = gimbal.state();
+  double initial_yaw = initial_gimbal_state.yaw;
+  #endif
+
+  // ======================== 打符模块 ========================
+#ifndef NO_AUTO_BUFF
+  auto_buff::Buff_Detector buff_detector(config_path);
+  auto_buff::Solver buff_solver(config_path);
+  auto_buff::BuffTracker buff_tracker(config_path);
+  auto_buff::Aimer buff_aimer(config_path);
+  auto_buff::Buff2026Director buff_director;
+
+  // 运动延时补偿 (移植自 MK2)
+  double motion_delay_ms = 0.0;
+  size_t pose_buffer_size = 200;
+  {
+    auto yaml = YAML::LoadFile(config_path);
+    if (yaml["buff_tracker"].IsDefined()) {
+      auto node = yaml["buff_tracker"];
+      motion_delay_ms = node["motion_delay_ms"].as<double>(motion_delay_ms);
+      pose_buffer_size = node["pose_buffer_size"].as<int>(static_cast<int>(pose_buffer_size));
+    }
+  }
+  tools::PoseBuffer pose_buffer(pose_buffer_size);
+#endif
+
+  // ======================== 模式切换状态 ========================
+  std::atomic<io::GimbalMode> current_mode{io::GimbalMode::IDLE};
+  io::GimbalMode last_mode = io::GimbalMode::IDLE;
+  ui_manager.setProgramMode("AutoVision");
+
+  std::atomic<bool> quit = false;
+
+  // ======================== 自瞄 MPC 规划线程 ========================
+  auto plan_thread = std::thread([&]() {
+    auto t0 = std::chrono::steady_clock::now();
+    uint16_t last_bullet_count = 0;
+
+    while (!quit) {
+      if (current_mode.load() == io::GimbalMode::AUTO_AIM) {
+        auto target = target_queue.front();
+        auto gs = gimbal.state();
+        #ifdef SENTRY_SR
+        auto velocity = ros2.get_nav_velocity();
+        auto form = ros2.subscribe_form();
+        auto gimbal_form = ros2.get_gimbal_form();
+        int8_t gimbal_form_value = gimbal_form ? gimbal_form->data : 0;
+        #endif
+        auto plan = planner.plan(target, gs.bullet_speed);
+
+        #ifdef FIRE_CONSTRAINT
+        // 开火约束检查
+        bool allow_fire = plan.fire;
+        // 云台角度约束
+        if (std::abs(plan.yaw - initial_yaw) > gimbal_yaw_threshold) {
+          allow_fire = false;
+        }
+        // 目标距离约束
+        if (target.has_value()) {
+          Eigen::VectorXd x = target->ekf_x();
+          double distance = std::sqrt(x[0]*x[0] + x[2]*x[2]);
+          if (distance > target_distance_threshold) {
+            allow_fire = false;
+          }
+        }
+        plan.fire = allow_fire;
+        #endif
+
+        #ifndef SENTRY_SR
+        gimbal.send(
+          plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
+          plan.pitch_acc);
+        #endif
+        #ifdef SENTRY_SR
+        gimbal.send(
+          plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
+          plan.pitch_acc,
+          velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z,
+          form.data, gimbal_form_value);
+        #endif
+
+        auto fired = gs.bullet_count > last_bullet_count;
+        last_bullet_count = gs.bullet_count;
+
+        std::this_thread::sleep_for(10ms);
+      } else {
+        std::this_thread::sleep_for(50ms);
+      }
+    }
+  });
+
+  cv::Mat img;
+  std::chrono::steady_clock::time_point t;
+
+  while (!exiter.exit()) {
+    auto loop_start_time = std::chrono::steady_clock::now();
+
+    // ---- 读取串口模式 ----
+    current_mode = gimbal.mode();
+    bool is_big   = (current_mode == io::GimbalMode::BIG_BUFF);
+    bool is_buff  = (current_mode == io::GimbalMode::SMALL_BUFF ||
+                     current_mode == io::GimbalMode::BIG_BUFF);
+    bool is_aim   = (current_mode == io::GimbalMode::AUTO_AIM);
+
+    // ---- 模式切换处理 ----
+    if (last_mode != current_mode) {
+      tools::logger()->info("[AutoVision] Mode switch: {} → {}",
+                            gimbal.str(last_mode), gimbal.str(current_mode));
+      last_mode = current_mode.load();
+
+      if (is_aim)
+        ui_manager.setProgramMode("AutoAim MPC");
+      else if (current_mode == io::GimbalMode::SMALL_BUFF)
+        ui_manager.setProgramMode("AutoBuff MPC (Small)");
+      else if (current_mode == io::GimbalMode::BIG_BUFF)
+        ui_manager.setProgramMode("AutoBuff MPC (Big)");
+      else
+        ui_manager.setProgramMode("AutoVision (IDLE)");
+    }
+
+    // UI FPS更新
+    ui_manager.updateFPS();
+
+    // 终端 FPS 计算和显示
+    frame_count++;
+    auto current_time = std::chrono::steady_clock::now();
+    auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+      current_time - last_fps_time).count();
+
+    if (elapsed_time >= 1000) {
+      terminal_fps = static_cast<float>(frame_count) * 1000.0f / static_cast<float>(elapsed_time);
+      frame_count = 0;
+      last_fps_time = current_time;
+      fmt::print("[FPS] {:.1f}\n", terminal_fps);
+    }
+
+    camera.read(img, t);
+    ui_web_stream.sendImage(img);
+    ui_web_stream.beginFrame(img.cols, img.rows);
+
+    auto q = gimbal.q(t);
+    auto gs = gimbal.state();
+    if (enable_recorder) recorder.record(img, q, t);
+
+    // ================================================================
+    //                         自瞄模式
+    // ================================================================
+    if (is_aim) {
+      solver.set_R_gimbal2world(q);
+      auto armors = yolo.detect(img);
+      auto targets = tracker.track(armors, t);
+
+      if (!targets.empty())
+        target_queue.push(targets.front());
+      else
+        target_queue.push(std::nullopt);
+
+      // ---- 图像绘制：检测结果 ----
+      for (const auto & armor : armors) {
+        tools::draw_points(img, armor.points, {0, 255, 0});
+        auto info = fmt::format("{:.2f} {} {} {}",
+          armor.confidence, auto_aim::COLORS[armor.color],
+          auto_aim::ARMOR_NAMES[armor.name], auto_aim::ARMOR_TYPES[armor.type]);
+        tools::draw_text(img, info, armor.center, {0, 255, 0});
+        tools::draw_text(img, fmt::format("armor_x: {:.2f}", armor.xyz_in_world[0]),
+          {10, 600}, {0, 255, 0});
+        tools::draw_text(img, fmt::format("armor_y: {:.2f}", armor.xyz_in_world[1]),
+          {10, 630}, {0, 255, 0});
+        tools::draw_text(img, fmt::format("armor_z: {:.2f}", armor.xyz_in_world[2]),
+          {10, 660}, {0, 255, 0});
+      }
+
+      if (!targets.empty()) {
+        auto target = targets.front();
+        std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
+        for (const Eigen::Vector4d & xyza : armor_xyza_list) {
+          auto image_points =
+            solver.reproject_armor(xyza.head(3), xyza[3], target.armor_type, target.name);
+          tools::draw_points(img, image_points, {0, 255, 0});
+        }
+
+        Eigen::Vector4d aim_xyza = planner.debug_xyza;
+        auto image_points =
+          solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
+        #ifndef NOVA_AIM_CENTER
+        tools::draw_points(img, image_points, {0, 0, 255});
+        #endif
+        #ifdef NOVA_AIM_CENTER
+        auto aim_color = planner.center_tracked() ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 0, 255);
+        tools::draw_points(img, image_points, aim_color);
+        #endif
+      }
+
+      #ifdef SENTRY_SR
+      ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp,
+                          gs.ally_outpost_hp, gs.state, gs.energy_state, gs.bullets);
+      #endif
+
+      // ---- Plotter + UI (自瞄, 合并以消除重复 planner.plan() 调用) ----
+      {
+        std::optional<auto_aim::Target> target_opt = target_queue.front();
+        bool has_target = target_opt.has_value();
+        auto plan = planner.plan(target_opt, gs.bullet_speed);
+
+        plotter.subplot("Yaw", {gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI},
+                        {"gimbal_yaw", "target_yaw", "plan_yaw"});
+        plotter.subplot("Pitch", {gs.pitch * 180/M_PI, plan.target_pitch * 180/M_PI, plan.pitch * 180/M_PI},
+                        {"gimbal_pitch", "target_pitch", "plan_pitch"});
+        plotter.draw();
+
+        ui_manager.initialize(img);
+
+        ui_manager.addLeftText("mode", "Mode: AUTO_AIM", cv::Scalar(0, 255, 0));
+        ui_manager.addLeftText("detect", fmt::format("Detect: {}", has_target ? "YES" : "NO"),
+                              has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
+        ui_manager.addLeftText("fire", fmt::format("Fire: {}", plan.fire ? "YES" : "NO"),
+                              plan.fire ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+        ui_manager.addLeftText("gimbal_status",
+          fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}",
+            -gs.yaw * 180.0 / M_PI, -gs.pitch * 180.0 / M_PI));
+        ui_manager.addLeftText("gimbal_vel",
+          fmt::format("Gimbal Vel Y: {:.2f}  P: {:.2f}",
+            -gs.yaw_vel * 180.0 / M_PI, -gs.pitch_vel * 180.0 / M_PI));
+        ui_manager.addLeftText("plan_status",
+          fmt::format("Plan Yaw: {:.2f}  Pitch: {:.2f}",
+            -plan.yaw * 180.0 / M_PI, -plan.pitch * 180.0 / M_PI), cv::Scalar(0, 165, 255));
+        ui_manager.addLeftText("plan_vel",
+          fmt::format("Plan Vel Y: {:.2f}  P: {:.2f}",
+            -plan.yaw_vel * 180.0 / M_PI, -plan.pitch_vel * 180.0 / M_PI), cv::Scalar(0, 165, 255));
+        ui_manager.addLeftText("plan_acc",
+          fmt::format("Plan Acc Y: {:.2f}  P: {:.2f}",
+            plan.yaw_acc, plan.pitch_acc), cv::Scalar(0, 165, 255));
+
+        #ifdef SENTRY_SR
+        ui_manager.addLeftText("game_progress",
+          fmt::format("Game Status: {} ", (int)gs.game_progress));
+        ui_manager.addLeftText("current_hp",
+          fmt::format("Blood: {} ", (int)gs.current_hp));
+        ui_manager.addLeftText("ally_outpost_hp",
+          fmt::format("Bullet: {} ", (int)gs.ally_outpost_hp));
+        ui_manager.addLeftText("state",
+          fmt::format("State: {} ", (int)gs.state));
+        ui_manager.addLeftText("energy_state",
+          fmt::format("  Energy State: {} ", (int)gs.energy_state));
+        ui_manager.addLeftText("bullets",
+          fmt::format("  Bullets: {} ", (int)gs.bullets));
+        #endif
+
+        if (has_target) {
+          auto& target = target_opt.value();
+          ui_manager.addLeftText("target_info",
+            fmt::format("Target Z: {:.2f}  Vz: {:.2f}", target.ekf_x()[4], target.ekf_x()[5]),
+            cv::Scalar(255, 255, 0));
+
+          if (target.ekf_x().size() > 7) {
+            ui_manager.addLeftText("target_w",
+              fmt::format("Target W: {:.2f}", target.ekf_x()[7]), cv::Scalar(255, 255, 0));
+          }
+
+          #ifdef NOVA_AIM_CENTER
+          bool is_center_locked = planner.center_tracked();
+          ui_manager.addLeftText("center_lock",
+            fmt::format("Center Lock: {}", is_center_locked ? "ON" : "OFF"),
+            is_center_locked ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 255, 0));
+          if (is_center_locked) {
+            auto ekf_x = target.ekf_x();
+            auto center_yaw = std::atan2(ekf_x[2], ekf_x[0]);
+            auto r = ekf_x[8];
+            auto lock_x = ekf_x[0] - r * std::cos(center_yaw);
+            auto lock_y = ekf_x[2] - r * std::sin(center_yaw);
+            ui_manager.addLeftText("lock_point",
+              fmt::format("Lock Pt: ({:.2f}, {:.2f})", lock_x, lock_y),
+              cv::Scalar(0, 255, 255));
+          }
+          #endif
+        }
+
+        #ifdef NOVA_Q
+        ui_manager.addLeftText("queue_size",
+          fmt::format("Queue Size: {}", gimbal.q_size()));
+        #endif
+
+        ui_manager.addRightText("bullet_speed",
+          fmt::format("Bullet Speed: {:.1f}", gs.bullet_speed));
+        ui_manager.addRightText("target_count", fmt::format("Targets: {}", targets.size()),
+                               targets.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+        ui_manager.addRightText("armor_count", fmt::format("Armors: {}", armors.size()),
+                               armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+      }
+    }
+    // ================================================================
+    //                         打符模式
+    // ================================================================
+#ifndef NO_AUTO_BUFF
+    else if (is_buff) {
+      pose_buffer.push(q, t);
+      {
+        auto q_sample = pose_buffer.sample(
+          t - std::chrono::milliseconds(static_cast<int>(motion_delay_ms)));
+        if (q_sample.has_value()) q = q_sample.value();
+      }
+
+      buff_detector.setBig2026Mode(is_big);
+      buff_tracker.set_type(is_big ? auto_buff::BIG : auto_buff::SMALL);
+      buff_solver.set_R_gimbal2world(q);
+
+      auto power_runes = buff_detector.detect_24(img);
+      auto found = buff_tracker.update(power_runes, t, buff_solver);
+      auto target_copy = buff_tracker.clone_target();
+
+      auto_aim::Plan plan{false, false, 0, 0, 0, 0, 0, 0, 0, 0};
+      int blade_id = 0;
+      if (found && target_copy) {
+        if (is_big) {
+          cv::Point2f image_center(img.cols / 2.0f, img.rows / 2.0f);
+          buff_director.update(power_runes, t, buff_tracker.target(), image_center);
+          blade_id = buff_director.getAimBladeId();
+          if (blade_id < 0) blade_id = 0;
+        }
+        plan = buff_aimer.mpc_aim(*target_copy, t, gs, true, blade_id);
+      }
+
+      #ifndef SENTRY_SR
+      gimbal.send(
+        plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
+        plan.pitch_acc);
+      #endif
+      #ifdef SENTRY_SR
+      gimbal.send(
+        plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
+        plan.pitch_acc, 0, 0, 0, 0, 0);
+      #endif
+
+      // ---- 图像绘制：打符 ----
+      auto selected = buff_tracker.last_observation();
+      if (found && selected.has_value() && target_copy) {
+        auto & p = selected.value();
+
+        if (is_big) {
+          for (auto * blade : p.get_targets()) {
+            for (int i = 0; i < 4; i++) tools::draw_point(img, blade->points[i]);
+            tools::draw_point(img, blade->center, {0, 0, 255}, 3);
+          }
+        } else {
+          for (int i = 0; i < 4; i++) tools::draw_point(img, p.target().points[i]);
+          tools::draw_point(img, p.target().center, {0, 0, 255}, 3);
+        }
+        tools::draw_point(img, p.r_center, {0, 0, 255}, 3);
+
+        // 当前帧 target 更新后的 buff 位姿
+        auto & target_ref = buff_tracker.target();
+        auto Rxyz_in_world_now =
+          target_ref.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
+        auto image_points =
+          buff_solver.reproject_buff(Rxyz_in_world_now, target_ref.ekf_x()[4], target_ref.ekf_x()[5]);
+        tools::draw_points(
+          img, std::vector<cv::Point2f>(image_points.begin(), image_points.begin() + 4), {0, 255, 0});
+        tools::draw_points(
+          img, std::vector<cv::Point2f>(image_points.begin() + 4, image_points.end()), {0, 255, 0});
+
+        // buff 瞄准位置 (预测)
+        auto Rxyz_in_world_pre =
+          target_ref.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
+        image_points =
+          buff_solver.reproject_buff(Rxyz_in_world_pre, target_copy->ekf_x()[4], target_copy->ekf_x()[5]);
+        tools::draw_points(
+          img, std::vector<cv::Point2f>(image_points.begin(), image_points.begin() + 4), {255, 0, 0});
+        tools::draw_points(
+          img, std::vector<cv::Point2f>(image_points.begin() + 4, image_points.end()), {255, 0, 0});
+      }
+
+      // ---- Plotter (打符) ----
+      {
+        plotter.subplot("Buff Gimbal",
+          {gs.yaw * 57.3, gs.pitch * 57.3,
+           gs.yaw_vel * 57.3, gs.pitch_vel * 57.3},
+          {"gimbal_yaw", "gimbal_pitch", "gimbal_yaw_vel", "gimbal_pitch_vel"});
+        if (plan.control) {
+          plotter.subplot("Buff Plan",
+            {plan.yaw * 57.3, plan.pitch * 57.3,
+             plan.yaw_vel * 57.3, plan.pitch_vel * 57.3},
+            {"plan_yaw", "plan_pitch", "plan_yaw_vel", "plan_pitch_vel"});
+        }
+        plotter.draw();
+      }
+
+      // ---- UI (打符) ----
+      {
+        ui_manager.initialize(img);
+
+        auto mode_color = is_big ? cv::Scalar(0, 165, 255) : cv::Scalar(0, 255, 0);
+        ui_manager.addLeftText("buff_mode",
+          fmt::format("Mode: {}", is_big ? "BIG (2026)" : "SMALL"), mode_color);
+
+        ui_manager.addLeftText("gimbal",
+          fmt::format("Gimbal Y: {:.1f}  P: {:.1f}", -gs.yaw * 57.3, -gs.pitch * 57.3));
+        ui_manager.addLeftText("gimbal_vel",
+          fmt::format("Gimbal Vel Y:{:.1f}  P:{:.1f}", -gs.yaw_vel * 57.3, -gs.pitch_vel * 57.3));
+
+        if (plan.control) {
+          ui_manager.addLeftText("plan",
+            fmt::format("Plan Y: {:.1f}  P: {:.1f}", -plan.yaw * 57.3, -plan.pitch * 57.3),
+            cv::Scalar(0, 165, 255));
+          ui_manager.addLeftText("plan_vel",
+            fmt::format("Plan Vel Y:{:.1f}  P:{:.1f}",
+              -plan.yaw_vel * 57.3, -plan.pitch_vel * 57.3), cv::Scalar(0, 165, 255));
+          ui_manager.addLeftText("plan_acc",
+            fmt::format("Plan Acc Y:{:.2f}  P:{:.2f}", plan.yaw_acc, plan.pitch_acc),
+            cv::Scalar(0, 165, 255));
+        }
+
+        if (selected.has_value()) {
+          const auto & p = selected.value();
+          ui_manager.addLeftText("rune_attitude",
+            fmt::format("Rune Y:{:.1f} P:{:.1f} R:{:.1f}",
+              p.ypr_in_world[0] * 57.3, p.ypr_in_world[1] * 57.3, p.ypr_in_world[2] * 57.3));
+          ui_manager.addLeftText("rune_distance",
+            fmt::format("Rune Dist: {:.2f}m", p.ypd_in_world[2]));
+
+          if (is_big) {
+            ui_manager.addLeftText("rune_blades",
+              fmt::format("Lit Blades: {}", p.target_indices_.size()), cv::Scalar(0, 255, 255));
+          }
+        }
+
+        bool is_tracking = buff_tracker.is_tracking();
+        if (is_tracking && target_copy) {
+          auto & target_ref = buff_tracker.target();
+          Eigen::VectorXd x = target_ref.ekf_x();
+
+          if (is_big) {
+            ui_manager.addLeftText("rotation",
+              fmt::format("Angle: {:.1f}  Spd: {:.2f}  Blade: {}",
+                x[5] * 57.3, x[6], blade_id), cv::Scalar(255, 255, 0));
+          } else {
+            ui_manager.addLeftText("rotation",
+              fmt::format("Angle: {:.1f}  Spd: {:.2f}",
+                x[5] * 57.3, x[6] * 57.3), cv::Scalar(255, 255, 0));
+          }
+
+          ui_manager.addLeftText("ekf_r",
+            fmt::format("R_yaw: {:.2f}  R_Vyaw: {:.2f}", x[0], x[1]));
+          ui_manager.addLeftText("ekf_rp",
+            fmt::format("R_pitch: {:.2f}  R_dis: {:.2f}", x[2], x[3]));
+
+          if (x.size() >= 10) {
+            ui_manager.addLeftText("ekf_harmonic",
+              fmt::format("a:{:.2f}  w:{:.2f}  fi:{:.2f}  spd0:{:.2f}",
+                x[7], x[8], x[9], target_ref.spd), cv::Scalar(0, 165, 255));
+          }
+        }
+
+        if (is_big) {
+          static const std::string kStateNames[] = {
+            "IDLE", "WAIT_FIRST", "2ND_WINDOW", "GROUP_TRANS", "COMPLETED", "FAILED"};
+          int s = static_cast<int>(buff_director.getState());
+          auto state_color = (s == 1 || s == 2) ? cv::Scalar(0, 255, 0) : cv::Scalar(200, 200, 200);
+          ui_manager.addLeftText("director_state",
+            fmt::format("Director: {}  Group: {}/5",
+              kStateNames[s], buff_director.getCompletedGroups()), state_color);
+        }
+
+        bool has_rune = power_runes.has_value();
+        ui_manager.addRightText("bullet_speed",
+          fmt::format("Bullet Speed: {:.1f}", gs.bullet_speed));
+        ui_manager.addRightText("detect", fmt::format("Detect: {}", has_rune ? "YES" : "NO"),
+                               has_rune ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
+        ui_manager.addRightText("track", fmt::format("Track: {}", is_tracking ? "YES" : "NO"),
+                               is_tracking ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
+        ui_manager.addRightText("fire", fmt::format("Fire: {}", plan.fire ? "YES" : "NO"),
+                               plan.fire ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+      }
+    }
+#endif
+    // ================================================================
+    //                         IDLE 模式
+    // ================================================================
+    else {
+      #ifndef SENTRY_SR
+      gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
+      #endif
+      #ifdef SENTRY_SR
+      gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      #endif
+
+      ui_manager.initialize(img);
+      ui_manager.addLeftText("mode", "Mode: IDLE", cv::Scalar(0, 255, 255));
+      ui_manager.addLeftText("gimbal",
+        fmt::format("Gimbal Y: {:.1f}  P: {:.1f}", -gs.yaw * 57.3, -gs.pitch * 57.3));
+      ui_manager.addRightText("bullet_speed",
+        fmt::format("Bullet Speed: {:.1f}", gs.bullet_speed));
+    }
+
+    // ---- 统一 UI 渲染 ----
+    ui_manager.render(img);
+    ui_web_stream.capturePanels(ui_manager);
+    ui_web_stream.sendFrame();
+
+    if (ui_manager.isImshowEnabled()) {
+      cv::namedWindow("reprojection", 0);
+      cv::imshow("reprojection", img);
+      auto key = cv::waitKey(1);
+      if (key == 'q') break;
+    }
+  }
+
+  quit = true;
+  if (plan_thread.joinable()) plan_thread.join();
+
+  #ifndef SENTRY_SR
+  gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
+  #endif
+  #ifdef SENTRY_SR
+  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  #endif
+
+  return 0;
+}

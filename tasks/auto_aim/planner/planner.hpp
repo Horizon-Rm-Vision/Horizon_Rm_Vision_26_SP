@@ -34,17 +34,15 @@ class Planner
 {
 public:
   Eigen::Vector4d debug_xyza;
-  
+
   Planner(const std::string & config_path);
-  
+
 
   Plan plan(Target target, double bullet_speed);
   Plan plan(std::optional<Target> target, double bullet_speed);
 
-  #ifdef AIM_CENTER
-  Eigen::Vector3d center_points; // 仅重投影用，存储世界坐标系中的目标位置
-  Plan aim_at_center(Target target, double bullet_speed);
-  bool aim_center_;
+  #ifdef NOVA_AIM_CENTER
+  bool center_tracked() const { return center_tracked_; }
   #endif
 
 private:
@@ -52,12 +50,17 @@ private:
   double pitch_offset_;
   double fire_thresh_;
   double low_speed_delay_time_, high_speed_delay_time_, decision_speed_;
-  #ifdef AIM_CENTER
-  int armor_yaw_threshold_;
-  #endif
   // 弹道模型选择
   enum class BallisticModel { kNoDrag, kHero };
   BallisticModel ballistic_model_ = BallisticModel::kNoDrag;
+
+#ifdef NOVA_AIM_CENTER
+  bool track_center_;
+  bool center_tracked_ = false;
+  double aim_center_palstance_threshold_;
+  double switch_trackmode_threshold_;
+  double aim_center_angle_tolerance_;
+  #endif
 
   TinySolver * yaw_solver_;
   TinySolver * pitch_solver_;
@@ -67,6 +70,9 @@ private:
 
   Eigen::Matrix<double, 2, 1> aim(const Target & target, double bullet_speed);
   Trajectory get_trajectory(Target & target, double yaw0, double bullet_speed);
+  #ifdef NOVA_AIM_CENTER
+  Eigen::Vector4d compute_facing_armor(const Target & target) const;
+  #endif
 };
 
 }  // namespace auto_aim

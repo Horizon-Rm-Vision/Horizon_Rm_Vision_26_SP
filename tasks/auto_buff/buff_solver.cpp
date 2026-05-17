@@ -27,15 +27,18 @@ Solver::Solver(const std::string & config_path) : R_gimbal2world_(Eigen::Matrix3
 {
   auto yaml = YAML::LoadFile(config_path);
 
-  auto R_gimbal2imubody_data = yaml["R_gimbal2imubody"].as<std::vector<double>>();
-  auto R_camera2gimbal_data = yaml["R_camera2gimbal"].as<std::vector<double>>();
-  auto t_camera2gimbal_data = yaml["t_camera2gimbal"].as<std::vector<double>>();
+  auto camera_param_path = yaml["camera_param_path"].as<std::string>("");
+  auto calib_yaml = camera_param_path.empty() ? yaml : YAML::LoadFile(camera_param_path);
+
+  auto R_gimbal2imubody_data = calib_yaml["R_gimbal2imubody"].as<std::vector<double>>();
+  auto R_camera2gimbal_data = calib_yaml["R_camera2gimbal"].as<std::vector<double>>();
+  auto t_camera2gimbal_data = calib_yaml["t_camera2gimbal"].as<std::vector<double>>();
   R_gimbal2imubody_ = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>(R_gimbal2imubody_data.data());
   R_camera2gimbal_ = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>(R_camera2gimbal_data.data());
   t_camera2gimbal_ = Eigen::Matrix<double, 3, 1>(t_camera2gimbal_data.data());
 
-  auto camera_matrix_data = yaml["camera_matrix"].as<std::vector<double>>();
-  auto distort_coeffs_data = yaml["distort_coeffs"].as<std::vector<double>>();
+  auto camera_matrix_data = calib_yaml["camera_matrix"].as<std::vector<double>>();
+  auto distort_coeffs_data = calib_yaml["distort_coeffs"].as<std::vector<double>>();
   Eigen::Matrix<double, 3, 3, Eigen::RowMajor> camera_matrix(camera_matrix_data.data());
   Eigen::Matrix<double, 1, 5> distort_coeffs(distort_coeffs_data.data());
   cv::eigen2cv(camera_matrix, camera_matrix_);
@@ -52,32 +55,18 @@ void Solver::set_R_gimbal2world(const Eigen::Quaterniond & q)
   R_gimbal2world_ = R_gimbal2imubody_.transpose() * R_imubody2imuabs * R_gimbal2imubody_;
 }
 
-void Solver::solve(std::optional<PowerRune> & ps) const
+void Solver::solveFanBladeCorners(
+  const std::vector<cv::Point2f> & corners,
+  Eigen::Vector3d & ypd_in_world,
+  Eigen::Vector3d & ypr_in_world,
+  Eigen::Vector3d & blade_xyz_in_world,
+  Eigen::Vector3d & blade_ypd_in_world) const
 {
-  if (!ps.has_value()) return;
-  PowerRune & p = ps.value();
-  // std::vector<cv::Point2f> image_points;
-  // std::vector<cv::Point3f> object_points;
-  // int i = 0;
-  // for (auto & fanblade : p.fanblades) {
-  //   if (fanblade.type != _unlight) {
-  //     image_points.insert(image_points.end(), fanblade.points.begin(), fanblade.points.end());
-  //     image_points.emplace_back(fanblade.center);
-  //     object_points.insert(object_points.end(), OBJECT_POINTS[i].begin(), OBJECT_POINTS[i].end());
-  //   }
-  //   ++i;
-  // }
-  // image_points.emplace_back(p.r_center);  //r_center
-  // object_points.emplace_back(cv::Point3f(0, 0, 0));
-  std::vector<cv::Point2f> image_points = p.target().points;
-  // image_points.emplace_back(p.target().center);
-  image_points.emplace_back(p.r_center);
-
-  std::vector<cv::Point2f> image_points_fourth(image_points.begin(), image_points.begin() + 4);
-  std::vector<cv::Point3f> OBJECT_POINTS_FOURTH(OBJECT_POINTS.begin(), OBJECT_POINTS.begin() + 4);
-  cv::solvePnP(
-    OBJECT_POINTS_FOURTH, image_points_fourth, camera_matrix_, distort_coeffs_, rvec_, tvec_, false,
-    cv::SOLVEPNP_IPPE);
+  // PnP: 4 角点 → 缓冲帧到相机的旋转 + 平移
+  std::vector<cv::Point2f> img_pts(corners.begin(), corners.begin() + 4);
+  std::vector<cv::Point3f> obj_pts(OBJECT_POINTS.begin(), OBJECT_POINTS.begin() + 4);
+  cv::solvePnP(obj_pts, img_pts, camera_matrix_, distort_coeffs_, rvec_, tvec_, false,
+               cv::SOLVEPNP_IPPE);
 
   Eigen::Vector3d t_buff2camera;
   cv::cv2eigen(tvec_, t_buff2camera);
@@ -88,25 +77,33 @@ void Solver::solve(std::optional<PowerRune> & ps) const
 
   Eigen::Vector3d blade_xyz_in_buff{{0, 0, 700e-3}};
 
-  // buff -> camera
+  // buff → camera
   Eigen::Vector3d xyz_in_camera = t_buff2camera;
-  Eigen::Vector3d blade_xyz_in_camera = R_buff2camera * blade_xyz_in_buff + t_buff2camera;
+  Eigen::Vector3d blade_in_camera = R_buff2camera * blade_xyz_in_buff + t_buff2camera;
 
-  // camera -> gimbal
-  Eigen::Matrix3d R_buff2gimbal = R_camera2gimbal_ * R_buff2camera;
+  // camera → gimbal
   Eigen::Vector3d xyz_in_gimbal = R_camera2gimbal_ * xyz_in_camera + t_camera2gimbal_;
-  Eigen::Vector3d blade_xyz_in_gimbal = R_camera2gimbal_ * blade_xyz_in_camera + t_camera2gimbal_;
+  Eigen::Vector3d blade_in_gimbal = R_camera2gimbal_ * blade_in_camera + t_camera2gimbal_;
 
-  /// gimbal -> world
+  // gimbal → world
+  Eigen::Vector3d xyz_in_world = R_gimbal2world_ * xyz_in_gimbal;
+  blade_xyz_in_world = R_gimbal2world_ * blade_in_gimbal;
+
+  // 球坐标
+  ypd_in_world = tools::xyz2ypd(xyz_in_world);
+  blade_ypd_in_world = tools::xyz2ypd(blade_xyz_in_world);
+
+  Eigen::Matrix3d R_buff2gimbal = R_camera2gimbal_ * R_buff2camera;
   Eigen::Matrix3d R_buff2world = R_gimbal2world_ * R_buff2gimbal;
+  ypr_in_world = tools::eulers(R_buff2world, 2, 1, 0);
+}
 
-  p.xyz_in_world = R_gimbal2world_ * xyz_in_gimbal;
-  p.ypd_in_world = tools::xyz2ypd(p.xyz_in_world);
-
-  p.blade_xyz_in_world = R_gimbal2world_ * blade_xyz_in_gimbal;
-  p.blade_ypd_in_world = tools::xyz2ypd(p.blade_xyz_in_world);
-
-  p.ypr_in_world = tools::eulers(R_buff2world, 2, 1, 0);
+void Solver::solve(std::optional<PowerRune> & ps) const
+{
+  if (!ps.has_value()) return;
+  PowerRune & p = ps.value();
+  solveFanBladeCorners(
+    p.target().points, p.ypd_in_world, p.ypr_in_world, p.blade_xyz_in_world, p.blade_ypd_in_world);
 }
 
 // 调试用

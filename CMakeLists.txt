@@ -10,7 +10,7 @@ set(CMAKE_BUILD_TYPE Release)
 message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}--------------------")
 
 # 编译模式选项：控制是否使用CUDA/TensorRT和OpenVINO
-option(USE_CUDA "Enable CUDA/TensorRT support" OFF)
+option(USE_CUDA "Enable CUDA/TensorRT support" ON)
 option(USE_OPENVINO "Enable OpenVINO support" ON)
 
 if(NOT USE_CUDA AND NOT USE_OPENVINO)
@@ -18,19 +18,20 @@ if(NOT USE_CUDA AND NOT USE_OPENVINO)
 endif()
 
 # 其他编译选项,默认不编译多余组件，可以改OFF为ON来启用或禁用，或者在cmake ..中添加-DBUILD_XXX=ON临时启用
-option(BUILD_SENTRY "Build sentry tools" ON)
+option(BUILD_SENTRY "Build sentry tools" OFF)
 option(BUILD_TEST "Build test tools" OFF)
-option(BUILD_CALIBRATION "Build calibration tools" ON)
+option(BUILD_CALIBRATION "Build calibration tools" OFF)
 option(BUILD_ALL "Build all components" OFF)
+option(BUILD_BUFF "Build auto_buff components" ON)
+option(BUILD_OMNI "Build omnidirectional perception (requires BUILD_SENTRY and ROS2)" OFF)
 
 # 全局宏控制，注释上即禁用，不注释即启用，亦可直接在cmake命令中添加 -DBUILD_GIMAL_ADD_VEL=ON 即可
-add_compile_definitions(SR_VEL) # 带前馈角速度的串口收发模式(哨兵模式暂时不可用)
+add_compile_definitions(SR_VEL) # 带前馈角速度的串口收发模式
 add_compile_definitions(LIM_CODE) #简化代码模式，启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销
-add_compile_definitions(AIM_CENTER) # 锁车中心模式，启用后会增加一个锁车中心点的计算和显示，并且在满足条件时优先锁定中心点而非装甲板
 add_compile_definitions(NOVA_Q) #基于peek2的四元数取数方式,待多几个版本测试以验证可靠性
 add_compile_definitions(FIRE_CONSTRAINT) # 开火约束
-#add_compile_definitions(NOVA_OUTPOST_V1) # 新版前哨站识别方案1
-#add_compile_definitions(NOVA_OUTPOST_V2) # 新版前哨站识别方案2,二者不能同时启用
+add_compile_definitions(NOVA_OUTPOST_V2) # 新版前哨站识别方案2
+add_compile_definitions(NOVA_AIM_CENTER) # 新版锁中心模式
 
 if(BUILD_SENTRY)
 add_compile_definitions(SENTRY_SR) # 串口通信编译为哨兵导航联合通信版本
@@ -43,6 +44,12 @@ message(STATUS "--------------------BUILD_CALIBRATION: ${BUILD_CALIBRATION}-----
 message(STATUS "--------------------BUILD_TEST: ${BUILD_TEST}--------------------")
 message(STATUS "--------------------BUILD_SENTRY: ${BUILD_SENTRY}--------------------")
 message(STATUS "--------------------BUILD_ALL: ${BUILD_ALL}--------------------")
+message(STATUS "--------------------BUILD_BUFF: ${BUILD_BUFF}--------------------")
+
+if(NOT BUILD_BUFF)
+  add_compile_definitions(NO_AUTO_BUFF)
+  message(STATUS "auto_buff components disabled, NO_AUTO_BUFF defined.")
+endif()
 
 # 添加查找模块路径（用于TensorRT）
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
@@ -89,8 +96,22 @@ include_directories(${PROJECT_SOURCE_DIR})
 add_subdirectory(tools)
 add_subdirectory(io)
 add_subdirectory(tasks/auto_aim)
-add_subdirectory(tasks/auto_buff)
-add_subdirectory(tasks/omniperception)
+if(BUILD_BUFF)
+  add_subdirectory(tasks/auto_buff)
+  set(AUTO_BUFF_LIBS auto_buff)
+  set(AUTO_BUFF_CERES ${CERES_LIBRARIES})
+else()
+  set(AUTO_BUFF_LIBS "")
+  set(AUTO_BUFF_CERES "")
+endif()
+
+
+if(BUILD_SENTRY AND BUILD_OMNI)
+  add_subdirectory(tasks/omniperception)
+  set(OMNIPERCEPTION_LIB omniperception)
+else()
+  set(OMNIPERCEPTION_LIB "")
+endif()
 
 #################### src 可执行文件 ###################
 if(NOT BUILD_SENTRY)
@@ -99,22 +120,26 @@ if(NOT BUILD_SENTRY)
     #add_executable(standard_mpc src/standard_mpc.cpp)
     add_executable(auto_aim_debug_mpc src/auto_aim_debug_mpc.cpp)
     #add_executable(mt_auto_aim_debug src/mt_auto_aim_debug.cpp)
-    #add_executable(auto_buff_debug src/auto_buff_debug.cpp)
-    #add_executable(auto_buff_debug_mpc src/auto_buff_debug_mpc.cpp)
-    add_executable(standard_serial src/standard_serial.cpp)
-    #add_executable(auto_buff_debug_serial src/auto_buff_debug_serial.cpp)
+    if(BUILD_BUFF)
+      add_executable(auto_buff_debug_mpc src/auto_buff_debug_mpc.cpp)
+      add_executable(auto_buff_debug_aimer src/auto_buff_debug_aimer.cpp)
+    endif()
+    add_executable(auto_vision_mpc src/auto_vision_mpc.cpp)
+    add_executable(auto_aim_debug_aimer src/auto_aim_debug_aimer.cpp)
     #add_executable(uav src/uav.cpp)
     #add_executable(uav_debug src/uav_debug.cpp)
 
-    target_link_libraries(standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
+    target_link_libraries(standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
     #target_link_libraries(mt_standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
     #target_link_libraries(standard_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
-    target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
+    target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
     #target_link_libraries(mt_auto_aim_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
-    #target_link_libraries(auto_buff_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff tools io ${CERES_LIBRARIES})
-    #target_link_libraries(auto_buff_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff tools io ${CERES_LIBRARIES})
-    target_link_libraries(standard_serial ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
-    #target_link_libraries(auto_buff_debug_serial ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff tools io ${CERES_LIBRARIES})
+    if(BUILD_BUFF)
+      target_link_libraries(auto_buff_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff auto_aim tools io ${AUTO_BUFF_CERES})
+      target_link_libraries(auto_buff_debug_aimer ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff auto_aim tools io ${AUTO_BUFF_CERES})
+    endif()
+    target_link_libraries(auto_vision_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
+    target_link_libraries(auto_aim_debug_aimer ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
     #target_link_libraries(uav ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
     #target_link_libraries(uav_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
 else()
@@ -146,7 +171,9 @@ target_link_libraries(auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io au
 
 ################## tests ##################
 if(BUILD_TEST OR BUILD_ALL AND NOT BUILD_SENTRY)
-    add_executable(auto_buff_test tests/auto_buff_test.cpp)
+    if(BUILD_BUFF)
+      add_executable(auto_buff_test tests/auto_buff_test.cpp)
+    endif()
     add_executable(camera_detect_test tests/camera_detect_test.cpp)
     add_executable(camera_test tests/camera_test.cpp)
     add_executable(camera_thread_test tests/camera_thread_test.cpp)
@@ -161,7 +188,9 @@ if(BUILD_TEST OR BUILD_ALL AND NOT BUILD_SENTRY)
     #add_executable(dm_test tests/dm_test.cpp)
     #add_executable(minimum_vision_system tests/minimum_vision_system.cpp)
 
-    target_link_libraries(auto_buff_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff tools io)
+    if(BUILD_BUFF)
+      target_link_libraries(auto_buff_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff auto_aim tools io)
+    endif()
     target_link_libraries(camera_detect_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools auto_aim io)
     target_link_libraries(camera_test ${OpenCV_LIBS} fmt::fmt tools io)
     target_link_libraries(camera_thread_test ${OpenCV_LIBS} fmt::fmt auto_aim tools io)
@@ -195,30 +224,45 @@ find_package(std_msgs QUIET)
 find_package(rosidl_typesupport_cpp QUIET)
 find_package(sp_msgs QUIET)
 find_package(geometry_msgs QUIET)
+find_package(sensor_msgs QUIET)
+find_package(cv_bridge QUIET)
 
 # 只有在找到 ROS 环境且BUILD_SENTRY 或 BUILD_ALL 为 ON 时才会添加 sentry 和 publish_test
-if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_cpp_FOUND AND sp_msgs_FOUND AND geometry_msgs_FOUND AND BUILD_SENTRY)
+if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_cpp_FOUND AND sp_msgs_FOUND AND geometry_msgs_FOUND AND sensor_msgs_FOUND AND cv_bridge_FOUND AND BUILD_SENTRY)
     #add_compile_definitions(SENTRY_SR) # 串口通信编译为哨兵导航联合通信版本
     # 编译 sentry 和 publish_test
     add_executable(auto_aim_debug_mpc src/auto_aim_debug_mpc.cpp)
-    add_executable(standard_serial src/standard_serial.cpp)
-    #add_executable(sentry src/sentry.cpp)
-    #add_executable(sentry_bp src/sentry_bp.cpp)
-    #add_executable(sentry_debug src/sentry_debug.cpp)
-    #add_executable(sentry_multithread src/sentry_multithread.cpp)
+    add_executable(auto_aim_debug_aimer src/auto_aim_debug_aimer.cpp)
+    add_executable(auto_vision_mpc src/auto_vision_mpc.cpp)
     add_executable(publish_test tests/publish_test.cpp)
     add_executable(subscribe_test tests/subscribe_test.cpp)
     add_executable(topic_loop_test tests/topic_loop_test.cpp)
 
-    target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
-    target_link_libraries(standard_serial ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
-    #target_link_libraries(sentry ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim omniperception tools io)
-    #target_link_libraries(sentry_bp ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim omniperception tools io)
-    #target_link_libraries(sentry_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim omniperception tools io)
-    #target_link_libraries(sentry_multithread ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim omniperception tools io)
+    target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
+    target_link_libraries(auto_aim_debug_aimer ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
+    target_link_libraries(auto_vision_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
     target_link_libraries(publish_test ${OpenCV_LIBS} fmt::fmt tools io auto_aim)
     target_link_libraries(subscribe_test ${OpenCV_LIBS} fmt::fmt tools io)
     target_link_libraries(topic_loop_test ${OpenCV_LIBS} fmt::fmt tools io)
+
+    # sentry 全向感知可执行文件 (需要 BUILD_OMNI)
+    if(BUILD_OMNI)
+        add_executable(sentry src/sentry.cpp)
+        add_executable(sentry_bp src/sentry_bp.cpp)
+        add_executable(sentry_debug src/sentry_debug.cpp)
+        add_executable(sentry_multithread src/sentry_multithread.cpp)
+        add_executable(sentry_odin src/sentry_odin.cpp)
+        add_executable(odincamera_test tests/odincamera_test.cpp)
+
+        target_link_libraries(sentry ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${OMNIPERCEPTION_LIB} tools io)
+        target_link_libraries(sentry_bp ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${OMNIPERCEPTION_LIB} tools io)
+        target_link_libraries(sentry_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${OMNIPERCEPTION_LIB} tools io)
+        target_link_libraries(sentry_multithread ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${OMNIPERCEPTION_LIB} tools io)
+        target_link_libraries(sentry_odin ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${OMNIPERCEPTION_LIB} tools io)
+        target_link_libraries(odincamera_test ${OpenCV_LIBS} fmt::fmt tools io)
+    else()
+        message(STATUS "BUILD_OMNI disabled, skipping sentry omni executables.")
+    endif()
 else()
     message(STATUS "ROS2 environment not found or sentry disabled, skipping ROS2-related code.")
 endif()

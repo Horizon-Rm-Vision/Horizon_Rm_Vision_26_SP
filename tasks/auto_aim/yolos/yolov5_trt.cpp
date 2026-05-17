@@ -694,9 +694,9 @@ bool YOLOV5_TRT::check_name(const Armor & armor) const
 bool YOLOV5_TRT::check_type(const Armor & armor) const
 {
   auto name_ok = (armor.type == ArmorType::small)
-                   ? (armor.name != ArmorName::one && armor.name != ArmorName::base)
+                   ? (armor.name != ArmorName::one)
                    : (armor.name != ArmorName::two && armor.name != ArmorName::sentry &&
-                      armor.name != ArmorName::outpost);
+                      armor.name != ArmorName::outpost && armor.name != ArmorName::base);
 
   return name_ok;
 }

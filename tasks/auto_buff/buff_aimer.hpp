@@ -25,11 +25,11 @@ public:
 
   io::Command aim(
     Target & target, std::chrono::steady_clock::time_point & timestamp, double bullet_speed,
-    bool to_now = true);
+    bool to_now = true, int blade_id = 0);
 
   auto_aim::Plan mpc_aim(
     Target & target, std::chrono::steady_clock::time_point & timestamp, io::GimbalState gs,
-    bool to_now = true);
+    bool to_now = true, int blade_id = 0);
 
   double angle;      ///
   double t_gap = 0;  ///
@@ -58,7 +58,7 @@ private:
 
   bool get_send_angle(
     auto_buff::Target & target, const double predict_time, const double bullet_speed,
-    const bool to_now, double & yaw, double & pitch);
+    const bool to_now, double & yaw, double & pitch, int blade_id = 0);
 };
 }  // namespace auto_buff
 #endif  // AUTO_AIM__AIMER_HPP

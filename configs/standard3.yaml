@@ -1,9 +1,9 @@
 #enemy_color: auto #auto表示根据gimbal发送的模式自动判断敌我颜色，非auto表示固定敌我颜色
-enemy_color: auto
+enemy_color: "red"
 #enemy_color: "blue"
 
-#####-----神经网络参数-----#####
-yolo_name: yolov5_ov
+#####-----自瞄神经网络模式参数-----#####
+yolo_name: yolov5_trt
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
@@ -11,9 +11,36 @@ yolov5_model_path: ../assets/yolov5.xml
 yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
+yolox_ov_model_path: ../assets/best_06_02.xml
+yolox_trt_model_path: ../assets/best_06_02-fp16-ampere.engine
+yolox_svm_model_path: ../assets/svm_numbers_rbf.xml
 device: CPU
-min_confidence: 0.8
+min_confidence: 0.6
 use_traditional: true
+
+#####-----yolox_ov参数-----#####
+yolox_ov:
+  use_svm: false #此行不生效,但先不要动
+  # 标签修正模式: "svm" (华科原版HOG+SVM,目前看效果最好), "lenet" (中南传统的LeNet,效果不行), "resnet" (traditional_cv模式ResNet,效果也不行)
+  label_correction_mode: "svm"
+  # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
+  lenet_model_path: "../assets/lenet.onnx"
+  lenet_label_path: "../assets/label.txt"
+  lenet_threshold: 0.5
+  # ResNet模式参数 (label_correction_mode: "resnet" 时生效)
+  resnet_model_path: "../assets/tiny_resnet.onnx"
+
+#####-----yolox_trt参数-----#####
+yolox_trt:
+  use_svm: false #此行不生效,但先不要动
+  # 标签修正模式: "svm" (华科原版HOG+SVM,目前看效果最好), "lenet" (中南传统的LeNet,效果不行), "resnet" (traditional_cv模式ResNet,效果也不行)
+  label_correction_mode: "svm"
+  # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
+  lenet_model_path: "../assets/lenet.onnx"
+  lenet_label_path: "../assets/label.txt"
+  lenet_threshold: 0.5
+  # ResNet模式参数 (label_correction_mode: "resnet" 时生效)
+  resnet_model_path: "../assets/tiny_resnet.onnx"
 
 #####-----ROI-----#####
 roi: 
@@ -24,7 +51,7 @@ roi:
 
 use_roi: false
 
-#####-----传统方法参数-----#####
+#####-----自瞄神经网络模式传统方法参数(仅yolov5_trt yolov5_ov和yolox_trt yolox_ov可用)-----#####
 threshold: 150
 max_angle_error: 45 # degree
 min_lightbar_ratio: 1.5
@@ -35,6 +62,29 @@ max_armor_ratio: 5
 max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
 
+#####-----自瞄传统视觉模式识别参数 (yolo_name: tra)-----#####
+traditional:
+  binary_thres: 90
+  use_pca: true      # 使用PCA算法矫正灯条角点
+  light:
+    min_ratio: 0.0001
+    max_ratio: 1.0
+    max_angle: 40.0
+    color_diff_thresh: 20
+  armor:
+    min_light_ratio: 0.8
+    min_small_center_distance: 0.8
+    max_small_center_distance: 3.5
+    min_large_center_distance: 3.5
+    max_large_center_distance: 8.0
+    max_angle: 35.0
+  classifier:
+    model_path: ../assets/lenet.onnx
+    label_path: ../assets/label.txt
+    threshold: 0.7
+    ignore_classes: ["negative"]
+
+
 #####-----tracker参数-----#####
 min_detect_count: 5
 max_temp_lost_count: 40 #15
@@ -43,6 +93,9 @@ max_temp_lost_count: 40 #15
 outpost_max_temp_lost_count: 75 #75
 outpost_min_detect_count: 3
 outpost_detect_fail_tolerance: 8
+outpost_correction_enable: true
+outpost_correction_min_detect_count: 3
+outpost_correction_cancel_count: 5
 outpost_h_max_reasonable: 0.25
 outpost_match_gate: 10.0
 outpost_q_h: 0.0006
@@ -67,6 +120,12 @@ gyro_speed_threshold: 2 # rad/s
 gimbal_yaw_threshold: 30 # degree, 云台yaw角度约束阈值
 target_distance_threshold: 5 # meter, 目标距离约束阈值
 
+#####-----锁中心参数-----#####
+track_center: false  # 是否启用锁中心模式
+aim_center_palstance_threshold: 6.5  # 锁中心角速度阈值，弧度制
+switch_trackmode_threshold: 1.2  # 切换锁中心模式的角速度偏移，弧度制
+aim_center_angle_tolerance: 1  # 锁中心自动击发角度容差，角度制
+
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree
 second_tolerance: 2 # 远距离射击容差，degree
@@ -86,121 +145,80 @@ Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----gimbal参数-----#####
-com_port: /dev/ttyACM0
+com_port: /dev/pts/3
 
 # #####-----相机参数-----#####
-# camera_name: "mindvision"
+#camera_name: "mindvision"
+#exposure_ms: 3
+#gamma: 3 #已经废弃
+#vid_pid: "f622:d13a"
+
+# camera_name: "hikrobot"
 # exposure_ms: 3
-# gamma: 3 #已经废弃
-# vid_pid: "f622:d13a"
+# gain: 10.0
+# vid_pid: "2bdf:0001"
 
-camera_name: "hikrobot"
-exposure_ms: 3
-gain: 10.0
-vid_pid: "2bdf:0001"
+camera_name: "daheng"
+exposure_ms: 10
+gamma: 2.85
+vid_pid: "KE0200010097"
+camera_param_path: ../configs/camera_param/MD_HERO_UL_8MM.yaml
 
-# camera_name: "daheng"
-# exposure_ms: 6
-# gamma: 2.85
-# vid_pid: "KE0200010097"
+#####-----BUFF神经网络参数-----#####
+model: ../assets/yolo11_buff_int8.xml  # YOLO11 buff检测模型路径
+yolox_model: ../assets/yolox_rune_3.6m.xml  # YOLOX buff检测模型路径（移植ROS版）
+buff_yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-ampere.engine  # YOLOX TRT buff检测模型路径（TensorRT引擎文件）
 
-R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
-#  1  0  0
-#  0  1  0
-#  0  0  1
+#####-----检测器模式-----#####
+detector_mode: "yolox_ov"  # 检测器模式: "yolo11" / "yolox_ov" / "yolox_trt"
 
-# # HERO-3-08
-# # 重投影误差: 0.3751px
-# camera_matrix: [2519.6346787506677, 0, 650.62921967933346, 0, 2520.0186051833116, 479.96940027405566, 0, 0, 1]
-# distort_coeffs: [-0.0094591070249334542, 0.39935443155347256, 0.0011520327176720976, -0.0011554823923010092, 0]
+#####-----buff检测参数-----#####
+confidence_threshold: 0.7  # 置信度阈值
+iou_threshold: 0.4  # NMS的IOU阈值
+lose_max: 20  # 最大丢失帧数
 
-# # 相机同理想情况的偏角: yaw0.38 pitch-0.52 roll-1.26 degree
-# R_camera2gimbal: [-0.0064779369372593987, -0.0092959577573492862, 0.99993580869094323, -0.99973770966816744, -0.021906286121654128, -0.0066803065650612352, 0.021966979776106534, -0.99971680980052036, -0.009151611977478824]
-# t_camera2gimbal: [0.11612241824736501, -0.010136533135126701, 0.098385671795090585]
+#####-----R标签检测参数（移植自ROS版）-----#####
+detect_r_tag: true  # 是否使用传统视觉方法检测R标中心
+binary_thresh: 100  # 二值化阈值（用于R标检测）
 
-# # # INFANTRY-A-3-10
-# # # 重投影误差: 0.2754px
-# # camera_matrix: [1266.6039864439122, 0, 643.04121833566421, 0, 1266.4506056550972, 494.58721502051958, 0, 0, 1]
-# # distort_coeffs: [-0.20874626403019023, 0.14038611567200077, -4.7953109312166869e-05, 9.4148356626248884e-05, 0]
-# # # 相机同理想情况的偏角: yaw-1.09 pitch-0.67 roll-1.70 degree
-# # R_camera2gimbal: [0.019389096825157548, -0.011088731212087291, 0.99975052036216061, -0.99937099647209426, -0.029911703809022194, 0.01904997075102156, 0.02969300144273259, -0.9994910354852351, -0.011661717282393402]
-# # t_camera2gimbal: [0.12501580483081576, 0.007616350691297802, 0.05634274875982663]
-
-#MD_HERO_UL_8MM
-# 重投影误差: 0.2310px
-camera_matrix: [1763.5295533178944, 0, 645.86006507429863, 0, 1764.2479533695321, 486.84155875369783, 0, 0, 1]
-distort_coeffs: [-0.063994930888736812, 0.3208738560373674, 0.00019061278817404133, -0.00084957472399383013, 0]
-
-# 相机同理想情况的偏角: yaw0.27 pitch-1.63 roll-1.95 degree
-# 标定板到世界坐标系原点的水平距离: 2.42 m
-# 标定板同竖直摆放时的偏角: yaw-10.28 pitch26.58 roll88.13 degree
-R_camera2gimbal: [-0.0037644611148647564, -0.028600461882099353, 0.99958383460950628, -0.99941395907312669, -0.033901758859873801, -0.0047338310052205844, 0.034023039874380739, -0.99901585789532754, -0.028456078987955442]
-t_camera2gimbal: [0.14536664794108903, 0.047210792174469635, 0.10461993940789979]
-
-# 相机同理想情况的偏角: yaw1.07 pitch-0.56 roll-2.00 degree
-#R_camera2gimbal: [-0.018315962937847319, -0.010430036788151903, 0.99977784524076019, -0.99922426024648503, -0.034675633732984767, -0.018667569742221567, 0.034862633815078196, -0.9993441923370614, -0.0097868281716848582]
-#t_camera2gimbal: [0.14553969772307446, 0.041173562112005957, 0.10608017692451503]
-
-
-# # 3-21-infantryB-6mm-mid
-# # 重投影误差: 0.2322px
-# camera_matrix: [1266.4036530077772, 0, 665.71225444274785, 0, 1266.1196648288451, 528.17723877846731, 0, 0, 1]
-# distort_coeffs: [-0.20593766909894601, 0.16350093720125505, 0.0010282908413185427, -0.0006084612900441053, 0]
-
-# # 相机同理想情况的偏角: yaw0.02 pitch-1.98 roll-2.18 degree
-# # 标定板到世界坐标系原点的水平距离: 1.61 m
-# # 标定板同竖直摆放时的偏角: yaw-19.57 pitch23.71 roll-90.58 degree
-# R_camera2gimbal: [0.00099514836140247062, -0.034493441870641101, 0.99940442872125401, -0.99927483554628382, -0.038074942149525698, -0.00031909913485715576, 0.038063272635000596, -0.99867937860367728, -0.034506318669000752]
-# t_camera2gimbal: [0.14248187960142356, -0.032337723960966631, 0.050903298954865527]
-
-# # # 相机同理想情况的偏角: yaw-1.51 pitch-2.23 roll-2.19 degree
-# # R_camera2gimbal: [0.027847057995872948, -0.037844628588460848, 0.99889555282220377, -0.99888136018961715, -0.03925831630553267, 0.026359303226662974, 0.038217399528420411, -0.99851217753608612, -0.038895522691293039]
-# # t_camera2gimbal: [0.14819703162162404, -0.030183296220309429, 0.055145640227770479]
-
-
-# # PLANE-3-10
-# # 重投影误差: 0.1957px
-# camera_matrix: [2508.7138136042017, 0, 646.73120200590392, 0, 2508.7560342575703, 502.48936237488226, 0, 0, 1]
-# distort_coeffs: [-0.0016609344221097332, 0.33422108330336775, -0.0013771157612911913, 0.0019174030459867077, 0]
-# # 相机同理想情况的偏角: yaw0.52 pitch2.72 roll0.29 degree 0.19handeye 3.10
-# R_camera2gimbal: [-0.0089080452263095022, 0.047467815012345205, 0.99883304574298082, -0.9999473078054989, 0.0046733921166786097, -0.0091400776068052188, -0.0051017979948916117, -0.9988618352625539, 0.047423683040668463]
-# t_camera2gimbal: [0.10323981204078483, -0.0060945656744575295, -0.045007750655802162]
-
-# # # SENTRY-UL
-# # # 重投影误差: 0.1728px
-# # camera_matrix: [1809.6026201331601, 0, 724.0137885267776, 0, 1810.6848940957705, 549.64495954190784, 0, 0, 1]
-# # distort_coeffs: [-0.077733912406472275, 0.14214846062382083, 0.00073875610347489155, -0.000788053308949367, 0]
-
-# # 相机同理想情况的偏角: yaw0.10 pitch3.20 roll-0.69 degree
-# # 标定板到世界坐标系原点的水平距离: 1.64 m
-# # 标定板同竖直摆放时的偏角: yaw-172.23 pitch13.40 roll-91.09 degree
-# R_camera2gimbal: [-0.0024108947876141183, 0.055743969570051538, 0.99844218532817242, -0.99992395858513461, -0.01220960503461694, -0.0017327989879380565, 0.012093991638702131, -0.99837043996778685, 0.055769166792872006]
-# t_camera2gimbal: [0.088499680431026864, 0.008325465769968619, 0.052859579552679316]
-
-# # 相机同理想情况的偏角: yaw-0.50 pitch-3.93 roll-1.19 degree
-# #R_camera2gimbal: [0.010227926370181439, -0.068247836370815107, 0.99761596937542485, -0.9997325295038072, -0.021393318744386436, 0.0087860892904833964, 0.020742684833102345, -0.99743900001143104, -0.068448391377088358]
-# #t_camera2gimbal: [0.13581761689413138, 0.012348126218333725, 0.066730865526566735]
-
-#####-----buff_detector参数-----#####
-model: "../assets/yolo11_buff_int8.xml"
+#####-----buff tracker参数-----#####
+buff_tracker:
+  lost_time_thres: 2.0
+  tracking_thres: 5
+  match_gate: 15.0
+  max_dis_diff: 1.0
+  r_yaw_var: 0.01
+  r_pitch_var: 0.01
+  r_dis_var: 0.5
+  r_roll_var: 0.1
+  motion_delay_ms: 0
+  pose_buffer_size: 200
 
 #####-----buff_aimer参数-----#####
 fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
 
 # 弹道解算模式，可选 "no_drag" (默认抛物线) 或 "hero" (带空气阻力迭代)
-ballistic_model: "no_drag"
+ballistic_model: "hero"
 
 #####-----nav速度倍数（仅用于哨兵模式，导航相关）-----#####
 velocity_n: 30
 
-#####-----锁车中心参数-----#####
-aim_center: false # 锁车中心
-aim_center_min_distance: 100 # 触发锁车中心机制的最小距离，单位m，当装甲板距离车中心大于该值时优先锁定车中心点
-armor_yaw_threshold: 10 # 锁车时装甲板yaw角度阈值，degree
 
-#####-----UI显示配置-----#####
+# #####-----UI显示配置-----#####
 ui:
-  enabled: true  # 是否绘制UI
-  imshow: true   # 是否使用imshow显示图像
-  
+  enabled: true
+  imshow: true
+  web:
+    enabled: true
+    host: "192.168.1.167"
+    port: 9878
+    send_image: true
+    image_quality: 75
+    max_image_dim: 640
+
+#####-----recorder参数-----#####
+recorder: false
+
+#####-----弹速参数-----#####
+bullet_speed: "auto"

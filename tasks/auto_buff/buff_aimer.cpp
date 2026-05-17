@@ -27,7 +27,7 @@ Aimer::Aimer(const std::string & config_path)
 
 io::Command Aimer::aim(
   auto_buff::Target & target, std::chrono::steady_clock::time_point & timestamp,
-  double bullet_speed, bool to_now)
+  double bullet_speed, bool to_now, int blade_id)
 {
   io::Command command = {false, false, 0, 0};
   if (target.is_unsolve()) return command;
@@ -43,7 +43,7 @@ io::Command Aimer::aim(
 
   bool angle_changed =
     std::abs(last_yaw_ - yaw) > 5 / 57.3 || std::abs(last_pitch_ - pitch) > 5 / 57.3;
-  if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch)) {
+  if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch, blade_id)) {
     command.yaw = yaw;
     command.pitch = -pitch;  //世界坐标系下的pitch向上为负
     if (mistake_count_ > 3) {
@@ -76,7 +76,7 @@ io::Command Aimer::aim(
 
 auto_aim::Plan Aimer::mpc_aim(
   auto_buff::Target & target, std::chrono::steady_clock::time_point & timestamp, io::GimbalState gs,
-  bool to_now)
+  bool to_now, int blade_id)
 {
   auto_aim::Plan plan = {false, false, 0, 0, 0, 0, 0, 0, 0, 0};
   if (target.is_unsolve()) return plan;
@@ -96,7 +96,7 @@ auto_aim::Plan Aimer::mpc_aim(
 
   bool angle_changed =
     std::abs(last_yaw_ - yaw) > 5 / 57.3 || std::abs(last_pitch_ - pitch) > 5 / 57.3;
-  if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch)) {
+  if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch, blade_id)) {
     plan.yaw = yaw;
     plan.pitch = -pitch;  //世界坐标系下的pitch向上为负
     if (mistake_count_ > 3) {
@@ -129,7 +129,7 @@ auto_aim::Plan Aimer::mpc_aim(
         auto dt = predict_time_;
         double last_yaw_mpc, last_pitch_mpc;
         get_send_angle(
-          target, predict_time_ * -1, bullet_speed, to_now, last_yaw_mpc, last_pitch_mpc);
+          target, predict_time_ * -1, bullet_speed, to_now, last_yaw_mpc, last_pitch_mpc, blade_id);
         plan.yaw_vel = tools::limit_rad(yaw - last_yaw_mpc) / (2 * dt);
         // plan.yaw_vel = tools::limit_min_max(plan.yaw_vel, -6.28, 6.28);
         plan.yaw_acc = (tools::limit_rad(yaw - gs.yaw) - tools::limit_rad(gs.yaw - last_yaw_mpc)) /
@@ -157,7 +157,7 @@ auto_aim::Plan Aimer::mpc_aim(
 
 bool Aimer::get_send_angle(
   auto_buff::Target & target, const double predict_time, const double bullet_speed,
-  const bool to_now, double & yaw, double & pitch)
+  const bool to_now, double & yaw, double & pitch, int blade_id)
 {
   // 考虑detecor所消耗的时间，此外假设aimer的用时可忽略不计
   // 如果 to_now 为 true，则根据当前时间和时间戳预测目标位置,deltatime = 现在时间减去当时照片时间，加上0.1
@@ -165,8 +165,8 @@ bool Aimer::get_send_angle(
   // std::cout << "gap: " << detect_now_gap << std::endl;
   angle = target.ekf_x()[5];
 
-  // 计算目标点的空间坐标
-  auto aim_in_world = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
+  // 计算目标点的空间坐标 (使用 blade_id 选择目标叶片)
+  auto aim_in_world = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7), blade_id);
   double d = std::sqrt(aim_in_world[0] * aim_in_world[0] + aim_in_world[1] * aim_in_world[1]);
   double h = aim_in_world[2];
 
@@ -183,7 +183,7 @@ bool Aimer::get_send_angle(
   angle = target.ekf_x()[5];
 
   // 计算新的目标点的空间坐标
-  aim_in_world = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
+  aim_in_world = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7), blade_id);
   d = fsqrt(aim_in_world[0] * aim_in_world[0] + aim_in_world[1] * aim_in_world[1]);
   h = aim_in_world[2];
   tools::Trajectory trajectory1(bullet_speed, d, h, ballistic_model_);

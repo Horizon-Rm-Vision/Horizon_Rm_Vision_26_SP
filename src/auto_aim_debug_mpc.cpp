@@ -14,12 +14,14 @@
 #include "tasks/auto_aim/yolo.hpp"
 #include "tools/exiter.hpp"
 #include "tools/ui_manager.hpp"
+#include "tools/ui_web_stream.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
 #include "tools/plotter.hpp"
 #include "tools/thread_safe_queue.hpp"
 #include "tools/ui_manager.hpp"
 #include "tools/yaml.hpp"
+#include "tools/recorder.hpp"
 
 #ifdef SENTRY_SR
 #include "io/ros2/publish2nav.hpp"
@@ -35,8 +37,10 @@ const std::string keys =
 
 int main(int argc, char * argv[])
 {
-  tools::Exiter exiter;
+  // 初始化绘图器、录制器、退出器
   tools::Plotter plotter;
+  tools::Recorder recorder;
+  tools::Exiter exiter;
 
   cv::CommandLineParser cli(argc, argv, keys);
   auto config_path = cli.get<std::string>(0);
@@ -44,6 +48,9 @@ int main(int argc, char * argv[])
     cli.printMessage();
     return 0;
   }
+
+  auto recorder_config = tools::load(config_path);
+  bool enable_recorder = recorder_config["recorder"] ? recorder_config["recorder"].as<bool>() : false;
 
   // 终端 FPS 显示变量
   auto last_fps_time = std::chrono::steady_clock::now();
@@ -64,6 +71,8 @@ int main(int argc, char * argv[])
   #endif
 
   tools::UIManager ui_manager(config_path);
+  tools::UIWebStream ui_web_stream(config_path);
+  plotter.configureWebStreamFromConfig(config_path);
   ui_manager.setProgramMode("AutoAim MPC");
 
   io::Gimbal gimbal(config_path);
@@ -166,7 +175,16 @@ int main(int argc, char * argv[])
       }
 
       //plotter.plot(data);
-      plotter.drawData({gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw", "plann_yaw"});
+      plotter.setWindowName("MPC Debug");
+      plotter.subplot("Yaw", {gs.yaw * 180/M_PI, plan.target_yaw * 180/M_PI, plan.yaw * 180/M_PI},
+                      {"gimbal_yaw", "target_yaw", "plan_yaw"});
+      plotter.subplot("Pitch", {gs.pitch * 180/M_PI, plan.target_pitch * 180/M_PI, plan.pitch * 180/M_PI},
+                      {"gimbal_pitch", "target_pitch", "plan_pitch"});
+      //plotter.subplot("Yaw Vel", {gs.yaw_vel, plan.yaw_vel},
+                      //{"gimbal_yaw_vel", "plan_yaw_vel"});
+      //plotter.subplot("Acc", {plan.yaw_acc, plan.pitch_acc},
+                      //{"plan_yaw_acc", "plan_pitch_acc"});
+      plotter.draw();
 
       std::this_thread::sleep_for(10ms);
     }
@@ -196,20 +214,14 @@ int main(int argc, char * argv[])
     }
     
     camera.read(img, t);
+    ui_web_stream.sendImage(img);
+    ui_web_stream.beginFrame(img.cols, img.rows);
     auto q = gimbal.q(t);
+    if (enable_recorder) recorder.record(img, q, t);
 
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);
-
-    #ifdef AIM_CENTER
-    if(tracker.aim_strategy_ == "follow") {
-      planner.aim_center_ = false;
-    }
-    else {
-      planner.aim_center_ = true;
-    }
-    #endif
 
     if (!targets.empty())
       target_queue.push(targets.front());
@@ -228,13 +240,6 @@ int main(int argc, char * argv[])
       tools::draw_text(img, fmt::format("armor_z: {:.2f}", armor.xyz_in_world[2]), {10, 660}, {0, 255, 0});
 
     }
-    #ifdef AIM_CENTER
-    // 绘制锁定中心
-    if (planner.aim_center_) {
-      auto center_image_points = solver.reproject_point(planner.center_points);
-      tools::draw_points(img, center_image_points, {0, 0, 255}, 10);
-    }
-    #endif
 
     if (!targets.empty()) {
       auto target = targets.front();
@@ -249,13 +254,12 @@ int main(int argc, char * argv[])
       Eigen::Vector4d aim_xyza = planner.debug_xyza;
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
-      #ifndef AIM_CENTER
+      #ifndef NOVA_AIM_CENTER
       tools::draw_points(img, image_points, {0, 0, 255});
       #endif
-      #ifdef AIM_CENTER
-      if(planner.aim_center_ == false){
-        tools::draw_points(img, image_points, {0, 0, 255});
-      }
+      #ifdef NOVA_AIM_CENTER
+        auto aim_color = planner.center_tracked() ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 0, 255);
+      tools::draw_points(img, image_points, aim_color);
       #endif
     }
     
@@ -298,11 +302,27 @@ int main(int argc, char * argv[])
     if (has_target) {
       auto& target = target_opt.value();
       ui_manager.addLeftText("target_info", fmt::format("Target Z: {:.2f}  Vz: {:.2f}", target.ekf_x()[4], target.ekf_x()[5]), cv::Scalar(255, 255, 0));
-      
+
       if (target.ekf_x().size() > 7) {
         ui_manager.addLeftText("target_w", fmt::format("Target W: {:.2f}", target.ekf_x()[7]), cv::Scalar(255, 255, 0));
       }
-      
+
+      #ifdef NOVA_AIM_CENTER
+      // 锁中心状态
+      bool is_center_locked = planner.center_tracked();
+      ui_manager.addLeftText("center_lock", fmt::format("Center Lock: {}", is_center_locked ? "ON" : "OFF"),
+                            is_center_locked ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 255, 0));
+      if (is_center_locked) {
+        auto ekf_x = target.ekf_x();
+        auto center_yaw = std::atan2(ekf_x[2], ekf_x[0]);
+        auto r = ekf_x[8];
+        auto lock_x = ekf_x[0] - r * std::cos(center_yaw);
+        auto lock_y = ekf_x[2] - r * std::sin(center_yaw);
+        ui_manager.addLeftText("lock_point", fmt::format("Lock Pt: ({:.2f}, {:.2f})", lock_x, lock_y),
+                              cv::Scalar(0, 255, 255));
+      }
+      #endif
+
       // Eigen::Vector4d aim_xyza = planner.debug_xyza;
       // ui_manager.addLeftText("armor_xyz", fmt::format("Armor X: {:.2f}  Y: {:.2f}  Z: {:.2f}", aim_xyza[0], aim_xyza[1], aim_xyza[2]), cv::Scalar(255, 255, 0));
     }
@@ -318,12 +338,10 @@ int main(int argc, char * argv[])
     ui_manager.addRightText("armor_count", fmt::format("Armors: {}", armors.size()), 
                            armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
     
-    #ifdef AIM_CENTER
-    ui_manager.addRightText("aim_strategy", fmt::format("Aim Strategy: {}", tracker.aim_strategy_));
-    #endif
-    
     // 应用UI绘制
     ui_manager.render(img);
+    ui_web_stream.capturePanels(ui_manager);
+    ui_web_stream.sendFrame();
 
     // cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
     if (ui_manager.isImshowEnabled()) {

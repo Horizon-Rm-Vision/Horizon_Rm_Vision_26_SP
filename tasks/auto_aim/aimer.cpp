@@ -37,6 +37,13 @@ Aimer::Aimer(const std::string & config_path)
     right_yaw_offset_ = yaml["right_yaw_offset"].as<double>() / 57.3;  // degree to rad
     tools::logger()->info("[Aimer] successfully loading shootmode");
   }
+
+  #ifdef NOVA_AIM_CENTER
+  track_center_ = yaml["track_center"].as<bool>();
+  aim_center_palstance_threshold_ = yaml["aim_center_palstance_threshold"].as<double>();
+  switch_trackmode_threshold_ = yaml["switch_trackmode_threshold"].as<double>();
+  aim_center_angle_tolerance_ = yaml["aim_center_angle_tolerance"].as<double>() / 57.3;  // degree to rad
+  #endif
 }
 
 io::Command Aimer::aim(
@@ -152,6 +159,47 @@ io::Command Aimer::aim(
   return command;
 }
 
+#ifdef NOVA_AIM_CENTER
+Eigen::Vector4d Aimer::compute_facing_armor(const Target & target) const
+{
+  Eigen::VectorXd x = target.ekf_x();
+  auto center_yaw = std::atan2(x[2], x[0]);
+  auto armor_list = target.armor_xyza_list();
+  auto armor_num = static_cast<int>(armor_list.size());
+
+  // Step 1: 找出正对相机的装甲板 (yaw最接近center_yaw的板)
+  int facing_id = 0;
+  double min_delta = 1e10;
+  for (int i = 0; i < armor_num; i++) {
+    auto delta = std::abs(tools::limit_rad(armor_list[i][3] - center_yaw));
+    if (delta < min_delta) {
+      min_delta = delta;
+      facing_id = i;
+    }
+  }
+
+  // Step 2: 角度超前 (仅标准4板目标，对齐WMJ StandardModel::getFacingArmor)
+  if (armor_num == 4) {
+    auto palstance = x[7];
+    if (std::abs(palstance) > 1e-6) {
+      auto leading_angle = (palstance > 0 ? -1.0 : 1.0) * (-50.0 / 57.3);
+      if (std::abs(tools::limit_rad(armor_list[facing_id][3] + leading_angle - center_yaw)) <
+          min_delta) {
+        facing_id = (facing_id + 1) % 2;
+      }
+    }
+  }
+
+  // Step 3: 用该装甲板的实际半径和高度计算 facing point
+  auto r = std::hypot(x[0] - armor_list[facing_id][0], x[2] - armor_list[facing_id][1]);
+  auto facing_x = x[0] - r * std::cos(center_yaw);
+  auto facing_y = x[2] - r * std::sin(center_yaw);
+  auto facing_z = armor_list[facing_id][2];
+
+  return {facing_x, facing_y, facing_z, center_yaw};
+}
+#endif
+
 AimPoint Aimer::choose_aim_point(const Target & target)
 {
   Eigen::VectorXd ekf_x = target.ekf_x();
@@ -162,6 +210,21 @@ AimPoint Aimer::choose_aim_point(const Target & target)
 
   // 整车旋转中心的球坐标yaw
   auto center_yaw = std::atan2(ekf_x[2], ekf_x[0]);
+
+  #ifdef NOVA_AIM_CENTER
+  // 判断是否锁中心（前哨站禁用锁中心）
+  if (track_center_ && target.name != ArmorName::outpost &&
+      ((std::abs(ekf_x[7]) - switch_trackmode_threshold_) > aim_center_palstance_threshold_)) {
+    center_tracked_ = true;
+  } else {
+    center_tracked_ = false;
+  }
+
+  // 锁中心模式：瞄准正对相机的旋转中心方向
+  if (center_tracked_) {
+    return {true, compute_facing_armor(target)};
+  }
+  #endif
 
   // 如果delta_angle为0，则该装甲板中心和整车中心的连线在世界坐标系的xy平面过原点
   std::vector<double> delta_angle_list;
@@ -218,5 +281,24 @@ AimPoint Aimer::choose_aim_point(const Target & target)
 
   return {false, armor_xyza_list[0]};
 }
+
+#ifdef NOVA_AIM_CENTER
+bool Aimer::check_center_fire(const Target & target) const
+{
+  if (!center_tracked_) return true;
+
+  Eigen::VectorXd x = target.ekf_x();
+  auto center_yaw = std::atan2(x[2], x[0]);
+  auto armor_xyza_list = target.armor_xyza_list();
+
+  double min_delta = 1e10;
+  for (const auto & xyza : armor_xyza_list) {
+    auto delta = std::abs(tools::limit_rad(xyza[3] - center_yaw));
+    if (delta < min_delta) min_delta = delta;
+  }
+
+  return min_delta < aim_center_angle_tolerance_;
+}
+#endif
 
 }  // namespace auto_aim

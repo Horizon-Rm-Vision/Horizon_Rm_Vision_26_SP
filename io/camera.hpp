@@ -13,6 +13,9 @@ class CameraBase
 public:
   virtual ~CameraBase() = default;
   virtual void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp) = 0;
+
+  /// 设备方位名: "left" / "right" / "front" / "back"
+  std::string device_name;
 };
 
 class Camera

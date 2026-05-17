@@ -36,6 +36,9 @@ min_confidence: 0.8
 min_detect_count: 5
 max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
+outpost_correction_enable: true
+outpost_correction_min_detect_count: 3
+outpost_correction_cancel_count: 5
 
 #####-----aimer参数-----#####
 yaw_offset: -2 # degree -2.5
@@ -47,6 +50,12 @@ high_speed_delay_time: 0.015 # s
 low_speed_delay_time: 0.060 # s
 gyro_angle_threshold: 60 # degree
 gyro_speed_threshold: 2 # rad/s
+
+#####-----锁中心参数-----#####
+track_center: false  # 是否启用锁中心模式
+aim_center_palstance_threshold: 6.5  # 锁中心角速度阈值，弧度制
+switch_trackmode_threshold: 1.2  # 切换锁中心模式的角速度偏移，弧度制
+aim_center_angle_tolerance: 1  # 锁中心自动击发角度容差，角度制
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree

@@ -15,6 +15,7 @@
 #include "tasks/auto_aim/yolo.hpp"
 #include "tools/exiter.hpp"
 #include "tools/ui_manager.hpp"
+#include "tools/ui_web_stream.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
 #include "tools/plotter.hpp"
@@ -41,6 +42,9 @@ int main(int argc, char * argv[])
     cli.printMessage();
     return 0;
   }
+
+  auto yaml_config = tools::load(config_path);
+  bool enable_recorder = yaml_config["recorder"] ? yaml_config["recorder"].as<bool>() : false;
 
   // 终端 FPS 显示变量
   auto last_fps_time = std::chrono::steady_clock::now();
@@ -76,6 +80,7 @@ int main(int argc, char * argv[])
   auto_aim::Shooter shooter(config_path);
 
   tools::UIManager ui_manager(config_path);
+  tools::UIWebStream ui_web_stream(config_path);
   ui_manager.setProgramMode("AutoAim AIMER");
 
   cv::Mat img;
@@ -110,6 +115,8 @@ int main(int argc, char * argv[])
     }
     
     camera.read(img, t);
+    ui_web_stream.sendImage(img);
+    ui_web_stream.beginFrame(img.cols, img.rows);
     q = gimbal.q(t);
     auto gimbal_mode = gimbal.mode();
     // Map GimbalMode to Mode
@@ -124,7 +131,7 @@ int main(int argc, char * argv[])
       last_mode = mode;
     }
 
-    // recorder.record(img, q, t);
+    if (enable_recorder) recorder.record(img, q, t);
 
     solver.set_R_gimbal2world(q);
 
@@ -138,7 +145,7 @@ int main(int argc, char * argv[])
 
     auto command = aimer.aim(targets, t, bullet_speed);
 
-    // 使用Shooter决定开火
+    // 使用Shooter决定开火（锁中心约束已集成在Shooter内部）
     Eigen::Vector3d gimbal_pos = ypr;
     command.shoot = shooter.shoot(command, aimer, targets, gimbal_pos);
 
@@ -170,7 +177,17 @@ int main(int argc, char * argv[])
       Eigen::Vector4d aim_xyza = aim_point.xyza;
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
+      #ifndef NOVA_AIM_CENTER
       if (aim_point.valid) tools::draw_points(img, image_points, {0, 0, 255});
+      #endif
+
+      #ifdef NOVA_AIM_CENTER
+      if (aim_point.valid) {
+        // 锁中心模式用不同颜色绘制瞄准点
+        auto aim_color = aimer.center_tracked() ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 0, 255);
+        tools::draw_points(img, image_points, aim_color);
+      }
+      #endif
     }
 
     // UI初始化
@@ -180,9 +197,28 @@ int main(int argc, char * argv[])
     bool has_target = !targets.empty();
     ui_manager.addLeftText("detect", fmt::format("Detect: {}", has_target ? "YES" : "NO"), 
                           has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
-    ui_manager.addLeftText("fire", fmt::format("Fire: {}", command.shoot ? "YES" : "NO"), 
+    ui_manager.addLeftText("fire", fmt::format("Fire: {}", command.shoot ? "YES" : "NO"),
                           command.shoot ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
-    
+
+    #ifdef NOVA_AIM_CENTER
+    // 锁中心状态
+    if (!targets.empty()) {
+      auto target = targets.front();
+      bool is_center_locked = aimer.center_tracked();
+      ui_manager.addLeftText("center_lock", fmt::format("Center Lock: {}", is_center_locked ? "ON" : "OFF"),
+                            is_center_locked ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 255, 0));
+      if (is_center_locked) {
+        auto ekf_x = target.ekf_x();
+        auto center_yaw = std::atan2(ekf_x[2], ekf_x[0]);
+        auto r = ekf_x[8];
+        auto lock_x = ekf_x[0] - r * std::cos(center_yaw);
+        auto lock_y = ekf_x[2] - r * std::sin(center_yaw);
+        ui_manager.addLeftText("lock_point", fmt::format("Lock Pt: ({:.2f}, {:.2f})", lock_x, lock_y),
+                              cv::Scalar(0, 255, 255));
+      }
+    }
+    #endif
+
     // 云台状态 - 接收到的数据
     auto gs = gimbal.state();
     #ifdef SENTRY_SR
@@ -191,7 +227,7 @@ int main(int argc, char * argv[])
     auto form = ros2.subscribe_form();
     int8_t gimbal_form_value = gimbal_form ? gimbal_form->data : 0;
     //发布导航的信息
-    ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.state, gs.energy_state,gs.bullets,gs.judge);
+    ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.state, gs.energy_state,gs.bullets);
     #endif
     ui_manager.addLeftText("gimbal_status", fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", -gs.yaw * 180.0 / M_PI, -gs.pitch * 180.0 / M_PI));
     
@@ -229,6 +265,8 @@ int main(int argc, char * argv[])
     
     // 应用UI绘制
     ui_manager.render(img);
+    ui_web_stream.capturePanels(ui_manager);
+    ui_web_stream.sendFrame();
 
     // 显示图像
     if (ui_manager.isImshowEnabled()) {
@@ -241,8 +279,10 @@ int main(int argc, char * argv[])
     }
     //#endif
 
-    plotter.drawData({gs.yaw * 180/M_PI, command.yaw * 180/M_PI}, {"gimbal_yaw", "target_yaw"});
-    
+    plotter.subplot("Yaw", {gs.yaw * 180/M_PI, command.yaw * 180/M_PI},
+                    {"gimbal_yaw", "target_yaw"});
+    plotter.draw();
+
     #ifdef FIRE_CONSTRAINT
     // 开火约束检查
     bool allow_fire = command.shoot;
@@ -263,7 +303,7 @@ int main(int argc, char * argv[])
     #endif
     
     #ifndef SENTRY_SR
-    gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, 0);
+    gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0);
     #endif
     #ifdef SENTRY_SR
     gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z, form.data,gimbal_form_value);
