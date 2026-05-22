@@ -83,12 +83,6 @@ int main(int argc, char * argv[])
   tools::ThreadSafeQueue<std::optional<auto_aim::Target>, true> target_queue(1);
   target_queue.push(std::nullopt);
 
-  #ifdef FIRE_CONSTRAINT
-  // 记录初始云台yaw
-  auto initial_gimbal_state = gimbal.state();
-  double initial_yaw = initial_gimbal_state.yaw;
-  #endif
-
   std::atomic<bool> quit = false;
   
   auto plan_thread = std::thread([&]() {
@@ -110,7 +104,7 @@ int main(int argc, char * argv[])
       // 开火约束检查
       bool allow_fire = plan.fire;
       // 云台角度约束
-      if (std::abs(plan.yaw - initial_yaw) > gimbal_yaw_threshold) {
+      if (std::abs(plan.yaw - gs.yaw) > gimbal_yaw_threshold) {
         allow_fire = false;
       }
       // 目标距离约束

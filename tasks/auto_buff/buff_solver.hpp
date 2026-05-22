@@ -25,14 +25,6 @@ public:
 
   void solve(std::optional<PowerRune> & ps) const;
 
-  /// 对任意扇叶的 4 个角点做 PnP, 填充输出姿态 (不依赖 PowerRune 结构)
-  void solveFanBladeCorners(
-    const std::vector<cv::Point2f> & corners,
-    Eigen::Vector3d & ypd_in_world,
-    Eigen::Vector3d & ypr_in_world,
-    Eigen::Vector3d & blade_xyz_in_world,
-    Eigen::Vector3d & blade_ypd_in_world) const;
-
   // 调试用
   cv::Point2f point_buff2pixel(cv::Point3f x);
 
@@ -47,18 +39,8 @@ private:
   Eigen::Vector3d t_camera2gimbal_;
   Eigen::Matrix3d R_gimbal2world_;
 
-  cv::Vec3d rvec_, tvec_;
+  mutable cv::Vec3d rvec_, tvec_;
 
-  // std::vector<std::vector<cv::Point3f>> OBJECT_POINTS = {
-  //   {cv::Point3f(0, 160e-3, 858.5e-3), cv::Point3f(0, -160e-3, 858.5e-3),
-  //    cv::Point3f(0, -186e-3, 541.5e-3), cv::Point3f(0, 186e-3, 541.5e-3),
-  //    cv::Point3f(0, 0, 700e-3)},
-  //   {},
-  //   {},
-  //   {},
-  //   {}};  // 单位：米
-
-  // TODO
   const std::vector<cv::Point3f> OBJECT_POINTS = {
     cv::Point3f(0, 0, 827e-3), cv::Point3f(0, 127e-3, 700e-3),
     cv::Point3f(0, 0, 573e-3), cv::Point3f(0, -127e-3, 700e-3),

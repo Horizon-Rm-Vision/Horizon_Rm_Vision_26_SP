@@ -84,12 +84,6 @@ int main(int argc, char * argv[])
   Eigen::Quaterniond q;
   std::chrono::steady_clock::time_point t;
 
-  #ifdef FIRE_CONSTRAINT
-  // 记录初始云台yaw
-  auto initial_gimbal_state = gimbal.state();
-  double initial_yaw = initial_gimbal_state.yaw;
-  #endif
-
   auto mode = io::Mode::idle;
   auto last_mode = io::Mode::idle;
 
@@ -275,7 +269,7 @@ int main(int argc, char * argv[])
     // 开火约束检查
     bool allow_fire = command.shoot;
     // 云台角度约束
-    if (std::abs(command.yaw - initial_yaw) > gimbal_yaw_threshold) {
+    if (std::abs(command.yaw - gs.yaw) > gimbal_yaw_threshold) {
       allow_fire = false;
     }
     // 目标距离约束

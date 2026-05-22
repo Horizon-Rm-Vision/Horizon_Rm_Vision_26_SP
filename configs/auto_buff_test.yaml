@@ -1,5 +1,7 @@
 # auto_buff_test.cpp 配置文件
 # 用于能量机关测试，通过 buff_mode 区分大符/小符模式
+#enemy_color: "red"
+enemy_color: "blue"
 
 #####-----能量机关模式-----#####
 buff_mode: "big"  # "big" = 大符 (2026 双目标激活), "small" = 小符 (单目标)
@@ -58,6 +60,19 @@ buff_tracker:
   r_roll_var: 0.1
   motion_delay_ms: 0
   pose_buffer_size: 200
+  # --- BigBuffSelector 参数（仅大符 BIG 模式生效）---
+  # miss_threshold: 连续丢失 first blade 的帧数阈值。
+  #   调小 → 更快判定 first blade 消失，切换到追踪 last blade（但可能因短暂漏检误切换）。
+  #   调大 → 更保守，需更长时间确认消失（但切换太晚可能导致 last blade 也丢失）。
+  miss_threshold: 12
+  # reset_threshold: 两个 blade 都丢失的帧数阈值，触发 selector 完全复位。
+  #   调小 → 更快复位重新初始化 blade pair（但可能因短暂遮挡误复位）。
+  #   调大 → 更耐遮挡，但丢失后恢复更慢。
+  reset_threshold: 50
+  # match_dist: blade 身份匹配的像素距离阈值。
+  #   调大 → 更容易将检测到的 blade 匹配到记忆中的 blade（但可能误匹配，混淆 first/last）。
+  #   调小 → 匹配更严格（但可能因检测抖动导致匹配失败，回退到角度匹配）。
+  match_dist: 70.0
 
 #####-----R标签检测参数（移植自ROS版）-----#####
 detect_r_tag: true  # 是否使用传统视觉方法检测R标中心

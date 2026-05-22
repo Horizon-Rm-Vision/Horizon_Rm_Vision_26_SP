@@ -36,3 +36,7 @@ echo "  麦轮步兵 (Mecanum Infantry) 编译完成!"
 echo "  可执行文件: ${BUILD_DIR}/auto_aim_debug_mpc"
 echo "              ${BUILD_DIR}/auto_buff_debug_mpc"
 echo "=============================================="
+
+# 编译完成后进入 build 文件夹
+cd "${BUILD_DIR}"
+exec bash

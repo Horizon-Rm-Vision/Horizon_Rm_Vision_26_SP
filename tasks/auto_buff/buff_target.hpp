@@ -47,15 +47,11 @@ public:
 
   Eigen::Vector3d point_buff2world(const Eigen::Vector3d & point_in_buff) const;
 
-  /// blade_id 重载: blade_id=0..4 对应 fanblades 中的 5 个位置偏移
-  Eigen::Vector3d point_buff2world(
-    const Eigen::Vector3d & point_in_buff, int blade_id) const;
-
   bool is_unsolve() const;
 
   Eigen::VectorXd ekf_x() const;
 
-  /// 获取 EKF 估计的 roll 角, 供 Director 做叶片 ID 匹配
+  /// 获取 EKF 估计的 roll 角
   double get_roll() const { return ekf_.x[5]; }
 
   double spd = 0;  //调试用
@@ -97,11 +93,9 @@ private:
 
   void update(double nowtime, const PowerRune & p) override;
 
-  /// blade_id 参量化雅可比: 在 roll 上叠加 blade_id * 2π/5
-  Eigen::MatrixXd h_jacobian(int blade_id = 0) const;
+  Eigen::MatrixXd h_jacobian() const;
 
   const double SMALL_W = CV_PI / 3;
-  // const double SMALL_W = 0;
 };
 
 /// BigTarget子类
@@ -123,8 +117,7 @@ private:
 
   void update(double nowtime, const PowerRune & p) override;
 
-  /// blade_id 参量化雅可比: 在 roll 上叠加 blade_id * 2π/5
-  Eigen::MatrixXd h_jacobian(int blade_id = 0) const;
+  Eigen::MatrixXd h_jacobian() const;
 
   tools::RansacSineFitter spd_fitter_;
 

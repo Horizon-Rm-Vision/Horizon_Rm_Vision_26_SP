@@ -18,7 +18,6 @@
 #ifndef NO_AUTO_BUFF
 #include "tasks/auto_buff/buff_aimer.hpp"
 #include "tasks/auto_buff/buff_detector.hpp"
-#include "tasks/auto_buff/buff_director.hpp"
 #include "tasks/auto_buff/buff_solver.hpp"
 #include "tasks/auto_buff/buff_tracker.hpp"
 #include "tasks/auto_buff/buff_type.hpp"
@@ -95,18 +94,12 @@ int main(int argc, char * argv[])
   tools::ThreadSafeQueue<std::optional<auto_aim::Target>, true> target_queue(1);
   target_queue.push(std::nullopt);
 
-  #ifdef FIRE_CONSTRAINT
-  auto initial_gimbal_state = gimbal.state();
-  double initial_yaw = initial_gimbal_state.yaw;
-  #endif
-
   // ======================== 打符模块 ========================
 #ifndef NO_AUTO_BUFF
   auto_buff::Buff_Detector buff_detector(config_path);
   auto_buff::Solver buff_solver(config_path);
   auto_buff::BuffTracker buff_tracker(config_path);
   auto_buff::Aimer buff_aimer(config_path);
-  auto_buff::Buff2026Director buff_director;
 
   // 运动延时补偿 (移植自 MK2)
   double motion_delay_ms = 0.0;
@@ -150,7 +143,7 @@ int main(int argc, char * argv[])
         // 开火约束检查
         bool allow_fire = plan.fire;
         // 云台角度约束
-        if (std::abs(plan.yaw - initial_yaw) > gimbal_yaw_threshold) {
+        if (std::abs(plan.yaw - gs.yaw) > gimbal_yaw_threshold) {
           allow_fire = false;
         }
         // 目标距离约束
@@ -390,8 +383,8 @@ int main(int argc, char * argv[])
         if (q_sample.has_value()) q = q_sample.value();
       }
 
-      buff_detector.setBig2026Mode(is_big);
       buff_tracker.set_type(is_big ? auto_buff::BIG : auto_buff::SMALL);
+      buff_tracker.set_img_size(img.cols, img.rows);
       buff_solver.set_R_gimbal2world(q);
 
       auto power_runes = buff_detector.detect_24(img);
@@ -399,15 +392,8 @@ int main(int argc, char * argv[])
       auto target_copy = buff_tracker.clone_target();
 
       auto_aim::Plan plan{false, false, 0, 0, 0, 0, 0, 0, 0, 0};
-      int blade_id = 0;
       if (found && target_copy) {
-        if (is_big) {
-          cv::Point2f image_center(img.cols / 2.0f, img.rows / 2.0f);
-          buff_director.update(power_runes, t, buff_tracker.target(), image_center);
-          blade_id = buff_director.getAimBladeId();
-          if (blade_id < 0) blade_id = 0;
-        }
-        plan = buff_aimer.mpc_aim(*target_copy, t, gs, true, blade_id);
+        plan = buff_aimer.mpc_aim(*target_copy, t, gs, true);
       }
 
       #ifndef SENTRY_SR
@@ -426,16 +412,26 @@ int main(int argc, char * argv[])
       if (found && selected.has_value() && target_copy) {
         auto & p = selected.value();
 
-        if (is_big) {
-          for (auto * blade : p.get_targets()) {
-            for (int i = 0; i < 4; i++) tools::draw_point(img, blade->points[i]);
-            tools::draw_point(img, blade->center, {0, 0, 255}, 3);
-          }
-        } else {
-          for (int i = 0; i < 4; i++) tools::draw_point(img, p.target().points[i]);
-          tools::draw_point(img, p.target().center, {0, 0, 255}, 3);
-        }
+        for (int i = 0; i < 4; i++) tools::draw_point(img, p.target().points[i]);
+        tools::draw_point(img, p.target().center, {0, 0, 255}, 3);
         tools::draw_point(img, p.r_center, {0, 0, 255}, 3);
+
+        // 大符模式下显示所有检测到的扇叶的first/last标识
+        if (is_big && power_runes.has_value()) {
+          for (const auto & blade : power_runes.value().fanblades) {
+            if (blade.type == auto_buff::_unlight) continue;
+            auto role = buff_tracker.get_blade_role(blade.center, power_runes.value().r_center);
+            if (role == auto_buff::BladeRole::FIRST) {
+              cv::putText(img, "first",
+                          blade.center + cv::Point2f(15, -10),
+                          cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 0), 2);
+            } else if (role == auto_buff::BladeRole::LAST) {
+              cv::putText(img, "last",
+                          blade.center + cv::Point2f(15, -10),
+                          cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 165, 255), 2);
+            }
+          }
+        }
 
         // 当前帧 target 更新后的 buff 位姿
         auto & target_ref = buff_tracker.target();
@@ -480,7 +476,7 @@ int main(int argc, char * argv[])
 
         auto mode_color = is_big ? cv::Scalar(0, 165, 255) : cv::Scalar(0, 255, 0);
         ui_manager.addLeftText("buff_mode",
-          fmt::format("Mode: {}", is_big ? "BIG (2026)" : "SMALL"), mode_color);
+          fmt::format("Mode: {}", is_big ? "BIG" : "SMALL"), mode_color);
 
         ui_manager.addLeftText("gimbal",
           fmt::format("Gimbal Y: {:.1f}  P: {:.1f}", -gs.yaw * 57.3, -gs.pitch * 57.3));
@@ -506,10 +502,15 @@ int main(int argc, char * argv[])
               p.ypr_in_world[0] * 57.3, p.ypr_in_world[1] * 57.3, p.ypr_in_world[2] * 57.3));
           ui_manager.addLeftText("rune_distance",
             fmt::format("Rune Dist: {:.2f}m", p.ypd_in_world[2]));
+        }
 
-          if (is_big) {
-            ui_manager.addLeftText("rune_blades",
-              fmt::format("Lit Blades: {}", p.target_indices_.size()), cv::Scalar(0, 255, 255));
+        // 大符模式下显示选择器状态
+        if (is_big) {
+          const auto & sel = buff_tracker.selector();
+          if (sel.is_initialized()) {
+            ui_manager.addLeftText("big_buff_sel",
+              fmt::format("BigBuff: {}", sel.is_tracking_first() ? "FIRST" : "LAST"),
+              sel.is_tracking_first() ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 165, 255));
           }
         }
 
@@ -518,15 +519,9 @@ int main(int argc, char * argv[])
           auto & target_ref = buff_tracker.target();
           Eigen::VectorXd x = target_ref.ekf_x();
 
-          if (is_big) {
-            ui_manager.addLeftText("rotation",
-              fmt::format("Angle: {:.1f}  Spd: {:.2f}  Blade: {}",
-                x[5] * 57.3, x[6], blade_id), cv::Scalar(255, 255, 0));
-          } else {
-            ui_manager.addLeftText("rotation",
-              fmt::format("Angle: {:.1f}  Spd: {:.2f}",
-                x[5] * 57.3, x[6] * 57.3), cv::Scalar(255, 255, 0));
-          }
+          ui_manager.addLeftText("rotation",
+            fmt::format("Angle: {:.1f}  Spd: {:.2f}",
+              x[5] * 57.3, x[6] * 57.3), cv::Scalar(255, 255, 0));
 
           ui_manager.addLeftText("ekf_r",
             fmt::format("R_yaw: {:.2f}  R_Vyaw: {:.2f}", x[0], x[1]));
@@ -538,16 +533,6 @@ int main(int argc, char * argv[])
               fmt::format("a:{:.2f}  w:{:.2f}  fi:{:.2f}  spd0:{:.2f}",
                 x[7], x[8], x[9], target_ref.spd), cv::Scalar(0, 165, 255));
           }
-        }
-
-        if (is_big) {
-          static const std::string kStateNames[] = {
-            "IDLE", "WAIT_FIRST", "2ND_WINDOW", "GROUP_TRANS", "COMPLETED", "FAILED"};
-          int s = static_cast<int>(buff_director.getState());
-          auto state_color = (s == 1 || s == 2) ? cv::Scalar(0, 255, 0) : cv::Scalar(200, 200, 200);
-          ui_manager.addLeftText("director_state",
-            fmt::format("Director: {}  Group: {}/5",
-              kStateNames[s], buff_director.getCompletedGroups()), state_color);
         }
 
         bool has_rune = power_runes.has_value();

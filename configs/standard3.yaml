@@ -93,6 +93,7 @@ outpost_q_h: 0.0006
 outpost_h_converged_variance: 0.05
 outpost_converged_pos_p_max: 0.5
 outpost_converged_vel_p_max: 10.0
+
 #####-----outpost 顶部装甲板过滤机制(仅用于无人机)-----#####
 #该机制用于前哨站顶部装甲板,过滤大于outpost_top_pitch的装甲板,保留小于outpost_front_pitch的装甲板
 #而介于outpost_top_pitch和outpost_front_pitch之间的装甲板为模糊地带
@@ -115,8 +116,8 @@ gyro_angle_threshold: 60 # degree
 gyro_speed_threshold: 2 # rad/s
 
 #####-----开火约束参数-----#####
-gimbal_yaw_threshold: 30 # degree, 云台yaw角度约束阈值
-target_distance_threshold: 5 # meter, 目标距离约束阈值
+gimbal_yaw_threshold: 60 # degree, 云台yaw角度约束阈值
+target_distance_threshold: 10 # meter, 目标距离约束阈值
 
 #####-----锁中心参数-----#####
 track_center: false  # 是否启用锁中心模式
@@ -192,6 +193,13 @@ buff_tracker:
   r_roll_var: 0.1
   motion_delay_ms: 0
   pose_buffer_size: 200
+  # --- BigBuffSelector 参数（仅大符 BIG 模式生效）---
+  # miss_threshold: 连续丢失 first blade 的帧数阈值。调小→更快切换追踪last blade，调大→更保守。
+  miss_threshold: 12
+  # reset_threshold: 两 blade 均丢失帧数阈值，触发完全复位。调小→更快复位，调大→更耐遮挡。
+  reset_threshold: 50
+  # match_dist: blade 身份匹配的像素距离阈值。调大→更容易匹配但可能误匹配，调小→更严格。
+  match_dist: 70.0
 
 #####-----buff_aimer参数-----#####
 fire_gap_time: 0.700   # s
