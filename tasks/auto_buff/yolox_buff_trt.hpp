@@ -26,6 +26,7 @@ public:
     cv::Rect_<float> rect;
     int label;
     float prob;
+    int color = 0;  // 0=blue, 1=red (from model output)
     std::vector<cv::Point2f> kpt;  // 6 keypoints, converted to YOLO11-compatible format
   };
 

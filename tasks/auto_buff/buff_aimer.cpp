@@ -13,21 +13,13 @@ Aimer::Aimer(const std::string & config_path)
   pitch_offset_ = yaml["pitch_offset"].as<double>() / 57.3;  // degree to rad
   fire_gap_time_ = yaml["fire_gap_time"].as<double>();
   predict_time_ = yaml["predict_time"].as<double>();
-  // 弹道模型
-  if (yaml["ballistic_model"].IsDefined()) {
-    auto str = yaml["ballistic_model"].as<std::string>();
-    if (str == "hero")
-      ballistic_model_ = tools::Trajectory::Model::kHero;
-    else
-      ballistic_model_ = tools::Trajectory::Model::kNoDrag;
-  }
 
   last_fire_t_ = std::chrono::steady_clock::now();
 }
 
 io::Command Aimer::aim(
   auto_buff::Target & target, std::chrono::steady_clock::time_point & timestamp,
-  double bullet_speed, bool to_now, int blade_id)
+  double bullet_speed, bool to_now)
 {
   io::Command command = {false, false, 0, 0};
   if (target.is_unsolve()) return command;
@@ -41,17 +33,21 @@ io::Command Aimer::aim(
   auto future = to_now ? (detect_now_gap + predict_time_) : 0.1 + predict_time_;
   double yaw, pitch;
 
-  bool angle_changed =
-    std::abs(last_yaw_ - yaw) > 5 / 57.3 || std::abs(last_pitch_ - pitch) > 5 / 57.3;
-  if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch, blade_id)) {
+  if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch)) {
     command.yaw = yaw;
     command.pitch = -pitch;  //世界坐标系下的pitch向上为负
     if (mistake_count_ > 3) {
       switch_fanblade_ = true;
+      #ifdef BIG_BUFF_FIRE_FIX
+      last_switch_time_ = now;
+      #endif
       mistake_count_ = 0;
       command.control = true;
     } else if (std::abs(last_yaw_ - yaw) > 5 / 57.3 || std::abs(last_pitch_ - pitch) > 5 / 57.3) {
       switch_fanblade_ = true;
+      #ifdef BIG_BUFF_FIRE_FIX
+      last_switch_time_ = now;
+      #endif
       mistake_count_++;
       command.control = false;
     } else {
@@ -62,6 +58,15 @@ io::Command Aimer::aim(
     last_yaw_ = yaw;
     last_pitch_ = pitch;
   }
+
+#ifdef BIG_BUFF_FIRE_FIX
+  // switch_fanblade_ 超时兜底: 超过 0.5s 强制清除, 防止 get_send_angle
+  // 持续失败导致永久抑制开火 (大符 blade 切换后 EKF 可能短暂不稳定)
+  if (switch_fanblade_ && tools::delta_time(now, last_switch_time_) > 0.5) {
+    switch_fanblade_ = false;
+    mistake_count_ = 0;
+  }
+#endif
 
   if (switch_fanblade_) {
     command.shoot = false;
@@ -76,7 +81,7 @@ io::Command Aimer::aim(
 
 auto_aim::Plan Aimer::mpc_aim(
   auto_buff::Target & target, std::chrono::steady_clock::time_point & timestamp, io::GimbalState gs,
-  bool to_now, int blade_id)
+  bool to_now)
 {
   auto_aim::Plan plan = {false, false, 0, 0, 0, 0, 0, 0, 0, 0};
   if (target.is_unsolve()) return plan;
@@ -94,18 +99,22 @@ auto_aim::Plan Aimer::mpc_aim(
   auto future = to_now ? (detect_now_gap + predict_time_) : 0.1 + predict_time_;
   double yaw, pitch;
 
-  bool angle_changed =
-    std::abs(last_yaw_ - yaw) > 5 / 57.3 || std::abs(last_pitch_ - pitch) > 5 / 57.3;
-  if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch, blade_id)) {
+  if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch)) {
     plan.yaw = yaw;
     plan.pitch = -pitch;  //世界坐标系下的pitch向上为负
     if (mistake_count_ > 3) {
       switch_fanblade_ = true;
+    #ifdef BIG_BUFF_FIRE_FIX
+      last_switch_time_ = now;
+    #endif
       mistake_count_ = 0;
       plan.control = true;
       first_in_aimer_ = true;
     } else if (std::abs(last_yaw_ - yaw) > 5 / 57.3 || std::abs(last_pitch_ - pitch) > 5 / 57.3) {
       switch_fanblade_ = true;
+    #ifdef BIG_BUFF_FIRE_FIX
+      last_switch_time_ = now;
+    #endif
       mistake_count_++;
       plan.control = false;
 
@@ -129,20 +138,24 @@ auto_aim::Plan Aimer::mpc_aim(
         auto dt = predict_time_;
         double last_yaw_mpc, last_pitch_mpc;
         get_send_angle(
-          target, predict_time_ * -1, bullet_speed, to_now, last_yaw_mpc, last_pitch_mpc, blade_id);
+          target, predict_time_ * -1, bullet_speed, to_now, last_yaw_mpc, last_pitch_mpc);
         plan.yaw_vel = tools::limit_rad(yaw - last_yaw_mpc) / (2 * dt);
-        // plan.yaw_vel = tools::limit_min_max(plan.yaw_vel, -6.28, 6.28);
         plan.yaw_acc = (tools::limit_rad(yaw - gs.yaw) - tools::limit_rad(gs.yaw - last_yaw_mpc)) /
                        std::pow(dt, 2);
-        // plan.yaw_acc = tools::limit_min_max(plan.yaw_acc, -50, 50);
 
         plan.pitch_vel = tools::limit_rad(-pitch + last_pitch_mpc) / (2 * dt);
-        // plan.pitch_vel = tools::limit_min_max(plan.pitch_vel, -6.28, 6.28);
         plan.pitch_acc = (-pitch - gs.pitch - (gs.pitch + last_pitch_mpc)) / std::pow(dt, 2);
-        // plan.pitch_acc = tools::limit_min_max(plan.pitch_acc, -100, 100);
       }
     }
   }
+
+  #ifdef BIG_BUFF_FIRE_FIX
+  // switch_fanblade_ 超时兜底: 超过 0.5s 强制清除
+  if (switch_fanblade_ && tools::delta_time(now, last_switch_time_) > 0.5) {
+    switch_fanblade_ = false;
+    mistake_count_ = 0;
+  }
+  #endif
 
   if (switch_fanblade_) {
     plan.fire = false;
@@ -157,21 +170,20 @@ auto_aim::Plan Aimer::mpc_aim(
 
 bool Aimer::get_send_angle(
   auto_buff::Target & target, const double predict_time, const double bullet_speed,
-  const bool to_now, double & yaw, double & pitch, int blade_id)
+  const bool to_now, double & yaw, double & pitch)
 {
   // 考虑detecor所消耗的时间，此外假设aimer的用时可忽略不计
   // 如果 to_now 为 true，则根据当前时间和时间戳预测目标位置,deltatime = 现在时间减去当时照片时间，加上0.1
   target.predict(predict_time);
-  // std::cout << "gap: " << detect_now_gap << std::endl;
   angle = target.ekf_x()[5];
 
-  // 计算目标点的空间坐标 (使用 blade_id 选择目标叶片)
-  auto aim_in_world = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7), blade_id);
+  // 计算目标点的空间坐标
+  auto aim_in_world = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
   double d = std::sqrt(aim_in_world[0] * aim_in_world[0] + aim_in_world[1] * aim_in_world[1]);
   double h = aim_in_world[2];
 
   // 创建弹道对象
-  tools::Trajectory trajectory0(bullet_speed, d, h, ballistic_model_);
+  tools::Trajectory trajectory0(bullet_speed, d, h);
   if (trajectory0.unsolvable) {  // 如果弹道无法解算，返回未命中结果
     tools::logger()->debug(
       "[Aimer] Unsolvable trajectory0: {:.2f} {:.2f} {:.2f}", bullet_speed, d, h);
@@ -183,10 +195,10 @@ bool Aimer::get_send_angle(
   angle = target.ekf_x()[5];
 
   // 计算新的目标点的空间坐标
-  aim_in_world = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7), blade_id);
+  aim_in_world = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
   d = fsqrt(aim_in_world[0] * aim_in_world[0] + aim_in_world[1] * aim_in_world[1]);
   h = aim_in_world[2];
-  tools::Trajectory trajectory1(bullet_speed, d, h, ballistic_model_);
+  tools::Trajectory trajectory1(bullet_speed, d, h);
   if (trajectory1.unsolvable) {  // 如果弹道无法解算，返回未命中结果
     tools::logger()->debug(
       "[Aimer] Unsolvable trajectory1: {:.2f} {:.2f} {:.2f}", bullet_speed, d, h);

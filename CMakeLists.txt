@@ -32,6 +32,8 @@ add_compile_definitions(NOVA_Q) #基于peek2的四元数取数方式,待多几�
 add_compile_definitions(FIRE_CONSTRAINT) # 开火约束
 add_compile_definitions(NOVA_OUTPOST_V2) # 新版前哨站识别方案2
 add_compile_definitions(NOVA_AIM_CENTER) # 新版锁中心模式
+#add_compile_definitions(BIG_BUFF_DUO_EKF) # 大符双线EKF模式,对大符的两块扇叶分别进行独立的EKF跟踪
+#add_compile_definitions(BIG_BUFF_FIRE_FIX) # 大符开火修正,待验证
 
 if(BUILD_SENTRY)
 add_compile_definitions(SENTRY_SR) # 串口通信编译为哨兵导航联合通信版本

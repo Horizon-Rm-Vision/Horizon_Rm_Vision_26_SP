@@ -9,7 +9,6 @@ set(AUTO_BUFF_SRCS
     buff_aimer.cpp
     buff_target.cpp
     buff_tracker.cpp
-    buff_director.cpp
 )
 
 if(USE_OPENVINO)

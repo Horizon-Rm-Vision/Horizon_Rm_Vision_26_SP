@@ -1,5 +1,6 @@
 #include "buff_detector.hpp"
 
+#include "io/gimbal/gimbal.hpp"
 #include "tools/logger.hpp"
 
 namespace auto_buff
@@ -44,6 +45,19 @@ Buff_Detector::Buff_Detector(const std::string & config)
   // R tag detection parameters (ROS port)
   detect_r_tag_ = yaml["detect_r_tag"].as<bool>(true);
   binary_thresh_ = yaml["binary_thresh"].as<int>(100);
+
+  // Read enemy_color for target color filtering (yoloX modes only)
+  // Unlike auto_aim, auto_buff targets the OPPOSITE color:
+  //   enemy_color=red  → target blue buff
+  //   enemy_color=blue → target red buff
+  //   enemy_color=auto → target = self_color (same as own car, for energy buff)
+  const auto enemy_color_cfg = yaml["enemy_color"].as<std::string>("red");
+  if (enemy_color_cfg == "auto") {
+    enemy_color_auto_ = true;
+    refresh_enemy_color_from_serial();
+  } else {
+    target_color_ = (enemy_color_cfg == "red") ? Color::blue : Color::red;
+  }
 }
 
 void Buff_Detector::handle_img(const cv::Mat & bgr_img, cv::Mat & dilated_img)
@@ -176,8 +190,20 @@ void Buff_Detector::handle_lose()
   if (lose_ >= LOSE_MAX) {
     status_ = LOSE;
     last_powerrune_ = std::nullopt;
+    return; //SP原版无此行,为bug,无此行会导致永远无法进入LOSE状态,无条件执行。但是是status_没有被任何调用方使用（只在 detector 内部读/写），且关键的 last_powerrune_ 确实被正确清空
   }
   status_ = TEM_LOSE;
+}
+
+void Buff_Detector::refresh_enemy_color_from_serial()
+{
+  if (!enemy_color_auto_) return;
+  const auto self_color = io::latest_self_color();
+  if (self_color == 0) {
+    target_color_ = Color::red;   // self is red team → target own red buff
+  } else if (self_color == 1) {
+    target_color_ = Color::blue;  // self is blue team → target own blue buff
+  }
 }
 
 std::optional<PowerRune> Buff_Detector::processResults(
@@ -195,7 +221,7 @@ std::optional<PowerRune> Buff_Detector::processResults(
 
   /// 生成PowerRune
   auto r_center = get_r_center(fanblades, bgr_img);
-  PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+  PowerRune powerrune(fanblades, r_center, last_powerrune_);
 
   /// handle error
   if (powerrune.is_unsolve()) {
@@ -226,9 +252,24 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
       return std::nullopt;
     }
 
-    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    /// 颜色过滤（auto模式刷新串口颜色）
+
+    if (enemy_color_auto_) refresh_enemy_color_from_serial();
+    if (target_color_ != Color::unknown) {
+      results.erase(std::remove_if(results.begin(), results.end(),
+          [this](const YOLOX_BUFF_TRT::Object & obj) {
+            Color obj_color = (obj.color == 0) ? Color::red : Color::blue;
+            return obj_color != target_color_;
+          }), results.end());
+      if (results.empty()) {
+        handle_lose();
+        return std::nullopt;
+      }
+    }
+
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的
     results.erase(std::remove_if(results.begin(), results.end(),
-                                 [](const auto & obj) { return obj.label == 1; }),
+                                 [](const YOLOX_BUFF_TRT::Object & obj) { return obj.label == 1; }),
                   results.end());
     if (results.empty()) {
       handle_lose();
@@ -239,13 +280,16 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
 
     std::vector<cv::Point2f> raw_r_centers;
     std::vector<std::vector<cv::Point2f>> all_kpts;
+    std::vector<Color> result_colors;
     for (auto & result : results) {
       raw_r_centers.push_back(result.kpt[5]);
       all_kpts.push_back(result.kpt);
+      result_colors.push_back((result.color == 0) ? Color::red : Color::blue);
     }
 
     std::vector<FanBlade> fanblades;
-    for (auto & kpt : all_kpts) fanblades.emplace_back(FanBlade(kpt, kpt[4], _light));
+    for (size_t i = 0; i < all_kpts.size(); ++i)
+      fanblades.emplace_back(FanBlade(all_kpts[i], all_kpts[i][4], _light, result_colors[i]));
 
     /// 使用ROS版的r_tag机制获取r_center
 
@@ -270,7 +314,7 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
     }
 
     /// 生成PowerRune
-    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_);
 
     if (powerrune.is_unsolve()) {
       handle_lose();
@@ -299,9 +343,24 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
       return std::nullopt;
     }
 
-    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    /// 颜色过滤（auto模式刷新串口颜色）
+
+    if (enemy_color_auto_) refresh_enemy_color_from_serial();
+    if (target_color_ != Color::unknown) {
+      results.erase(std::remove_if(results.begin(), results.end(),
+          [this](const YOLOX_BUFF::Object & obj) {
+            Color obj_color = (obj.color == 0) ? Color::red : Color::blue;
+            return obj_color != target_color_;
+          }), results.end());
+      if (results.empty()) {
+        handle_lose();
+        return std::nullopt;
+      }
+    }
+
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的
     results.erase(std::remove_if(results.begin(), results.end(),
-                                 [](const auto & obj) { return obj.label == 1; }),
+                                 [](const YOLOX_BUFF::Object & obj) { return obj.label == 1; }),
                   results.end());
     if (results.empty()) {
       handle_lose();
@@ -312,13 +371,16 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
 
     std::vector<cv::Point2f> raw_r_centers;
     std::vector<std::vector<cv::Point2f>> all_kpts;
+    std::vector<Color> result_colors;
     for (auto & result : results) {
       raw_r_centers.push_back(result.kpt[5]);
       all_kpts.push_back(result.kpt);
+      result_colors.push_back((result.color == 0) ? Color::red : Color::blue);
     }
 
     std::vector<FanBlade> fanblades;
-    for (auto & kpt : all_kpts) fanblades.emplace_back(FanBlade(kpt, kpt[4], _light));
+    for (size_t i = 0; i < all_kpts.size(); ++i)
+      fanblades.emplace_back(FanBlade(all_kpts[i], all_kpts[i][4], _light, result_colors[i]));
 
     /// 使用ROS版的r_tag机制获取r_center
 
@@ -343,7 +405,7 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
     }
 
     /// 生成PowerRune
-    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_);
 
     if (powerrune.is_unsolve()) {
       handle_lose();
@@ -376,7 +438,7 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
 
     /// 生成PowerRune
     auto r_center = get_r_center(fanblades, bgr_img);
-    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_);
 
     /// handle error
     if (powerrune.is_unsolve()) {
@@ -410,9 +472,24 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
       return std::nullopt;
     }
 
-    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    /// 颜色过滤（auto模式刷新串口颜色）
+
+    if (enemy_color_auto_) refresh_enemy_color_from_serial();
+    if (target_color_ != Color::unknown) {
+      results.erase(std::remove_if(results.begin(), results.end(),
+          [this](const YOLOX_BUFF_TRT::Object & obj) {
+            Color obj_color = (obj.color == 0) ? Color::red : Color::blue;
+            return obj_color != target_color_;
+          }), results.end());
+      if (results.empty()) {
+        handle_lose();
+        return std::nullopt;
+      }
+    }
+
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的
     results.erase(std::remove_if(results.begin(), results.end(),
-                                 [](const auto & obj) { return obj.label == 1; }),
+                                 [](const YOLOX_BUFF_TRT::Object & obj) { return obj.label == 1; }),
                   results.end());
     if (results.empty()) {
       handle_lose();
@@ -429,9 +506,10 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
 
     cv::Point2f raw_r_center = results[0].kpt[5];
     std::vector<cv::Point2f> kpt = results[0].kpt;
+    Color obj_color = (results[0].color == 0) ? Color::red : Color::blue;
 
     std::vector<FanBlade> fanblades;
-    fanblades.emplace_back(FanBlade(kpt, kpt[4], _light));
+    fanblades.emplace_back(FanBlade(kpt, kpt[4], _light, obj_color));
 
     /// ROS版r_tag机制获取r_center
 
@@ -456,7 +534,7 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
     }
 
     /// 生成PowerRune
-    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_);
 
     if (powerrune.is_unsolve()) {
       handle_lose();
@@ -483,9 +561,24 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
       return std::nullopt;
     }
 
-    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    /// 颜色过滤（auto模式刷新串口颜色）
+
+    if (enemy_color_auto_) refresh_enemy_color_from_serial();
+    if (target_color_ != Color::unknown) {
+      results.erase(std::remove_if(results.begin(), results.end(),
+          [this](const YOLOX_BUFF::Object & obj) {
+            Color obj_color = (obj.color == 0) ? Color::red : Color::blue;
+            return obj_color != target_color_;
+          }), results.end());
+      if (results.empty()) {
+        handle_lose();
+        return std::nullopt;
+      }
+    }
+
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的
     results.erase(std::remove_if(results.begin(), results.end(),
-                                 [](const auto & obj) { return obj.label == 1; }),
+                                 [](const YOLOX_BUFF::Object & obj) { return obj.label == 1; }),
                   results.end());
     if (results.empty()) {
       handle_lose();
@@ -502,9 +595,10 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
 
     cv::Point2f raw_r_center = results[0].kpt[5];
     std::vector<cv::Point2f> kpt = results[0].kpt;
+    Color obj_color = (results[0].color == 0) ? Color::red : Color::blue;
 
     std::vector<FanBlade> fanblades;
-    fanblades.emplace_back(FanBlade(kpt, kpt[4], _light));
+    fanblades.emplace_back(FanBlade(kpt, kpt[4], _light, obj_color));
 
     /// ROS版r_tag机制获取r_center
 
@@ -529,7 +623,7 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
     }
 
     /// 生成PowerRune
-    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_);
 
     if (powerrune.is_unsolve()) {
       handle_lose();
@@ -563,7 +657,7 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
 
     /// 生成PowerRune
     auto r_center = get_r_center(fanblades, bgr_img);
-    PowerRune powerrune(fanblades, r_center, last_powerrune_, big_2026_mode_);
+    PowerRune powerrune(fanblades, r_center, last_powerrune_);
 
     /// handle error
     if (powerrune.is_unsolve()) {
@@ -594,9 +688,21 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
 
     if (results.empty()) return std::nullopt;
 
-    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    /// 颜色过滤（auto模式刷新串口颜色）
+
+    if (enemy_color_auto_) refresh_enemy_color_from_serial();
+    if (target_color_ != Color::unknown) {
+      results.erase(std::remove_if(results.begin(), results.end(),
+          [this](const YOLOX_BUFF_TRT::Object & obj) {
+            Color obj_color = (obj.color == 0) ? Color::red : Color::blue;
+            return obj_color != target_color_;
+          }), results.end());
+      if (results.empty()) return std::nullopt;
+    }
+
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的
     results.erase(std::remove_if(results.begin(), results.end(),
-                                 [](const auto & obj) { return obj.label == 1; }),
+                                 [](const YOLOX_BUFF_TRT::Object & obj) { return obj.label == 1; }),
                   results.end());
     if (results.empty()) return std::nullopt;
 
@@ -604,13 +710,16 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
 
     std::vector<cv::Point2f> raw_r_centers;
     std::vector<std::vector<cv::Point2f>> all_kpts;
+    std::vector<Color> result_colors;
     for (auto & result : results) {
       raw_r_centers.push_back(result.kpt[5]);
       all_kpts.push_back(result.kpt);
+      result_colors.push_back((result.color == 0) ? Color::red : Color::blue);
     }
 
     std::vector<FanBlade> fanblades_t;
-    for (auto & kpt : all_kpts) fanblades_t.emplace_back(FanBlade(kpt, kpt[4], _light));
+    for (size_t i = 0; i < all_kpts.size(); ++i)
+      fanblades_t.emplace_back(FanBlade(all_kpts[i], all_kpts[i][4], _light, result_colors[i]));
 
     /// 计算r_center,筛选fanblade
 
@@ -658,9 +767,21 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
 
     if (results.empty()) return std::nullopt;
 
-    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的(YOLO11模型不能识别已激活扇叶故无需该机制)
+    /// 颜色过滤（auto模式刷新串口颜色）
+
+    if (enemy_color_auto_) refresh_enemy_color_from_serial();
+    if (target_color_ != Color::unknown) {
+      results.erase(std::remove_if(results.begin(), results.end(),
+          [this](const YOLOX_BUFF::Object & obj) {
+            Color obj_color = (obj.color == 0) ? Color::red : Color::blue;
+            return obj_color != target_color_;
+          }), results.end());
+      if (results.empty()) return std::nullopt;
+    }
+
+    /// 过滤已激活的扇叶 (label=1=ACTIVATED), 只保留未激活的
     results.erase(std::remove_if(results.begin(), results.end(),
-                                 [](const auto & obj) { return obj.label == 1; }),
+                                 [](const YOLOX_BUFF::Object & obj) { return obj.label == 1; }),
                   results.end());
     if (results.empty()) return std::nullopt;
 
@@ -668,13 +789,16 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
 
     std::vector<cv::Point2f> raw_r_centers;
     std::vector<std::vector<cv::Point2f>> all_kpts;
+    std::vector<Color> result_colors;
     for (auto & result : results) {
       raw_r_centers.push_back(result.kpt[5]);
       all_kpts.push_back(result.kpt);
+      result_colors.push_back((result.color == 0) ? Color::red : Color::blue);
     }
 
     std::vector<FanBlade> fanblades_t;
-    for (auto & kpt : all_kpts) fanblades_t.emplace_back(FanBlade(kpt, kpt[4], _light));
+    for (size_t i = 0; i < all_kpts.size(); ++i)
+      fanblades_t.emplace_back(FanBlade(all_kpts[i], all_kpts[i][4], _light, result_colors[i]));
 
     /// 计算r_center,筛选fanblade
 
