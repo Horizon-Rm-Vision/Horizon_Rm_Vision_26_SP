@@ -17,6 +17,13 @@ const int INF = 1000000;
 enum PowerRune_type { SMALL, BIG };
 enum FanBlade_type { _target, _unlight, _light };
 enum Track_status { TRACK, TEM_LOSE, LOSE };
+enum class Color { red, blue, unknown };
+
+struct GridAndStride {
+  int grid0;
+  int grid1;
+  int stride;
+};
 
 struct GridAndStride {
   int grid0;
@@ -31,13 +38,13 @@ public:
   std::vector<cv::Point2f> points;  // 四个点从左上角开始逆时针
   double angle, width, height;
   FanBlade_type type;  // 类型
+  Color color = Color::unknown;  // 扇叶颜色（仅yolox_ov/yolox_trt模式有效）
 
   explicit FanBlade() = default;
 
-  // explicit FanBlade(const std::vector<cv::Point2f> & kpt, cv::Point2f keypoints_center, FanBlade_type t);
-
   explicit FanBlade(
-    const std::vector<cv::Point2f> & kpt, cv::Point2f keypoints_center, FanBlade_type t);
+    const std::vector<cv::Point2f> & kpt, cv::Point2f keypoints_center, FanBlade_type t,
+    Color c = Color::unknown);
 
   explicit FanBlade(FanBlade_type t);
 };

@@ -29,7 +29,14 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   outpost_correction_min_detect_count_{3},
   outpost_correction_cancel_count_{5},
   outpost_seen_streak_{0},
+<<<<<<< HEAD
   non_outpost_seen_streak_{0}
+=======
+  non_outpost_seen_streak_{0},
+  outpost_top_filter_enable_{false},
+  outpost_top_pitch_{27.5},
+  outpost_front_pitch_{-15.0}
+>>>>>>> origin/main
 {
   auto yaml = YAML::LoadFile(config_path);
   const auto enemy_color_cfg = yaml["enemy_color"].as<std::string>();
@@ -76,6 +83,16 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
     yaml["outpost_correction_cancel_count"].as<int>() :
     outpost_correction_cancel_count_;
 
+<<<<<<< HEAD
+=======
+  outpost_top_filter_enable_ =
+    yaml["outpost_top_filter_enable"] ? yaml["outpost_top_filter_enable"].as<bool>() : false;
+  outpost_top_pitch_ =
+    yaml["outpost_top_pitch"] ? yaml["outpost_top_pitch"].as<double>() : 27.5;
+  outpost_front_pitch_ =
+    yaml["outpost_front_pitch"] ? yaml["outpost_front_pitch"].as<double>() : -15.0;
+
+>>>>>>> origin/main
   normal_temp_lost_count_ = max_temp_lost_count_;
 }
 
@@ -145,11 +162,13 @@ std::list<Target> Tracker::track(
   apply_outpost_correction(armors);
 
   // 过滤前哨站顶部装甲板
-  // armors.remove_if([this](const auto_aim::Armor & a) {
-  //   return a.name == ArmorName::outpost &&
-  //          solver_.oupost_reprojection_error(a, 27.5 * CV_PI / 180.0) <
-  //            solver_.oupost_reprojection_error(a, -15 * CV_PI / 180.0);
-  // });
+  if (outpost_top_filter_enable_) {
+    armors.remove_if([this](const auto_aim::Armor & a) {
+      return a.name == ArmorName::outpost &&
+             solver_.oupost_reprojection_error(a, outpost_top_pitch_ * CV_PI / 180.0) <
+               solver_.oupost_reprojection_error(a, outpost_front_pitch_ * CV_PI / 180.0);
+    });
+  }
 
   // 优先选择靠近图像中心的装甲板
   armors.sort([](const Armor & a, const Armor & b) {

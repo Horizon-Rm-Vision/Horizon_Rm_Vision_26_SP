@@ -15,7 +15,21 @@ yolox_trt_model_path: ../assets/best_06_02-fp16-ampere.engine
 yolox_svm_model_path: ../assets/svm_numbers_rbf.xml
 device: CPU
 min_confidence: 0.8
-use_traditional: true
+use_traditional: false
+
+#####-----yolox模式标签修正(ov/trt)-----#####
+yolox:
+  # 标签修正模式: "svm" (华科原版HOG+SVM,目前看效果最好)
+  #"lenet" (中南传统的LeNet)
+  #"resnet" (traditional_cv模式ResNet) 
+  #"none" 或不填则禁用标签修正
+  label_correction_mode: "svm"
+  # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
+  lenet_model_path: "../assets/lenet.onnx"
+  lenet_label_path: "../assets/label.txt"
+  lenet_threshold: 0.5
+  # ResNet模式参数 (label_correction_mode: "resnet" 时生效)
+  resnet_model_path: "../assets/tiny_resnet.onnx"
 
 #####-----yolox_ov参数-----#####
 yolox_ov:
@@ -103,6 +117,12 @@ outpost_q_h: 0.0006
 outpost_h_converged_variance: 0.05
 outpost_converged_pos_p_max: 0.5
 outpost_converged_vel_p_max: 10.0
+<<<<<<< HEAD
+=======
+outpost_top_filter_enable: false
+outpost_top_pitch: 27.5
+outpost_front_pitch: -15.0
+>>>>>>> origin/main
 
 #####-----aimer参数-----#####
 yaw_offset: -1 # degree -2.5

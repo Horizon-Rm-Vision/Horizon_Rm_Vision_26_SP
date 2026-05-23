@@ -55,7 +55,11 @@ public:
 
   Eigen::VectorXd ekf_x() const;
 
+<<<<<<< HEAD
   /// 获取 EKF 估计的 roll 角, 供 Director 做叶片 ID 匹配
+=======
+  /// 获取 EKF 估计的 roll 角
+>>>>>>> origin/main
   double get_roll() const { return ekf_.x[5]; }
 
   double spd = 0;  //调试用
@@ -101,7 +105,6 @@ private:
   Eigen::MatrixXd h_jacobian(int blade_id = 0) const;
 
   const double SMALL_W = CV_PI / 3;
-  // const double SMALL_W = 0;
 };
 
 /// BigTarget子类

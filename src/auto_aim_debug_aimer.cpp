@@ -46,10 +46,14 @@ int main(int argc, char * argv[])
   auto yaml_config = tools::load(config_path);
   bool enable_recorder = yaml_config["recorder"] ? yaml_config["recorder"].as<bool>() : false;
 
+<<<<<<< HEAD
   // 终端 FPS 显示变量
   auto last_fps_time = std::chrono::steady_clock::now();
   int frame_count = 0;
   float terminal_fps = 0.0f;
+=======
+  auto last_t = std::chrono::steady_clock::now();
+>>>>>>> origin/main
 
   #ifdef SENTRY_SR
   auto yaml = YAML::LoadFile(config_path);
@@ -87,12 +91,6 @@ int main(int argc, char * argv[])
   Eigen::Quaterniond q;
   std::chrono::steady_clock::time_point t;
 
-  #ifdef FIRE_CONSTRAINT
-  // 记录初始云台yaw
-  auto initial_gimbal_state = gimbal.state();
-  double initial_yaw = initial_gimbal_state.yaw;
-  #endif
-
   auto mode = io::Mode::idle;
   auto last_mode = io::Mode::idle;
 
@@ -100,19 +98,10 @@ int main(int argc, char * argv[])
     // UI FPS更新
     ui_manager.updateFPS();
     
-    // 终端 FPS 计算和显示
-    frame_count++;
-    auto current_time = std::chrono::steady_clock::now();
-    auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_fps_time).count();
-    
-    if (elapsed_time >= 1000) {
-      terminal_fps = static_cast<float>(frame_count) * 1000.0f / static_cast<float>(elapsed_time);
-      frame_count = 0;
-      last_fps_time = current_time;
-      
-      // 输出 FPS 到终端
-      fmt::print("[FPS] {:.1f}\n", terminal_fps);
-    }
+    auto now = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration<double>(now - last_t).count();
+    last_t = now;
+    tools::logger()->info("[FPS] {:.1f}", 1.0 / dt);
     
     camera.read(img, t);
     ui_web_stream.sendImage(img);
@@ -227,7 +216,11 @@ int main(int argc, char * argv[])
     auto form = ros2.subscribe_form();
     int8_t gimbal_form_value = gimbal_form ? gimbal_form->data : 0;
     //发布导航的信息
+<<<<<<< HEAD
     ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.state, gs.energy_state,gs.bullets ,gs.judge);
+=======
+    ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.state, gs.energy_state,gs.bullets,gs.judge);
+>>>>>>> origin/main
     #endif
     ui_manager.addLeftText("gimbal_status", fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", -gs.yaw * 180.0 / M_PI, -gs.pitch * 180.0 / M_PI));
     
@@ -243,7 +236,10 @@ int main(int argc, char * argv[])
     ui_manager.addLeftText("state", fmt::format("State: {} ", (int)gs.state));
     ui_manager.addLeftText("energy_state", fmt::format("  Energy State: {} ", (int)gs.energy_state));
     ui_manager.addLeftText("bullets", fmt::format("  Bullets: {} ", (int)gs.bullets));
+<<<<<<< HEAD
     ui_manager.addLeftText("judge", fmt::format("  Judge: {} ", (int)gs.judge));
+=======
+>>>>>>> origin/main
     #endif
     
     // 添加右侧UI元素
@@ -288,7 +284,7 @@ int main(int argc, char * argv[])
     // 开火约束检查
     bool allow_fire = command.shoot;
     // 云台角度约束
-    if (std::abs(command.yaw - initial_yaw) > gimbal_yaw_threshold) {
+    if (std::abs(command.yaw - gs.yaw) > gimbal_yaw_threshold) {
       allow_fire = false;
     }
     // 目标距离约束

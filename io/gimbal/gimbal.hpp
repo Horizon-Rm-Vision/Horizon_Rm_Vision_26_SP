@@ -134,6 +134,8 @@ public:
 private:
   int fd_ = -1;
   std::string com_port_;
+  bool use_bullet_speed_override_ = false;
+  float bullet_speed_override_ = 0.0f;
   
   std::thread thread_;
   std::atomic<bool> quit_ = false;

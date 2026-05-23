@@ -61,6 +61,7 @@ int main(int argc, char * argv[])
 
   std::chrono::steady_clock::time_point timestamp;
   io::Command last_command;
+  auto last_t = std::chrono::steady_clock::now();
 
   while (!exiter.exit()) {
     camera.read(img, timestamp);
@@ -191,6 +192,11 @@ int main(int argc, char * argv[])
     cv::imshow("reprojection", img);
     auto key = cv::waitKey(1);
     if (key == 'q') break;
+
+    auto now = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration<double>(now - last_t).count();
+    last_t = now;
+    tools::logger()->info("[FPS] {:.1f}", 1.0 / dt);
   }
   return 0;
 }

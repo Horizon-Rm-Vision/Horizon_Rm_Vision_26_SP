@@ -11,7 +11,11 @@ pip install -r requirements.txt
 ## 运行
 
 ```bash
+<<<<<<< HEAD
 python receiver.py --host 0.0.0.0 --port 9876
+=======
+python3 receiver.py --host 0.0.0.0 --port 9878
+>>>>>>> origin/main
 ```
 
 启动后会打开两个窗口：`Web UI Receiver` 与 `Plotter`。

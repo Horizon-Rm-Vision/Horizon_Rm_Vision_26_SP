@@ -8,7 +8,10 @@
 #include "io/gimbal/gimbal.hpp"
 #include "tasks/auto_buff/buff_aimer.hpp"
 #include "tasks/auto_buff/buff_detector.hpp"
+<<<<<<< HEAD
 #include "tasks/auto_buff/buff_director.hpp"
+=======
+>>>>>>> origin/main
 #include "tasks/auto_buff/buff_solver.hpp"
 #include "tasks/auto_buff/buff_tracker.hpp"
 #include "tasks/auto_buff/buff_type.hpp"
@@ -52,10 +55,14 @@ int main(int argc, char * argv[])
   plotter.configureWebStreamFromConfig(config_path);
   ui_manager.setProgramMode("AutoBuff MPC");
 
+<<<<<<< HEAD
   // 终端 FPS 显示变量
   auto last_fps_time = std::chrono::steady_clock::now();
   int frame_count = 0;
   float terminal_fps = 0.0f;
+=======
+  auto last_t = std::chrono::steady_clock::now();
+>>>>>>> origin/main
 
   // 初始化云台、相机
   io::Gimbal gimbal(config_path);
@@ -79,7 +86,10 @@ int main(int argc, char * argv[])
   auto_buff::Solver solver(config_path);
   auto_buff::BuffTracker tracker(config_path);
   auto_buff::Aimer aimer(config_path);
+<<<<<<< HEAD
   auto_buff::Buff2026Director director;
+=======
+>>>>>>> origin/main
 
   io::GimbalMode last_gimbal_mode = io::GimbalMode::IDLE;
 
@@ -93,6 +103,10 @@ int main(int argc, char * argv[])
     camera.read(img, t);
     ui_web_stream.sendImage(img);
     q = gimbal.q(t);
+<<<<<<< HEAD
+=======
+    tracker.set_img_size(img.cols, img.rows);
+>>>>>>> origin/main
     pose_buffer.push(q, t);
     {
       auto q_sample = pose_buffer.sample(t - std::chrono::milliseconds(static_cast<int>(motion_delay_ms)));
@@ -106,6 +120,7 @@ int main(int argc, char * argv[])
     // UI FPS更新
     ui_manager.updateFPS();
 
+<<<<<<< HEAD
     // 终端 FPS 计算和显示
     frame_count++;
     auto current_time = std::chrono::steady_clock::now();
@@ -116,6 +131,12 @@ int main(int argc, char * argv[])
       last_fps_time = current_time;
       fmt::print("[FPS] {:.1f}\n", terminal_fps);
     }
+=======
+    auto now = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration<double>(now - last_t).count();
+    last_t = now;
+    tools::logger()->info("[FPS] {:.1f}", 1.0 / dt);
+>>>>>>> origin/main
 
     ui_web_stream.beginFrame(img.cols, img.rows);
 
@@ -130,7 +151,10 @@ int main(int argc, char * argv[])
       last_gimbal_mode = gimbal_mode;
     }
 
+<<<<<<< HEAD
     detector.setBig2026Mode(is_big);
+=======
+>>>>>>> origin/main
     tracker.set_type(is_big ? auto_buff::BIG : auto_buff::SMALL);
 
     solver.set_R_gimbal2world(q);
@@ -142,6 +166,7 @@ int main(int argc, char * argv[])
     auto target_copy = tracker.clone_target();
 
     auto plan = auto_aim::Plan{false, false, 0, 0, 0, 0, 0, 0, 0, 0};
+<<<<<<< HEAD
     int blade_id = 0;
     if (found && target_copy) {
       if (is_big) {
@@ -151,6 +176,10 @@ int main(int argc, char * argv[])
         if (blade_id < 0) blade_id = 0;
       }
       plan = aimer.mpc_aim(*target_copy, t, gs, true, blade_id);
+=======
+    if (found && target_copy) {
+      plan = aimer.mpc_aim(*target_copy, t, gs, true);
+>>>>>>> origin/main
     }
 
     gimbal.send(
@@ -164,6 +193,7 @@ int main(int argc, char * argv[])
       auto & p = selected.value();
 
       // 显示
+<<<<<<< HEAD
       if (is_big) {
         for (auto * blade : p.get_targets()) {
           for (int i = 0; i < 4; i++) tools::draw_point(img, blade->points[i]);
@@ -175,6 +205,29 @@ int main(int argc, char * argv[])
       }
       tools::draw_point(img, p.r_center, {0, 0, 255}, 3);
 
+=======
+      for (int i = 0; i < 4; i++) tools::draw_point(img, p.target().points[i]);
+      tools::draw_point(img, p.target().center, {0, 0, 255}, 3);
+      tools::draw_point(img, p.r_center, {0, 0, 255}, 3);
+
+      // 大符模式下显示所有检测到的扇叶的first/last标识
+      if (is_big && power_runes.has_value()) {
+        for (const auto & blade : power_runes.value().fanblades) {
+          if (blade.type == auto_buff::_unlight) continue;
+          auto role = tracker.get_blade_role(blade.center, power_runes.value().r_center);
+          if (role == auto_buff::BladeRole::FIRST) {
+            cv::putText(img, "first",
+                        blade.center + cv::Point2f(15, -10),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 0), 2);
+          } else if (role == auto_buff::BladeRole::LAST) {
+            cv::putText(img, "last",
+                        blade.center + cv::Point2f(15, -10),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 165, 255), 2);
+          }
+        }
+      }
+
+>>>>>>> origin/main
       // 当前帧target更新后buff
       auto & target_ref = tracker.target();
       auto Rxyz_in_world_now = target_ref.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
@@ -229,11 +282,14 @@ int main(int argc, char * argv[])
         data["spd0"] = target_ref.spd;
       }
 
+<<<<<<< HEAD
       if (is_big) {
         data["director_state"] = static_cast<int>(director.getState());
         data["director_completed"] = director.getCompletedGroups();
         data["director_blade_id"] = blade_id;
       }
+=======
+>>>>>>> origin/main
     }
 
     // 云台响应情况
@@ -261,7 +317,11 @@ int main(int argc, char * argv[])
     // 左侧面板：模式标识
     {
       auto mode_color = is_big ? cv::Scalar(0, 165, 255) : cv::Scalar(0, 255, 0);
+<<<<<<< HEAD
       ui_manager.addLeftText("buff_mode", fmt::format("Mode: {}", is_big ? "BIG (2026)" : "SMALL"),
+=======
+      ui_manager.addLeftText("buff_mode", fmt::format("Mode: {}", is_big ? "BIG" : "SMALL"),
+>>>>>>> origin/main
                              mode_color);
     }
 
@@ -289,8 +349,21 @@ int main(int argc, char * argv[])
       ui_manager.addLeftText("rune_distance", fmt::format("Rune Dist: {:.2f}m", p.ypd_in_world[2]));
 
       if (is_big) {
+<<<<<<< HEAD
         ui_manager.addLeftText("rune_blades", fmt::format("Lit Blades: {}", p.target_indices_.size()),
                                cv::Scalar(0, 255, 255));
+=======
+      }
+    }
+
+    // 大符模式下显示选择器状态
+    if (is_big) {
+      const auto & sel = tracker.selector();
+      if (sel.is_initialized()) {
+        ui_manager.addLeftText("big_buff_sel",
+          fmt::format("BigBuff: {}", sel.is_tracking_first() ? "FIRST" : "LAST"),
+          sel.is_tracking_first() ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 165, 255));
+>>>>>>> origin/main
       }
     }
 
@@ -301,6 +374,7 @@ int main(int argc, char * argv[])
       Eigen::VectorXd x = target_ref.ekf_x();
 
       // 核心旋转信息：当前角度和角速度
+<<<<<<< HEAD
       if (is_big) {
         ui_manager.addLeftText("rotation", fmt::format("Angle: {:.1f}  Spd: {:.2f}  Blade: {}",
                               x[5] * 57.3, x[6], blade_id), cv::Scalar(255, 255, 0));
@@ -308,6 +382,10 @@ int main(int argc, char * argv[])
         ui_manager.addLeftText("rotation", fmt::format("Angle: {:.1f}  Spd: {:.2f}",
                               x[5] * 57.3, x[6] * 57.3), cv::Scalar(255, 255, 0));
       }
+=======
+      ui_manager.addLeftText("rotation", fmt::format("Angle: {:.1f}  Spd: {:.2f}",
+                        x[5] * 57.3, x[6] * 57.3), cv::Scalar(255, 255, 0));
+>>>>>>> origin/main
 
       // 扇叶观测器内参
       ui_manager.addLeftText("ekf_r", fmt::format("R_yaw: {:.2f}  R_Vyaw: {:.2f}", x[0], x[1]));
@@ -320,6 +398,7 @@ int main(int argc, char * argv[])
       }
     }
 
+<<<<<<< HEAD
     // 大符 Director 状态
     if (is_big) {
       static const std::string kStateNames[] = {
@@ -330,6 +409,8 @@ int main(int argc, char * argv[])
         fmt::format("Director: {}  Group: {}/5", kStateNames[s], director.getCompletedGroups()),
         state_color);
     }
+=======
+>>>>>>> origin/main
 
     // 右侧面板：弹速,各种状态
     ui_manager.addRightText("bullet_speed", fmt::format("Bullet Speed: {:.1f}", gs.bullet_speed));

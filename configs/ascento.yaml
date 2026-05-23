@@ -39,6 +39,12 @@ outpost_max_temp_lost_count: 75
 outpost_correction_enable: true
 outpost_correction_min_detect_count: 3
 outpost_correction_cancel_count: 5
+<<<<<<< HEAD
+=======
+outpost_top_filter_enable: false
+outpost_top_pitch: 27.5
+outpost_front_pitch: -15.0
+>>>>>>> origin/main
 
 #####-----aimer参数-----#####
 yaw_offset: 1.5 # degree

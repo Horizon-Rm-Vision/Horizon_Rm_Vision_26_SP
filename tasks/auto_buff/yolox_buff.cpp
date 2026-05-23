@@ -144,6 +144,10 @@ void YOLOX_BUFF::generateProposals(
     obj.rect = rect;
     obj.prob = confidence;
     obj.label = static_cast<int>(class_id.x);
+<<<<<<< HEAD
+=======
+    obj.color = static_cast<int>(color_id.x);
+>>>>>>> origin/main
     obj.kpt = kpt;
 
     output_objs.push_back(std::move(obj));

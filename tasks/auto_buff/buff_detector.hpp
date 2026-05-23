@@ -65,8 +65,16 @@ private:
   // Mode selection
   DetectorMode mode_;
 
+<<<<<<< HEAD
   // 2026 大符模式: 启用双目标识别
   bool big_2026_mode_ = false;
+=======
+  // Color filtering (for yoloX modes that can distinguish fan blade color)
+  // enemy_color in YAML: red → target blue; blue → target red; auto → self_color
+  Color target_color_ = Color::unknown;
+  bool enemy_color_auto_ = false;
+  void refresh_enemy_color_from_serial();
+>>>>>>> origin/main
 
   // R tag detection parameters
   bool detect_r_tag_;

@@ -20,10 +20,14 @@ endif()
 # 其他编译选项,默认不编译多余组件，可以改OFF为ON来启用或禁用，或者在cmake ..中添加-DBUILD_XXX=ON临时启用
 option(BUILD_SENTRY "Build sentry tools" ON)
 option(BUILD_TEST "Build test tools" OFF)
-option(BUILD_CALIBRATION "Build calibration tools" ON)
+option(BUILD_CALIBRATION "Build calibration tools" OFF)
 option(BUILD_ALL "Build all components" OFF)
 option(BUILD_BUFF "Build auto_buff components" ON)
+<<<<<<< HEAD
 option(BUILD_OMNI "Build omnidirectional perception (requires BUILD_SENTRY and ROS2)" ON)
+=======
+option(BUILD_OMNI "Build omnidirectional perception (requires BUILD_SENTRY and ROS2)" OFF)
+>>>>>>> origin/main
 
 # 全局宏控制，注释上即禁用，不注释即启用，亦可直接在cmake命令中添加 -DBUILD_GIMAL_ADD_VEL=ON 即可
 add_compile_definitions(SR_VEL) # 带前馈角速度的串口收发模式
@@ -32,6 +36,10 @@ add_compile_definitions(NOVA_Q) #基于peek2的四元数取数方式,待多几�
 add_compile_definitions(FIRE_CONSTRAINT) # 开火约束
 add_compile_definitions(NOVA_OUTPOST_V2) # 新版前哨站识别方案2
 add_compile_definitions(NOVA_AIM_CENTER) # 新版锁中心模式
+<<<<<<< HEAD
+=======
+#add_compile_definitions(BIG_BUFF_DUO_EKF) # 大符双线EKF模式,对大符的两块扇叶分别进行独立的EKF跟踪
+>>>>>>> origin/main
 
 if(BUILD_SENTRY)
 add_compile_definitions(SENTRY_SR) # 串口通信编译为哨兵导航联合通信版本
@@ -115,7 +123,7 @@ endif()
 
 #################### src 可执行文件 ###################
 if(NOT BUILD_SENTRY)
-    add_executable(standard src/standard.cpp)
+    #add_executable(standard src/standard.cpp)
     #add_executable(mt_standard src/mt_standard.cpp)
     #add_executable(standard_mpc src/standard_mpc.cpp)
     add_executable(auto_aim_debug_mpc src/auto_aim_debug_mpc.cpp)
@@ -123,13 +131,22 @@ if(NOT BUILD_SENTRY)
     if(BUILD_BUFF)
       add_executable(auto_buff_debug_mpc src/auto_buff_debug_mpc.cpp)
       add_executable(auto_buff_debug_aimer src/auto_buff_debug_aimer.cpp)
+<<<<<<< HEAD
     endif()
     add_executable(auto_vision_mpc src/auto_vision_mpc.cpp)
+=======
+      add_executable(auto_vision_mpc src/auto_vision_mpc.cpp)
+    endif()
+>>>>>>> origin/main
     add_executable(auto_aim_debug_aimer src/auto_aim_debug_aimer.cpp)
     #add_executable(uav src/uav.cpp)
     #add_executable(uav_debug src/uav_debug.cpp)
 
+<<<<<<< HEAD
     target_link_libraries(standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
+=======
+    #target_link_libraries(standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
+>>>>>>> origin/main
     #target_link_libraries(mt_standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
     #target_link_libraries(standard_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
     target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
@@ -137,8 +154,13 @@ if(NOT BUILD_SENTRY)
     if(BUILD_BUFF)
       target_link_libraries(auto_buff_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff auto_aim tools io ${AUTO_BUFF_CERES})
       target_link_libraries(auto_buff_debug_aimer ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff auto_aim tools io ${AUTO_BUFF_CERES})
+<<<<<<< HEAD
     endif()
     target_link_libraries(auto_vision_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
+=======
+      target_link_libraries(auto_vision_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
+      endif()
+>>>>>>> origin/main
     target_link_libraries(auto_aim_debug_aimer ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
     #target_link_libraries(uav ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
     #target_link_libraries(uav_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
@@ -168,12 +190,19 @@ endif()
 ################## demo ##################
 add_executable(auto_aim_test tests/auto_aim_test.cpp)
 target_link_libraries(auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
+if(BUILD_BUFF)
+    add_executable(auto_buff_test tests/auto_buff_test.cpp)
+    target_link_libraries(auto_buff_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff auto_aim tools io)
+endif()
 
 ################## tests ##################
 if(BUILD_TEST OR BUILD_ALL AND NOT BUILD_SENTRY)
+<<<<<<< HEAD
     if(BUILD_BUFF)
       add_executable(auto_buff_test tests/auto_buff_test.cpp)
     endif()
+=======
+>>>>>>> origin/main
     add_executable(camera_detect_test tests/camera_detect_test.cpp)
     add_executable(camera_test tests/camera_test.cpp)
     add_executable(camera_thread_test tests/camera_thread_test.cpp)
@@ -188,9 +217,12 @@ if(BUILD_TEST OR BUILD_ALL AND NOT BUILD_SENTRY)
     #add_executable(dm_test tests/dm_test.cpp)
     #add_executable(minimum_vision_system tests/minimum_vision_system.cpp)
 
+<<<<<<< HEAD
     if(BUILD_BUFF)
       target_link_libraries(auto_buff_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff auto_aim tools io)
     endif()
+=======
+>>>>>>> origin/main
     target_link_libraries(camera_detect_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools auto_aim io)
     target_link_libraries(camera_test ${OpenCV_LIBS} fmt::fmt tools io)
     target_link_libraries(camera_thread_test ${OpenCV_LIBS} fmt::fmt auto_aim tools io)

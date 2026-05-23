@@ -61,6 +61,7 @@ int main(int argc, char * argv[])
 
   auto mode = io::Mode::idle;
   auto last_mode = io::Mode::idle;
+  auto last_t = std::chrono::steady_clock::now();
 
   while (!exiter.exit()) {
     auto t0 = std::chrono::steady_clock::now();
@@ -169,6 +170,11 @@ int main(int argc, char * argv[])
     cv::imshow("reprojection", img);
     auto key = cv::waitKey(1);
     if (key == 'q') break;
+
+    auto now = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration<double>(now - last_t).count();
+    last_t = now;
+    tools::logger()->info("[FPS] {:.1f}", 1.0 / dt);
   }
 
   detect_thread.join();

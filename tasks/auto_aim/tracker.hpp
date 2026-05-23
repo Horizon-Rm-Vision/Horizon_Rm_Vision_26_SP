@@ -51,6 +51,13 @@ private:
   int outpost_seen_streak_;
   int non_outpost_seen_streak_;
 
+<<<<<<< HEAD
+=======
+  bool outpost_top_filter_enable_;
+  double outpost_top_pitch_;
+  double outpost_front_pitch_;
+
+>>>>>>> origin/main
   #ifdef NOVA_OUTPOST_V2
   int outpost_min_detect_count_;
   int outpost_detect_fail_tolerance_;

@@ -11,6 +11,7 @@
 #include "tasks/auto_aim/yolo.hpp"
 #include "tools/exiter.hpp"
 #include "tools/ui_manager.hpp"
+#include "tools/ui_web_stream.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
 #include "tools/plotter.hpp"
@@ -38,8 +39,16 @@ int main(int argc, char * argv[])
 
   tools::Plotter plotter;
   tools::Exiter exiter;
+
+  // 初始化UIManager和WebStream (参考 auto_aim_debug_aimer)
   tools::UIManager ui_manager(config_path);
+<<<<<<< HEAD
   //plotter.setWindowName("MPC Debug");
+=======
+  tools::UIWebStream ui_web_stream(config_path);
+  plotter.configureWebStreamFromConfig(config_path);
+  ui_manager.setProgramMode("AutoAim Replay");
+>>>>>>> origin/main
 
   auto video_path = fmt::format("{}.avi", input_path);
   auto text_path = fmt::format("{}.txt", input_path);
@@ -65,6 +74,9 @@ int main(int argc, char * argv[])
     text >> t >> w >> x >> y >> z;
   }
 
+  // 使用 UIManager 的 FPS 计时
+  auto last_ui_time = std::chrono::steady_clock::now();
+
   for (int frame_count = start_index; !exiter.exit(); frame_count++) {
     if (end_index > 0 && frame_count > end_index) break;
 
@@ -74,6 +86,8 @@ int main(int argc, char * argv[])
     double t, w, x, y, z;
     text >> t >> w >> x >> y >> z;
     auto timestamp = t0 + std::chrono::microseconds(int(t * 1e6));
+
+    ui_web_stream.sendImage(img);
 
     /// 自瞄核心逻辑
 
@@ -94,7 +108,6 @@ int main(int argc, char * argv[])
       command.shoot = true;
 
     if (command.control) last_command = command;
-    /// 调试输出
 
     auto finish = std::chrono::steady_clock::now();
     tools::logger()->info(
@@ -103,23 +116,33 @@ int main(int argc, char * argv[])
       tools::delta_time(aimer_start, tracker_start) * 1e3,
       tools::delta_time(finish, aimer_start) * 1e3);
 
-    tools::draw_text(
-      img,
-      fmt::format(
-        "command is {},{:.2f},{:.2f},shoot:{}", command.control, command.yaw * 57.3,
-        command.pitch * 57.3, command.shoot),
-      {10, 60}, {154, 50, 205});
+    // UI FPS更新
+    ui_manager.updateFPS();
 
-    Eigen::Quaternion gimbal_q = {w, x, y, z};
-    tools::draw_text(
-      img,
-      fmt::format(
-        "gimbal yaw{:.2f}", (tools::eulers(gimbal_q.toRotationMatrix(), 2, 1, 0) * 57.3)[0]),
-      {10, 90}, {255, 255, 255});
+    auto now_ui = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration<double>(now_ui - last_ui_time).count();
+    last_ui_time = now_ui;
+    if (dt > 0) tools::logger()->info("[FPS] {:.1f}", 1.0 / dt);
 
-    nlohmann::json data;
+    ui_web_stream.beginFrame(img.cols, img.rows);
+
+    /// 调试绘制
 
     // 装甲板原始观测数据
+    for (const auto & armor : armors) {
+      tools::draw_points(img, armor.points, {0, 255, 0});
+      auto info = fmt::format("{:.2f} {} {} {}", armor.confidence,
+        auto_aim::COLORS[armor.color], auto_aim::ARMOR_NAMES[armor.name],
+        auto_aim::ARMOR_TYPES[armor.type]);
+      tools::draw_text(img, info, armor.center, {0, 255, 0});
+    }
+
+    Eigen::Quaternion gimbal_q = {w, x, y, z};
+    auto yaw = tools::eulers(gimbal_q.toRotationMatrix(), 2, 1, 0)[0];
+
+    // 绘图器数据收集
+    nlohmann::json data;
+
     data["armor_num"] = armors.size();
     if (!armors.empty()) {
       const auto & armor = armors.front();
@@ -131,8 +154,6 @@ int main(int argc, char * argv[])
       data["armor_center_y"] = armor.center_norm.y;
     }
 
-    Eigen::Quaternion q{w, x, y, z};
-    auto yaw = tools::eulers(q, 2, 1, 0)[0];
     data["gimbal_yaw"] = yaw * 57.3;
     data["cmd_yaw"] = command.yaw * 57.3;
     data["shoot"] = command.shoot;
@@ -188,11 +209,8 @@ int main(int argc, char * argv[])
       data["nis_fail"] = target.ekf().data.at("nis_fail");
       data["nees_fail"] = target.ekf().data.at("nees_fail");
       data["recent_nis_failures"] = target.ekf().data.at("recent_nis_failures");
-
-          
-
-          //plotter.drawData({ command.pitch * 180/M_PI}, {"target_pitch"});
     }
+<<<<<<< HEAD
 //plotter.drawData({ command.yaw * 180/M_PI,yaw * 180/M_PI}, {"target_yaw","gimbal_yaw"});
       plotter.subplot("Yaw", {yaw * 180/M_PI, command.yaw * 180/M_PI},
                       {"gimbal_yaw", "target_yaw"});
@@ -203,17 +221,84 @@ int main(int argc, char * argv[])
   
 
     cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
+=======
+
+    plotter.subplot("Yaw", {yaw * 180/M_PI, command.yaw * 180/M_PI},
+                    {"gimbal_yaw", "target_yaw"});
+    plotter.subplot("Pitch", {command.pitch * 180/M_PI},
+                    {"target_pitch"});
+    plotter.draw();
+
+    // -------------- UI渲染 (参考 auto_aim_debug_aimer) --------------
+
+    ui_manager.initialize(img);
+
+    // 左侧面板：检测与开火状态
+    bool has_target = !targets.empty();
+    ui_manager.addLeftText("detect", fmt::format("Detect: {}", has_target ? "YES" : "NO"),
+                          has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
+    ui_manager.addLeftText("fire", fmt::format("Fire: {}", command.shoot ? "YES" : "NO"),
+                          command.shoot ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+
+    // 左侧面板：云台状态与cmd数据
+    Eigen::Vector3d ypr = tools::eulers(gimbal_q.toRotationMatrix(), 2, 1, 0);
+    ui_manager.addLeftText("gimbal", fmt::format("Gimbal Y: {:.1f}  P: {:.1f}",
+                            -ypr[0] * 57.3, ypr[1] * 57.3));
+
+    if (command.control) {
+      ui_manager.addLeftText("cmd", fmt::format("Cmd Y: {:.1f}  P: {:.1f}",
+                              -command.yaw * 57.3, -command.pitch * 57.3), cv::Scalar(0, 165, 255));
+    }
+
+    // EKF目标状态
+    if (!targets.empty()) {
+      auto target = targets.front();
+      Eigen::VectorXd x = target.ekf_x();
+      ui_manager.addLeftText("ekf_pos", fmt::format("x:{:.2f} y:{:.2f} z:{:.2f}", x[0], x[2], x[4]));
+      ui_manager.addLeftText("ekf_vel", fmt::format("vx:{:.2f} vy:{:.2f} vz:{:.2f}", x[1], x[3], x[5]));
+      ui_manager.addLeftText("ekf_rot", fmt::format("a:{:.1f}deg w:{:.2f} r:{:.2f}", x[6] * 57.3, x[7], x[8]));
+    }
+
+    // 右侧面板：目标统计与FPS
+    ui_manager.addRightText("target_count", fmt::format("Targets: {}", targets.size()),
+                           targets.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+    ui_manager.addRightText("armor_count", fmt::format("Armors: {}", armors.size()),
+                           armors.empty() ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+>>>>>>> origin/main
 
     auto now = std::chrono::steady_clock::now();
     double fps = 1.0 / tools::delta_time(now, last_frame_time);
     last_frame_time = now;
+<<<<<<< HEAD
     tools::draw_text(
       img, fmt::format("FPS: {:.1f}", fps), {10, 30}, {255, 0, 0});
 
     cv::imshow("reprojection", img);
     auto key = cv::waitKey(30);
     if (key == 'q') break;
+=======
+    ui_manager.addRightText("fps", fmt::format("FPS: {:.1f}", fps));
+
+    ui_manager.render(img);
+    ui_web_stream.capturePanels(ui_manager);
+    ui_web_stream.sendFrame();
+
+    if (ui_manager.isImshowEnabled()) {
+      cv::namedWindow("result", 0);
+      cv::imshow("result", img);
+      int key = cv::waitKey(1);
+      if (key == 'q') break;
+      while (key == ' ') {
+        int y = cv::waitKey(30);
+        if (y == 'q') break;
+        if (y == ' ') break;
+      }
+    }
+>>>>>>> origin/main
   }
+
+  cv::destroyAllWindows();
+  text.close();
 
   return 0;
 }

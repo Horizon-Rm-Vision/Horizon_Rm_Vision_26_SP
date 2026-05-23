@@ -109,7 +109,7 @@ void SmallTarget::predict(double dt)
         0.0, 0.0, 0.0, 0.0, 0.0, 1.0,  dt, // roll
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0; // spd
 
-  // 过程噪声协方差矩阵                            //// 调整
+  // 过程噪声协方差矩阵
   auto v1 = 0.001;  // 角加速度方差
   auto a = dt * dt * dt * dt / 4;
   auto b = dt * dt * dt / 2;
@@ -121,7 +121,7 @@ void SmallTarget::predict(double dt)
            0.0,    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
            0.0,    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
            0.0,    0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-  // clang-format on 
+  // clang-format on
   auto f = [&](const Eigen::VectorXd & x) -> Eigen::VectorXd {
     Eigen::VectorXd x_prior = A_ * x;
     x_prior[0] = tools::limit_rad(x_prior[0]);
@@ -156,7 +156,7 @@ void SmallTarget::init(double nowtime, const PowerRune & p)
   // clang-format off
   // 初始状态
   x0_ << p.ypd_in_world[0], 0.0, p.ypd_in_world[1], p.ypd_in_world[2],
-         p.ypr_in_world[0], p.ypr_in_world[2], 
+         p.ypr_in_world[0], p.ypr_in_world[2],
          SMALL_W * voter.clockwise();
   // 初始状态协方差矩阵
   P0_ << 10.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
@@ -166,15 +166,6 @@ void SmallTarget::init(double nowtime, const PowerRune & p)
           0.0,  0.0,  0.0,  0.0, 10.0,  0.0,  0.0,
           0.0,  0.0,  0.0,  0.0,  0.0, 10.0,  0.0,
           0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2;
-  // 状态转移矩阵
-  // A_ 
-  // 过程噪声协方差矩阵                            //// 调整
-  // Q_ 
-  // 测量方程矩阵
-  // H_
-  // 测量噪声协方差矩阵                            //// 调整
-  // R_
-
   // clang-format on
 
   // 防止夹角求和出现异常值
@@ -221,20 +212,7 @@ void SmallTarget::update(double nowtime, const PowerRune & p)
   // 预测下一个状态
   predict(nowtime - lasttime_);
 
-  // [R_yaw]     angle0
-  // [R_pitch]   angle1
-  // [R_dis]
-  // [angle/row] angle3
-  // [B_yaw]     angle4
-  // [B_pitch]   angle5
-  // [B_dis]
-
-  /// 1.
-
-  // [R_yaw]     angle0
-  // [R_pitch]   angle1
-  // [R_dis]
-  // [angle/row] angle3
+  /// 1. R_center 观测
 
   // clang-format off
   Eigen::MatrixXd H1{
@@ -254,7 +232,7 @@ void SmallTarget::update(double nowtime, const PowerRune & p)
 
   // 防止夹角求差出现异常值
   auto z_subtract1 = [](const Eigen::VectorXd & a, const Eigen::VectorXd & b) -> Eigen::VectorXd {
-    Eigen::VectorXd c = a - b;  //4 1
+    Eigen::VectorXd c = a - b;
     c[0] = tools::limit_rad(c[0]);
     c[1] = tools::limit_rad(c[1]);
     c[3] = tools::limit_rad(c[3]);
@@ -265,11 +243,15 @@ void SmallTarget::update(double nowtime, const PowerRune & p)
 
   ekf_.update(z1, H1, R1, z_subtract1);
 
+<<<<<<< HEAD
   ///2. 主扇叶观测 (blade_id = 0)
 
   // [B_yaw]     angle4
   // [B_pitch]   angle5
   // [B_dis]
+=======
+  /// 2. 主扇叶尖端观测
+>>>>>>> origin/main
 
   // clang-format off
   Eigen::MatrixXd H2 = h_jacobian(0);  // 3*7
@@ -282,6 +264,7 @@ void SmallTarget::update(double nowtime, const PowerRune & p)
   // clang-format on
 
   // 定义非线性转换函数h: x -> z
+<<<<<<< HEAD
   auto h2_blade = [this](int blade_id) {
     return [this, blade_id](const Eigen::VectorXd & x) -> Eigen::Vector3d {
       Eigen::VectorXd R_ypd{{x[0], x[2], x[3]}};
@@ -290,11 +273,19 @@ void SmallTarget::update(double nowtime, const PowerRune & p)
       Eigen::VectorXd B_ypd = tools::xyz2ypd(B_xyz);
       return B_ypd;
     };
+=======
+  auto h2 = [&](const Eigen::VectorXd & x) -> Eigen::Vector3d {
+    Eigen::VectorXd R_ypd{{x[0], x[2], x[3]}};
+    Eigen::VectorXd R_xyz = tools::ypd2xyz(R_ypd);
+    Eigen::VectorXd B_xyz = point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
+    Eigen::VectorXd B_ypd = tools::xyz2ypd(B_xyz);
+    return B_ypd;
+>>>>>>> origin/main
   };
 
   // 防止夹角求差出现异常值
   auto z_subtract2 = [](const Eigen::VectorXd & a, const Eigen::VectorXd & b) -> Eigen::VectorXd {
-    Eigen::VectorXd c = a - b;  //6 1
+    Eigen::VectorXd c = a - b;
     c[0] = tools::limit_rad(c[0]);
     c[1] = tools::limit_rad(c[1]);
     return c;
@@ -342,7 +333,6 @@ Eigen::MatrixXd SmallTarget::h_jacobian(int blade_id) const
     {            0.0,             0.0,             0.0, 0.0, 1.0}
   };// 5*5
 
-  // double pitch = 0;
   double yaw = ekf_.x[4];
   double roll = ekf_.x[5] + double(blade_id) * 2.0 * CV_PI / 5.0;  // blade_id 偏移
   double cos_yaw = cos(yaw);
@@ -360,15 +350,6 @@ Eigen::MatrixXd SmallTarget::h_jacobian(int blade_id) const
   // clang-format on
 
   return H3 * H2 * H1 * H0;  // 3*7
-
-  // auto h2 = [&](const Eigen::VectorXd & x) -> Eigen::Vector3d {
-  //   Eigen::VectorXd R_ypd{{x[0], x[2], x[3]}};
-  //   Eigen::VectorXd R_xyz = tools::ypd2xyz(R_ypd);
-  //   Eigen::VectorXd R_xyz_and_yr{{R_ypd[0], R_ypd[1], R_ypd[2], x[4], x[5]}};
-  //   Eigen::VectorXd B_xyz = point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
-  //   Eigen::VectorXd B_ypd = tools::xyz2ypd(B_xyz);
-  //   return B_ypd;
-  // };
 }
 
 /// BigTarget
@@ -417,7 +398,6 @@ void BigTarget::predict(double dt)
 {
   // 预测下一个状态
   double spd = fit_spd_;
-  // double spd = ekf_.x[6];
   double a = ekf_.x[7];
   double w = ekf_.x[8];
   double fi = ekf_.x[9];
@@ -433,8 +413,8 @@ void BigTarget::predict(double dt)
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,//a
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0,//w
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0;//theta
-        
-  // 过程噪声协方差矩阵                            //// 调整
+
+  // 过程噪声协方差矩阵
   auto v1 = 0.9;  // 角加速度方差
   auto a1 = dt * dt * dt * dt / 4;
   auto b1 = dt * dt * dt / 2;
@@ -445,24 +425,16 @@ void BigTarget::predict(double dt)
             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
             0.0,     0.0, 0.0, 0.0, 0.0, 0.09,  0.0,  0.0,  0.0,  0.0,//row
-            0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.5,  0.0,  0.0,  0.0,// spd 0.5  1
+            0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.5,  0.0,  0.0,  0.0,// spd
             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,// a
             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,// w
             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  1.0;// fi
-            // 0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  1.0,  0.0,  0.0,  0.0,// spd  2
-            // 0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
-            // 0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 
-            // 0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  4.0;
-
-            // 0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
-            // 0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 
-            // 0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0;
   auto f = [&](const Eigen::VectorXd & x) -> Eigen::VectorXd {
     Eigen::VectorXd x_prior = x;
     x_prior[0] = tools::limit_rad(x_prior[0] + dt * x_prior[1]);
     x_prior[2] = tools::limit_rad(x_prior[2]);
     x_prior[4] = tools::limit_rad(x_prior[4]); // yaw
-    x_prior[5] = tools::limit_rad(x_prior[5] + voter.clockwise() * 
+    x_prior[5] = tools::limit_rad(x_prior[5] + voter.clockwise() *
     (-a / w * std::cos(w * t + fi) + a / w * std::cos(w * lasttime_ + fi) + (2.09 - a) * dt)); // roll
     x_prior[6] = a * sin(w * t + fi) + 2.09 - a; // spd
     return x_prior;
@@ -470,6 +442,60 @@ void BigTarget::predict(double dt)
   // clang-format on
   ekf_.predict(A_, Q_, f);
 }
+
+// 主要修正了 row 状态的雅可比矩阵，消除了原有的模型线性化错误，但row方向是否正确还需要实测验证,暂时不用
+// void BigTarget::predict(double dt)
+// {
+//   // 预测下一个状态
+//   double a = ekf_.x[7];
+//   double w = ekf_.x[8];
+//   double fi = ekf_.x[9];
+//   double t = lasttime_ + dt;
+//   int cw = voter.clockwise();
+//   double cos_wt_fi = std::cos(w * t + fi);
+//   double sin_wt_fi = std::sin(w * t + fi);
+//   double cos_wt0_fi = std::cos(w * lasttime_ + fi);
+//   double sin_wt0_fi = std::sin(w * lasttime_ + fi);
+//   // clang-format off
+//   A_ << 1.0,  dt, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,//R_yaw
+//         0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,//v_R_yaw
+//         0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,//R_pitch
+//         0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,//R_dis
+//         0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,//yaw
+//         0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, cw * (-cos_wt_fi / w + cos_wt0_fi / w - dt), cw * (a * cos_wt_fi / (w * w) - a * cos_wt0_fi / (w * w) + a * t * sin_wt_fi / w - a * lasttime_ * sin_wt0_fi / w), cw * (a * sin_wt_fi / w - a * sin_wt0_fi / w),//row
+//         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, sin_wt_fi - 1, t * a * cos_wt_fi,                                                                                       a * cos_wt_fi,//spd
+//         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,//a
+//         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0,//w
+//         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0;//theta
+
+//   // 过程噪声协方差矩阵
+//   auto v1 = 0.9;  // 角加速度方差
+//   auto a1 = dt * dt * dt * dt / 4;
+//   auto b1 = dt * dt * dt / 2;
+//   auto c1 = dt * dt;
+//   Q_ << a1 * v1, b1 * v1, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+//         b1 * v1, c1 * v1, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+//             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+//             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+//             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+//             0.0,     0.0, 0.0, 0.0, 0.0, 0.09,  0.0,  0.0,  0.0,  0.0,//row
+//             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.5,  0.0,  0.0,  0.0,// spd
+//             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,// a
+//             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,// w
+//             0.0,     0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  1.0;// fi
+//   auto f = [&](const Eigen::VectorXd & x) -> Eigen::VectorXd {
+//     Eigen::VectorXd x_prior = x;
+//     x_prior[0] = tools::limit_rad(x_prior[0] + dt * x_prior[1]);
+//     x_prior[2] = tools::limit_rad(x_prior[2]);
+//     x_prior[4] = tools::limit_rad(x_prior[4]); // yaw
+//     x_prior[5] = tools::limit_rad(x_prior[5] + cw *
+//     (-a / w * cos_wt_fi + a / w * cos_wt0_fi + (2.09 - a) * dt)); // roll
+//     x_prior[6] = a * sin_wt_fi + 2.09 - a; // spd
+//     return x_prior;
+//   };
+//   // clang-format on
+//   ekf_.predict(A_, Q_, f);
+// }
 
 void BigTarget::init(double nowtime, const PowerRune & p)
 {
@@ -499,8 +525,8 @@ void BigTarget::init(double nowtime, const PowerRune & p)
   // clang-format off
   // 初始状态
   x0_ << p.ypd_in_world[0], 0.0, p.ypd_in_world[1], p.ypd_in_world[2],
-         p.ypr_in_world[0], p.ypr_in_world[2], 
-         1.1775, 0.9125, 1.942, 0.0;//std::atan((spd - 2.09) / 0.9125 + 1
+         p.ypr_in_world[0], p.ypr_in_world[2],
+         1.1775, 0.9125, 1.942, 0.0;
   // 初始状态协方差矩阵
   P0_ << 10.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
           0.0, 10.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
@@ -512,15 +538,6 @@ void BigTarget::init(double nowtime, const PowerRune & p)
           0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 10.0,  0.0,  0.0,
           0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 10.0,  0.0,
           0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 400.0;
-  // 状态转移矩阵
-  // A_
-  // 过程噪声协方差矩阵                            //// 调整
-  // Q_
-  // 测量方程矩阵
-  // H_
-  // 测量噪声协方差矩阵                            //// 调整
-  // R_
-
   // clang-format on
 
   // 防止夹角求和出现异常值
@@ -567,25 +584,12 @@ void BigTarget::update(double nowtime, const PowerRune & p)
   // vote判断是顺时针还是逆时针旋转
   voter.vote(ekf_.x[5], ypr[2]);
 
-  auto anglelast = ekf_.x[5];  ///
+  auto anglelast = ekf_.x[5];
 
   // 预测下一个状态
   predict(nowtime - lasttime_);
 
-  // [R_yaw]     angle0
-  // [R_pitch]   angle1
-  // [R_dis]
-  // [angle/row] angle3
-  // [B_yaw]     angle4
-  // [B_pitch]   angle5
-  // [B_dis]
-
-  /// 1.
-
-  // [R_yaw]     angle0
-  // [R_pitch]   angle1
-  // [R_dis]
-  // [angle/row] angle3
+  /// 1. R_center 观测
 
   // clang-format off
   Eigen::MatrixXd H1{
@@ -599,13 +603,13 @@ void BigTarget::update(double nowtime, const PowerRune & p)
     {0.01, 0.0, 0.0,  0.0}, // R_yaw
     {0.0, 0.01, 0.0,  0.0}, // R_pitch
     {0.0,  0.0, 0.5,  0.0}, // R_dis
-    {0.0,  0.0, 0.0, 0.1}  // roll  1: 0.01 2:0.04
+    {0.0,  0.0, 0.0, 0.1}  // roll
   };
   // clang-format on
 
   // 防止夹角求差出现异常值
   auto z_subtract1 = [](const Eigen::VectorXd & a, const Eigen::VectorXd & b) -> Eigen::VectorXd {
-    Eigen::VectorXd c = a - b;  //4 1
+    Eigen::VectorXd c = a - b;
     c[0] = tools::limit_rad(c[0]);
     c[1] = tools::limit_rad(c[1]);
     c[3] = tools::limit_rad(c[3]);
@@ -616,11 +620,15 @@ void BigTarget::update(double nowtime, const PowerRune & p)
 
   ekf_.update(z1, H1, R1, z_subtract1);
 
+<<<<<<< HEAD
   ///2. 主扇叶观测 (blade_id = 0)
 
   // [B_yaw]     angle4
   // [B_pitch]   angle5
   // [B_dis]
+=======
+  /// 2. 主扇叶尖端观测
+>>>>>>> origin/main
 
   // clang-format off
   Eigen::MatrixXd H2 = h_jacobian(0);  // 3*10
@@ -633,6 +641,7 @@ void BigTarget::update(double nowtime, const PowerRune & p)
   // clang-format on
 
   // 定义非线性转换函数h: x -> z
+<<<<<<< HEAD
   auto h2_blade = [this](int blade_id) {
     return [this, blade_id](const Eigen::VectorXd & x) -> Eigen::Vector3d {
       Eigen::VectorXd R_ypd{{x[0], x[2], x[3]}};
@@ -641,11 +650,19 @@ void BigTarget::update(double nowtime, const PowerRune & p)
       Eigen::VectorXd B_ypd = tools::xyz2ypd(B_xyz);
       return B_ypd;
     };
+=======
+  auto h2 = [&](const Eigen::VectorXd & x) -> Eigen::Vector3d {
+    Eigen::VectorXd R_ypd{{x[0], x[2], x[3]}};
+    Eigen::VectorXd R_xyz = tools::ypd2xyz(R_ypd);
+    Eigen::VectorXd B_xyz = point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
+    Eigen::VectorXd B_ypd = tools::xyz2ypd(B_xyz);
+    return B_ypd;
+>>>>>>> origin/main
   };
 
   // 防止夹角求差出现异常值
   auto z_subtract2 = [](const Eigen::VectorXd & a, const Eigen::VectorXd & b) -> Eigen::VectorXd {
-    Eigen::VectorXd c = a - b;  //6 1
+    Eigen::VectorXd c = a - b;
     c[0] = tools::limit_rad(c[0]);
     c[1] = tools::limit_rad(c[1]);
     return c;
@@ -694,7 +711,7 @@ Eigen::MatrixXd BigTarget::h_jacobian(int blade_id) const
     {0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
     {0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
     {0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0}
-  };// 5*7
+  };// 5*10
 
   Eigen::VectorXd R_ypd{{ekf_.x[0], ekf_.x[2], ekf_.x[3]}};
   Eigen::MatrixXd H_ypd2xyz = tools::ypd2xyz_jacobian(R_ypd);  // 3*3
@@ -706,7 +723,6 @@ Eigen::MatrixXd BigTarget::h_jacobian(int blade_id) const
     {            0.0,             0.0,             0.0, 0.0, 1.0}
   };// 5*5
 
-  // double pitch = 0;
   double yaw = ekf_.x[4];
   double roll = ekf_.x[5] + double(blade_id) * 2.0 * CV_PI / 5.0;  // blade_id 偏移
   double cos_yaw = cos(yaw);
@@ -723,15 +739,6 @@ Eigen::MatrixXd BigTarget::h_jacobian(int blade_id) const
   Eigen::MatrixXd H3 = tools::xyz2ypd_jacobian(B_xyz);// 3*3
   // clang-format on
 
-  return H3 * H2 * H1 * H0;  // 3*7
-
-  // auto h2 = [&](const Eigen::VectorXd & x) -> Eigen::Vector3d {
-  //   Eigen::VectorXd R_ypd{{x[0], x[2], x[3]}};
-  //   Eigen::VectorXd R_xyz = tools::ypd2xyz(R_ypd);
-  //   Eigen::VectorXd R_xyz_and_yr{{R_ypd[0], R_ypd[1], R_ypd[2], x[4], x[5]}};
-  //   Eigen::VectorXd B_xyz = point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.7));
-  //   Eigen::VectorXd B_ypd = tools::xyz2ypd(B_xyz);
-  //   return B_ypd;
-  // };
+  return H3 * H2 * H1 * H0;  // 3*10
 }
 }  // namespace auto_buff

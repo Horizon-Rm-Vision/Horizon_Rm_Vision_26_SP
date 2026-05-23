@@ -52,10 +52,14 @@ int main(int argc, char * argv[])
   auto recorder_config = tools::load(config_path);
   bool enable_recorder = recorder_config["recorder"] ? recorder_config["recorder"].as<bool>() : false;
 
+<<<<<<< HEAD
   // 终端 FPS 显示变量
   auto last_fps_time = std::chrono::steady_clock::now();
   int frame_count = 0;
   float terminal_fps = 0.0f;
+=======
+  auto last_t = std::chrono::steady_clock::now();
+>>>>>>> origin/main
 
   #ifdef SENTRY_SR
   auto yaml = YAML::LoadFile(config_path);
@@ -86,12 +90,6 @@ int main(int argc, char * argv[])
   tools::ThreadSafeQueue<std::optional<auto_aim::Target>, true> target_queue(1);
   target_queue.push(std::nullopt);
 
-  #ifdef FIRE_CONSTRAINT
-  // 记录初始云台yaw
-  auto initial_gimbal_state = gimbal.state();
-  double initial_yaw = initial_gimbal_state.yaw;
-  #endif
-
   std::atomic<bool> quit = false;
   
   auto plan_thread = std::thread([&]() {
@@ -113,7 +111,7 @@ int main(int argc, char * argv[])
       // 开火约束检查
       bool allow_fire = plan.fire;
       // 云台角度约束
-      if (std::abs(plan.yaw - initial_yaw) > gimbal_yaw_threshold) {
+      if (std::abs(plan.yaw - gs.yaw) > gimbal_yaw_threshold) {
         allow_fire = false;
       }
       // 目标距离约束
@@ -199,19 +197,10 @@ int main(int argc, char * argv[])
     // UI FPS更新
     ui_manager.updateFPS();
     
-    // 终端 FPS 计算和显示
-    frame_count++;
-    auto current_time = std::chrono::steady_clock::now();
-    auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_fps_time).count();
-    
-    if (elapsed_time >= 1000) {
-      terminal_fps = static_cast<float>(frame_count) * 1000.0f / static_cast<float>(elapsed_time);
-      frame_count = 0;
-      last_fps_time = current_time;
-      
-      // 输出 FPS 到终端
-      fmt::print("[FPS] {:.1f}\n", terminal_fps);
-    }
+    auto now = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration<double>(now - last_t).count();
+    last_t = now;
+    tools::logger()->info("[FPS] {:.1f}", 1.0 / dt);
     
     camera.read(img, t);
     ui_web_stream.sendImage(img);

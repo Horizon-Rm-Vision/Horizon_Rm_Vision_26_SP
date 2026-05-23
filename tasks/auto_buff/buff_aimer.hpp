@@ -8,8 +8,6 @@
 #include <cmath>
 #include <vector>
 
-#include "tools/trajectory.hpp"
-
 #include "../auto_aim/planner/planner.hpp"
 #include "buff_target.hpp"
 #include "buff_type.hpp"
@@ -35,12 +33,9 @@ public:
   double t_gap = 0;  ///
 
 private:
-  SmallTarget target_;
+  //SmallTarget target_;
   double yaw_offset_;
   double pitch_offset_;
-
-  // 弹道模型选择
-  tools::Trajectory::Model ballistic_model_ = tools::Trajectory::Model::kNoDrag;
 
   double fire_gap_time_;
   double predict_time_;
@@ -50,6 +45,11 @@ private:
 
   double last_yaw_ = 0;
   double last_pitch_ = 0;
+
+  #ifdef BIG_BUFF_FIRE_FIX
+  // switch_fanblade_ 超时兜底，防止 get_send_angle 持续失败导致永久抑制开火
+  std::chrono::steady_clock::time_point last_switch_time_;
+  #endif
 
   // for mpc
   bool first_in_aimer_ = true;

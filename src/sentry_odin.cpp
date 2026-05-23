@@ -106,6 +106,10 @@ int main(int argc, char * argv[])
   cv::Mat img;
   std::chrono::steady_clock::time_point timestamp;
   io::Command last_command;
+<<<<<<< HEAD
+=======
+  auto last_t = std::chrono::steady_clock::now();
+>>>>>>> origin/main
 
   while (!exiter.exit()) {
     camera.read(img, timestamp);
@@ -159,6 +163,14 @@ int main(int argc, char * argv[])
     Eigen::Vector4d target_info = decider.get_target_info(armors, targets);
 
     ros2.publish(target_info);
+<<<<<<< HEAD
+=======
+
+    auto now = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration<double>(now - last_t).count();
+    last_t = now;
+    tools::logger()->info("[FPS] {:.1f}", 1.0 / dt);
+>>>>>>> origin/main
   }
 
   return 0;

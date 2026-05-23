@@ -69,6 +69,7 @@ int main(int argc, char * argv[])
 
   std::atomic<io::GimbalMode> mode{io::GimbalMode::IDLE};
   auto last_mode{io::GimbalMode::IDLE};
+  auto last_t = std::chrono::steady_clock::now();
 
   auto plan_thread = std::thread([&]() {
     auto t0 = std::chrono::steady_clock::now();
@@ -144,6 +145,11 @@ int main(int argc, char * argv[])
 
     } else
       gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
+
+    auto now = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration<double>(now - last_t).count();
+    last_t = now;
+    tools::logger()->info("[FPS] {:.1f}", 1.0 / dt);
   }
 
   quit = true;

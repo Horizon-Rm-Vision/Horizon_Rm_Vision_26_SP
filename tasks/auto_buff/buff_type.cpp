@@ -6,8 +6,9 @@
 namespace auto_buff
 {
 FanBlade::FanBlade(
-  const std::vector<cv::Point2f> & kpt, cv::Point2f keypoints_center, FanBlade_type t)
-: center(keypoints_center), type(t)
+  const std::vector<cv::Point2f> & kpt, cv::Point2f keypoints_center, FanBlade_type t,
+  Color c)
+: center(keypoints_center), type(t), color(c)
 {
   points.insert(points.end(), kpt.begin(), kpt.end());
 }
@@ -24,6 +25,7 @@ PowerRune::PowerRune(
 {
   /// 找出target
 
+<<<<<<< HEAD
   if (big_2026_mode_) {
     // ---- 2026 大符: 不识别单一 target, 所有检测到的扇叶均为 _light ----
     // (保留原始 type, 构造时只能是 _light)
@@ -38,6 +40,40 @@ PowerRune::PowerRune(
       float min_distance = norm(ts[0].center - last_target_center);
       for (auto it = ts.begin(); it != ts.end(); ++it) {
         float distance = norm(it->center - last_target_center);
+=======
+  // 只有一个fanblade，就为target
+  if (light_num == 1) ts[0].type = _target;
+  // 没有新亮起来的fanblade
+  else if (last_powerrune.has_value() && ts.size() == last_powerrune.value().light_num) {
+    auto last_target_center = last_powerrune.value().fanblades[0].center;
+    auto target_fanblade_it = ts.begin();  // 初始化为 fanblades 的第一个元素
+    float min_distance = norm(ts[0].center - last_target_center);
+    for (auto it = ts.begin(); it != ts.end(); ++it) {
+      float distance = norm(it->center - last_target_center);
+      if (distance < min_distance) {
+        min_distance = distance;
+        target_fanblade_it = it;  // 更新最近的 fanblade 的迭代器
+      }
+    }
+    target_fanblade_it->type = _target;  // 设置最近的 fanblade 的 type
+    std::iter_swap(ts.begin(), target_fanblade_it);
+  }
+  // 没有历史帧但检测到多块扇叶（新版大符首次识别到一组两块）
+  else if (!last_powerrune.has_value() && light_num >= 2) {
+    ts[0].type = _target;
+  }
+  // 有新亮起来的fanblade
+  else if (last_powerrune.has_value() && light_num == last_powerrune.value().light_num + 1) {
+    auto last_fanblades = last_powerrune.value().fanblades;
+    float max_min_distance = -1.0f;        // 初始化最大最小距离为-1
+    auto target_fanblade_it = ts.begin();  // 用于存储目标 fanblade 的迭代器
+    for (auto it = ts.begin(); it != ts.end(); ++it) {
+      float min_distance = std::numeric_limits<float>::max();  // 初始化最小距离为最大浮点数
+      // 计算当前 fanblade 到 last_fanblades 中每个 fanblade 的最小距离
+      for (const auto & last_fanblade : last_fanblades) {
+        if (last_fanblade.type == _unlight) continue;
+        float distance = norm(it->center - last_fanblade.center);
+>>>>>>> origin/main
         if (distance < min_distance) {
           min_distance = distance;
           target_fanblade_it = it;  // 更新最近的 fanblade 的迭代器
