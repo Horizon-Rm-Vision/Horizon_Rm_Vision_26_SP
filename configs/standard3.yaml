@@ -3,7 +3,7 @@ enemy_color: "red"
 #enemy_color: "blue"
 
 #####-----自瞄神经网络模式参数-----#####
-yolo_name: yolov5_trt
+yolo_name: yolov5_ov
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
@@ -104,8 +104,8 @@ outpost_converged_pos_p_max: 0.5
 outpost_converged_vel_p_max: 10.0
 
 #####-----弹道手动校正参数-----#####
-yaw_offset: 0 # degree -2.5 #正值枪口向左
-pitch_offset: 0 # degree 2 #正值枪口向上
+yaw_offset:  3.6 # degree -2.5 #正值枪口向左
+pitch_offset: -1.0 # degree 2 #正值枪口向上
 
 #####-----aimer参数-----#####
 comming_angle: 30 # degree (调小，只考虑很接近中心的装甲板)
@@ -117,8 +117,8 @@ gyro_angle_threshold: 60 # degree
 gyro_speed_threshold: 2 # rad/s
 
 #####-----开火约束参数-----#####
-gimbal_yaw_threshold: 30 # degree, 云台yaw角度约束阈值
-target_distance_threshold: 5 # meter, 目标距离约束阈值
+gimbal_yaw_threshold: 1000 # degree, 云台yaw角度约束阈值
+target_distance_threshold: 50 # meter, 目标距离约束阈值
 
 #####-----锁中心参数-----#####
 track_center: false  # 是否启用锁中心模式
@@ -145,7 +145,7 @@ Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----gimbal参数-----#####
-com_port: /dev/pts/3
+com_port: auto
 
 # #####-----相机参数-----#####
 #camera_name: "mindvision"
@@ -153,15 +153,15 @@ com_port: /dev/pts/3
 #gamma: 3 #已经废弃
 #vid_pid: "f622:d13a"
 
-# camera_name: "hikrobot"
-# exposure_ms: 3
-# gain: 10.0
-# vid_pid: "2bdf:0001"
+camera_name: "hikrobot"
+exposure_ms: 5
+gain: 10.0
+vid_pid: "2bdf:0001"
 
-camera_name: "daheng"
-exposure_ms: 10
-gamma: 2.85
-vid_pid: "KE0200010097"
+# camera_name: "daheng"
+# exposure_ms: 10
+# gamma: 2.85
+# vid_pid: "KE0200010097"
 camera_param_path: ../configs/camera_param/MD_HERO_UL_8MM.yaml
 
 #####-----BUFF神经网络参数-----#####
@@ -199,21 +199,21 @@ fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
 
 # 弹道解算模式，可选 "no_drag" (默认抛物线) 或 "hero" (带空气阻力迭代)
-ballistic_model: "hero"
+ballistic_model: "no_drag"
 
 #####-----nav速度倍数（仅用于哨兵模式，导航相关）-----#####
-velocity_n: 30
+velocity_n: 1
 
 
 # #####-----UI显示配置-----#####
 ui:
-  enabled: true
-  imshow: true
+  enabled: false
+  imshow: false
   web:
     enabled: true
-    host: "192.168.1.167"
-    port: 9878
-    send_image: true
+    host: "172.25.214.177"
+    port: 9000
+    send_image: false
     image_quality: 75
     max_image_dim: 640
 
@@ -221,4 +221,4 @@ ui:
 recorder: false
 
 #####-----弹速参数-----#####
-bullet_speed: "auto"
+bullet_speed: 18.0

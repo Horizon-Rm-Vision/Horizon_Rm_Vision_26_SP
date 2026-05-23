@@ -227,7 +227,7 @@ int main(int argc, char * argv[])
     auto form = ros2.subscribe_form();
     int8_t gimbal_form_value = gimbal_form ? gimbal_form->data : 0;
     //发布导航的信息
-    ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.state, gs.energy_state,gs.bullets);
+    ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.state, gs.energy_state,gs.bullets ,gs.judge);
     #endif
     ui_manager.addLeftText("gimbal_status", fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", -gs.yaw * 180.0 / M_PI, -gs.pitch * 180.0 / M_PI));
     
@@ -243,6 +243,7 @@ int main(int argc, char * argv[])
     ui_manager.addLeftText("state", fmt::format("State: {} ", (int)gs.state));
     ui_manager.addLeftText("energy_state", fmt::format("  Energy State: {} ", (int)gs.energy_state));
     ui_manager.addLeftText("bullets", fmt::format("  Bullets: {} ", (int)gs.bullets));
+    ui_manager.addLeftText("judge", fmt::format("  Judge: {} ", (int)gs.judge));
     #endif
     
     // 添加右侧UI元素
