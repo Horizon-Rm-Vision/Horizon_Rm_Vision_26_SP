@@ -3,20 +3,20 @@ enemy_color: "red"
 #enemy_color: "blue"
 
 #####-----自瞄神经网络模式参数-----#####
-yolo_name: yolov5_trt
+yolo_name: tra
 classify_model: ../assets/tiny_resnet.onnx
 yolo11_model_path: ../assets/yolo11.xml
 yolov8_model_path: ../assets/yolov8.xml
 yolov5_model_path: ../assets/yolov5.xml
-yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
-#yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
+# yolov5_trt_model_path: ../assets/yolov5a-fp16-ampere.engine
+yolov5_trt_model_path: ../assets/yolov5a-fp16-orin.engine
 #yolov5_trt_model_path: ../assets/yolov5a-fp16-ada.engine
 yolox_ov_model_path: ../assets/best_06_02.xml
-yolox_trt_model_path: ../assets/best_06_02-fp16-ampere.engine
-#yolox_trt_model_path: ../assets/best_06_02-fp16-orin.engine
+# yolox_trt_model_path: ../assets/best_06_02-fp16-ampere.engine
+yolox_trt_model_path: ../assets/best_06_02-fp16-orin.engine
 yolox_svm_model_path: ../assets/svm_numbers_rbf.xml
 device: CPU
-min_confidence: 0.6
+min_confidence: 0.8
 use_traditional: true
 
 #####-----yolox模式标签修正(ov/trt)-----#####
@@ -29,7 +29,7 @@ yolox:
   # LeNet模式参数 (label_correction_mode: "lenet" 时生效)
   lenet_model_path: "../assets/lenet.onnx"
   lenet_label_path: "../assets/label.txt"
-  lenet_threshold: 0.5
+  lenet_threshold: 0.6
   # ResNet模式参数 (label_correction_mode: "resnet" 时生效)
   resnet_model_path: "../assets/tiny_resnet.onnx"
 
@@ -56,7 +56,7 @@ max_rectangular_error: 25 # degree
 #####-----自瞄传统视觉模式识别参数 (yolo_name: tra)-----#####
 traditional:
   binary_thres: 90
-  use_pca: true      # 使用PCA算法矫正灯条角点
+  use_pca: false      # 使用PCA算法矫正灯条角点
   light:
     min_ratio: 0.0001
     max_ratio: 1.0
@@ -86,7 +86,7 @@ outpost_min_detect_count: 3
 outpost_detect_fail_tolerance: 8
 outpost_correction_enable: true
 outpost_correction_min_detect_count: 3
-outpost_correction_cancel_count: 5
+outpost_correction_cancel_count: 25
 outpost_h_max_reasonable: 0.25
 outpost_match_gate: 10.0
 outpost_q_h: 0.0006
@@ -99,40 +99,42 @@ outpost_converged_vel_p_max: 10.0
 #而介于outpost_top_pitch和outpost_front_pitch之间的装甲板为模糊地带
 #取两个角度的中间位置为分界,靠近哪个角度就归类为那个角度的行为,所有角度为世界坐标系下角度
 #大致可以简化理解为:被过滤的角度<(outpost_top_pitch+outpost_front_pitch)/2<不被过滤的角度
-outpost_top_pitch: 27.5 
+
+outpost_top_filter_enable: true
+outpost_top_pitch: 25
 outpost_front_pitch: -15.0 
 
 #####-----弹道手动校正参数-----#####
-yaw_offset: 0 # degree -2.5 #正值枪口向左
+yaw_offset: 0.5 # degree -2.5 #正值枪口向左
 pitch_offset: 0 # degree 2 #正值枪口向上
 
 #####-----aimer参数-----#####
 comming_angle: 30 # degree (调小，只考虑很接近中心的装甲板)
 leaving_angle: 10 # degree (调小，更谨慎切换)
 decision_speed: 0.5 #8 # rad/s (调大，不容易进入小陀螺模式，使用角度差最小选择逻辑)
-high_speed_delay_time: 0.015 # s
-low_speed_delay_time: 0.015 # s 
+high_speed_delay_time: 0.03 # s
+low_speed_delay_time: 0.03 # s 
 gyro_angle_threshold: 60 # degree
 gyro_speed_threshold: 2 # rad/s
 
 #####-----开火约束参数-----#####
 gimbal_yaw_threshold: 60 # degree, 云台yaw角度约束阈值
-target_distance_threshold: 10 # meter, 目标距离约束阈值
+target_distance_threshold: 7 # meter, 目标距离约束阈值
 
 #####-----锁中心参数-----#####
-track_center: false  # 是否启用锁中心模式
-aim_center_palstance_threshold: 6.5  # 锁中心角速度阈值，弧度制
-switch_trackmode_threshold: 1.2  # 切换锁中心模式的角速度偏移，弧度制
-aim_center_angle_tolerance: 1  # 锁中心自动击发角度容差，角度制
+track_center: true  # 是否启用锁中心模式
+aim_center_palstance_threshold: 2.5  # 锁中心角速度阈值，弧度制 6.5 outpost2.512
+switch_trackmode_threshold: 1  # 切换锁中心模式402的角速度偏移，弧度制1.2
+aim_center_angle_tolerance: 0.1  # 锁中心自动击发角度容差，角度制
 
 #####-----shooter参数-----#####
-first_tolerance: 3 # 近距离射击容差，degree
-second_tolerance: 2 # 远距离射击容差，degree
+first_tolerance: 0.1 # 近距离射击容差，degree
+second_tolerance: 0.1 # 远距离射击容差，degree
 judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
 #####-----planner-----#####
-fire_thresh: 0.0035
+fire_thresh: 0.002
 
 max_yaw_acc: 50 #50
 Q_yaw: [9e6, 0]
@@ -144,30 +146,30 @@ Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----gimbal参数-----#####
-com_port: /dev/pts/4
+com_port: auto
 
 # #####-----相机参数-----#####
-#camera_name: "mindvision"
-#exposure_ms: 3
-#gamma: 3 #已经废弃
-#vid_pid: "f622:d13a"
+camera_name: "mindvision"
+exposure_ms: 18
+gamma: 3 #已经废弃
+vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
 # vid_pid: "2bdf:0001"
 
-camera_name: "daheng"
-exposure_ms: 10
-gamma: 2.85
-vid_pid: "KE0200010097"
-camera_param_path: ../configs/camera_param/MD_HERO_UL_8MM.yaml
+# camera_name: "daheng"
+# exposure_ms: 10
+# gamma: 2.85
+# vid_pid: "KE0200010097"
+camera_param_path: ../configs/camera_param/MD_HERO_UC_12MM_V1.yaml
 
 #####-----BUFF神经网络参数-----#####
 model: ../assets/yolo11_buff_int8.xml  # YOLO11 buff检测模型路径
 yolox_model: ../assets/yolox_rune_3.6m.xml  
-buff_yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-ampere.engine  
-#buff_yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-orin.engine  
+# buff_yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-ampere.engine  
+buff_yolox_trt_model_path: ../assets/yolox_rune_3.6m-fp16-orin.engine  
 
 #####-----检测器模式-----#####
 detector_mode: "yolox_ov"  # 检测器模式: "yolo11" / "yolox_ov" / "yolox_trt"
@@ -206,7 +208,7 @@ fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
 
 # 弹道解算模式，可选 "no_drag" (默认抛物线) 或 "hero" (带空气阻力迭代)
-ballistic_model: "hero"
+ballistic_model: "no_drag"
 
 #####-----nav速度倍数（仅用于哨兵模式，导航相关）-----#####
 velocity_n: 30
@@ -214,11 +216,11 @@ velocity_n: 30
 
 # #####-----UI显示配置-----#####
 ui:
-  enabled: true
+  enabled: false
   imshow: false
   web:
     enabled: true
-    host: "192.168.1.49"
+    host: "10.89.56.144"
     port: 9878
     send_image: true
     image_quality: 75

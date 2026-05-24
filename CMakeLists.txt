@@ -11,7 +11,7 @@ message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}-------
 
 # 编译模式选项：控制是否使用CUDA/TensorRT和OpenVINO
 option(USE_CUDA "Enable CUDA/TensorRT support" ON)
-option(USE_OPENVINO "Enable OpenVINO support" ON)
+option(USE_OPENVINO "Enable OpenVINO support" OFF)
 
 if(NOT USE_CUDA AND NOT USE_OPENVINO)
     message(FATAL_ERROR "At least one of USE_CUDA or USE_OPENVINO must be enabled.")
@@ -22,7 +22,7 @@ option(BUILD_SENTRY "Build sentry tools" OFF)
 option(BUILD_TEST "Build test tools" OFF)
 option(BUILD_CALIBRATION "Build calibration tools" OFF)
 option(BUILD_ALL "Build all components" OFF)
-option(BUILD_BUFF "Build auto_buff components" ON)
+option(BUILD_BUFF "Build auto_buff components" OFF)
 option(BUILD_OMNI "Build omnidirectional perception (requires BUILD_SENTRY and ROS2)" OFF)
 
 # 全局宏控制，注释上即禁用，不注释即启用，亦可直接在cmake命令中添加 -DBUILD_GIMAL_ADD_VEL=ON 即可
@@ -59,7 +59,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 # ========== 条件启用CUDA/TensorRT ==========
 if(USE_CUDA)
     enable_language(CUDA)
-    set(CMAKE_CUDA_ARCHITECTURES 86) # 设置CUDA架构:xavier为72,orin为87，16/20系显卡为75，30系显卡为80/86，40系显卡为89
+    set(CMAKE_CUDA_ARCHITECTURES 87) # 设置CUDA架构:xavier为72,orin为87，16/20系显卡为75，30系显卡为80/86，40系显卡为89
     set(CMAKE_CUDA_STANDARD 17)
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
     
