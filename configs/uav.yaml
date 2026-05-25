@@ -70,6 +70,7 @@ outpost_correction_cancel_count: 5
 outpost_top_filter_enable: false
 outpost_top_pitch: 27.5
 outpost_front_pitch: -15.0
+outpost_top_plate_fire_disable: false
 
 #####-----aimer参数-----#####
 yaw_offset: 0 # degree -2.5

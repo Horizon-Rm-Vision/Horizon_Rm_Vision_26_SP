@@ -62,6 +62,10 @@ private:
   double aim_center_angle_tolerance_;
   #endif
 
+#ifdef HERO_OUTPOST_FILTER
+  bool outpost_top_plate_fire_disable_;
+#endif
+
   TinySolver * yaw_solver_;
   TinySolver * pitch_solver_;
 

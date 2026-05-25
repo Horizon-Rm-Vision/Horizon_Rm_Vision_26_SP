@@ -1,5 +1,7 @@
 #include "yolo11_buff.hpp"
 
+#include "tools/ui_manager.hpp"
+
 const double ConfidenceThreshold = 0.7f;
 const double IouThreshold = 0.4f;
 namespace auto_buff
@@ -118,19 +120,21 @@ std::vector<YOLO11_BUFF::Object> YOLO11_BUFF::get_multicandidateboxes(cv::Mat & 
     object_result.push_back(obj);
 
     /// 绘制关键点和连线
-    cv::rectangle(image, obj.rect, cv::Scalar(255, 255, 255), 1, 8);            // 绘制矩形框
-    const std::string label = "buff:" + std::to_string(obj.prob).substr(0, 4);  // 绘制标签
-    const cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
-    const cv::Rect textBox(
-      obj.rect.tl().x, obj.rect.tl().y - 15, textSize.width, textSize.height + 5);
-    cv::rectangle(image, textBox, cv::Scalar(0, 255, 255), cv::FILLED);
-    cv::putText(
-      image, label, cv::Point(obj.rect.tl().x, obj.rect.tl().y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5,
-      cv::Scalar(0, 0, 0));
-    const int radius = 2;  // 绘制关键点
-    const cv::Size & shape = image.size();
-    for (int i = 0; i < NUM_POINTS; ++i)
-      cv::circle(image, obj.kpt[i], radius, cv::Scalar(255, 0, 0), -1, cv::LINE_AA);
+    if (tools::UIManager::isUIEnabled()) {
+      cv::rectangle(image, obj.rect, cv::Scalar(255, 255, 255), 1, 8);            // 绘制矩形框
+      const std::string label = "buff:" + std::to_string(obj.prob).substr(0, 4);  // 绘制标签
+      const cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
+      const cv::Rect textBox(
+        obj.rect.tl().x, obj.rect.tl().y - 15, textSize.width, textSize.height + 5);
+      cv::rectangle(image, textBox, cv::Scalar(0, 255, 255), cv::FILLED);
+      cv::putText(
+        image, label, cv::Point(obj.rect.tl().x, obj.rect.tl().y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5,
+        cv::Scalar(0, 0, 0));
+      const int radius = 2;  // 绘制关键点
+      const cv::Size & shape = image.size();
+      for (int i = 0; i < NUM_POINTS; ++i)
+        cv::circle(image, obj.kpt[i], radius, cv::Scalar(255, 0, 0), -1, cv::LINE_AA);
+    }
   }
   /// 计算FPS
   const float t = (cv::getTickCount() - start) / static_cast<float>(cv::getTickFrequency());
@@ -203,22 +207,24 @@ std::vector<YOLO11_BUFF::Object> YOLO11_BUFF::get_onecandidatebox(cv::Mat & imag
     if (max_confidence < 0.7) save(std::to_string(start), image);
 
     /// 绘制关键点和连线
-    cv::rectangle(image, obj.rect, cv::Scalar(255, 255, 255), 1, 8);                  // 绘制矩形框
-    const std::string label = "buff:" + std::to_string(max_confidence).substr(0, 4);  // 绘制标签
-    const cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
-    const cv::Rect textBox(
-      obj.rect.tl().x, obj.rect.tl().y - 15, textSize.width, textSize.height + 5);
-    cv::rectangle(image, textBox, cv::Scalar(0, 255, 255), cv::FILLED);
-    cv::putText(
-      image, label, cv::Point(obj.rect.tl().x, obj.rect.tl().y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5,
-      cv::Scalar(0, 0, 0));
-    const int radius = 2;  // 绘制关键点
-    const cv::Size & shape = image.size();
-    for (int i = 0; i < NUM_POINTS; ++i) {
-      cv::circle(image, obj.kpt[i], radius, cv::Scalar(255, 255, 0), -1, cv::LINE_AA);
+    if (tools::UIManager::isUIEnabled()) {
+      cv::rectangle(image, obj.rect, cv::Scalar(255, 255, 255), 1, 8);                  // 绘制矩形框
+      const std::string label = "buff:" + std::to_string(max_confidence).substr(0, 4);  // 绘制标签
+      const cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
+      const cv::Rect textBox(
+        obj.rect.tl().x, obj.rect.tl().y - 15, textSize.width, textSize.height + 5);
+      cv::rectangle(image, textBox, cv::Scalar(0, 255, 255), cv::FILLED);
       cv::putText(
-        image, std::to_string(i + 1), obj.kpt[i] + cv::Point2f(5, -5), cv::FONT_HERSHEY_SIMPLEX,
-        0.5, cv::Scalar(255, 255, 0), 1, cv::LINE_AA);
+        image, label, cv::Point(obj.rect.tl().x, obj.rect.tl().y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5,
+        cv::Scalar(0, 0, 0));
+      const int radius = 2;  // 绘制关键点
+      const cv::Size & shape = image.size();
+      for (int i = 0; i < NUM_POINTS; ++i) {
+        cv::circle(image, obj.kpt[i], radius, cv::Scalar(255, 255, 0), -1, cv::LINE_AA);
+        cv::putText(
+          image, std::to_string(i + 1), obj.kpt[i] + cv::Point2f(5, -5), cv::FONT_HERSHEY_SIMPLEX,
+          0.5, cv::Scalar(255, 255, 0), 1, cv::LINE_AA);
+      }
     }
   }
 

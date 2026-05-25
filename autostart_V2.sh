@@ -40,7 +40,7 @@ do
 
             source /opt/ros/humble/setup.bash
             source ./local_setup.sh
-            ./$program_name
+            taskset -c 10,11,16,17,18,19 ./$program_name
            
             rm /tmp/$program_name.lock
             echo "$name 已启动!"

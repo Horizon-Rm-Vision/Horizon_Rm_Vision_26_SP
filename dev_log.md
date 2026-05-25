@@ -253,8 +253,26 @@
   5.auto_aim_test和auto_buff_test增加对应aimer模式的ui
 ## 
 
+#### Release Candidate 1 STABLE：
+
+- **功能更新:**
+  1.集成RC1-DEV1至DEV25全部更新内容
+  2.SPSREMU支持最新版哨兵通信格式
+  3.能量机关识别支持通过YAML设置R标修正ROI大小
+  4.为英雄增加过滤最高处前哨站装甲板(宏HERO_OUTPOST_FILTER),使其只击打下面两块
+  5.哨兵自启增加锁核机制
+- **质量更新:**
+  1.合并了能量机关识别yolox模式冗余重复的传统修正函数
+  2.能量机关识别全部UI绘制全部由UI_MANAGER托管
+  3.集成目前全部车型内外参文件
+  4.recorder的默认保存位置移出build防止误删
+  5.修复新recorder机制的导致aimer模式回放机制的问题
+- **待测试:**
+  1.MPC模式的回放程序(auto_aim_test_mpc),可用性待测试
+  2.由于mpc机制的特殊性,recorder原有录制内容无法满足新回放模式运行,现已修改recorder以适配该新模式,保留对aimer的旧回放程序的支持,可行性待测试
+## 
+
 待开发任务：
-1.TRT推理性能进一步优化
-2.NANO简化代码模式（对应代码内的宏LIM_CODE），启用后会去掉一些暂时不必要的代码，用于提升编译速度和开销（尤其是JETSON）,目前已将src里不需要的几个程序和DM_IMU部分的代码屏蔽
-3.分析bullet_count对火控的影响
+1.基地灯识别
+2.集成英雄自定义客户端图传编码端
 

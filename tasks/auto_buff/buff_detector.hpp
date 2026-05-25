@@ -42,7 +42,7 @@ private:
 
   // R tag detection using traditional vision method (ported from ROS)
   std::tuple<cv::Point2f, cv::Mat> detectRTag(
-    const cv::Mat & img, int binary_thresh, const cv::Point2f & prior);
+    const cv::Mat & img, int binary_thresh, int roi_size, const cv::Point2f & prior);
 
   // Shared logic for detect_24 and detect (runs after inference)
   std::optional<PowerRune> processResults(
@@ -71,6 +71,7 @@ private:
   // R tag detection parameters
   bool detect_r_tag_;
   int binary_thresh_;
+  int r_tag_roi_size_;
 
   Track_status status_;
   int lose_;  // 丢失的次数

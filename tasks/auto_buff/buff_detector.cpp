@@ -45,6 +45,7 @@ Buff_Detector::Buff_Detector(const std::string & config)
   // R tag detection parameters (ROS port)
   detect_r_tag_ = yaml["detect_r_tag"].as<bool>(true);
   binary_thresh_ = yaml["binary_thresh"].as<int>(100);
+  r_tag_roi_size_ = yaml["r_tag_roi_size"].as<int>(200);
 
   // Read enemy_color for target color filtering (yoloX modes only)
   // Unlike auto_aim, auto_buff targets the OPPOSITE color:
@@ -131,16 +132,18 @@ cv::Point2f Buff_Detector::get_r_center(std::vector<FanBlade> & fanblades, cv::M
 };
 
 std::tuple<cv::Point2f, cv::Mat> Buff_Detector::detectRTag(
-  const cv::Mat & img, int binary_thresh, const cv::Point2f & prior)
+  const cv::Mat & img, int binary_thresh, int roi_size, const cv::Point2f & prior)
 {
+  int half = roi_size / 2;
+
   // Check if prior is within image bounds
   if (prior.x < 0 || prior.x > img.cols || prior.y < 0 || prior.y > img.rows) {
-    cv::Mat empty_roi = cv::Mat::zeros(cv::Size(200, 200), CV_8UC3);
+    cv::Mat empty_roi = cv::Mat::zeros(cv::Size(roi_size, roi_size), CV_8UC3);
     return {prior, empty_roi};
   }
 
-  // Create ROI around prior point (200x200 window)
-  cv::Rect roi = cv::Rect(prior.x - 100, prior.y - 100, 200, 200) &
+  // Create ROI around prior point
+  cv::Rect roi = cv::Rect(prior.x - half, prior.y - half, roi_size, roi_size) &
                  cv::Rect(0, 0, img.cols, img.rows);
   cv::Point2f prior_in_roi = prior - cv::Point2f(roi.tl());
 
@@ -296,7 +299,7 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
     cv::Point2f r_center;
     cv::Mat binary_roi;
     if (detect_r_tag_ && !raw_r_centers.empty()) {
-      std::tie(r_center, binary_roi) = MODE_YOLOX_TRT_->detectRTag(bgr_img, binary_thresh_, raw_r_centers[0]);
+      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, r_tag_roi_size_, raw_r_centers[0]);
     } else {
       r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
     }
@@ -308,8 +311,10 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
         cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
-        binary_roi.copyTo(bgr_img(roi_rect));
-        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        if (tools::UIManager::isUIEnabled()) {
+          binary_roi.copyTo(bgr_img(roi_rect));
+          cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        }
       }
     }
 
@@ -387,7 +392,7 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
     cv::Point2f r_center;
     cv::Mat binary_roi;
     if (detect_r_tag_ && !raw_r_centers.empty()) {
-      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, raw_r_centers[0]);
+      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, r_tag_roi_size_, raw_r_centers[0]);
     } else {
       r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
     }
@@ -399,8 +404,10 @@ std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
         cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
-        binary_roi.copyTo(bgr_img(roi_rect));
-        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        if (tools::UIManager::isUIEnabled()) {
+          binary_roi.copyTo(bgr_img(roi_rect));
+          cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        }
       }
     }
 
@@ -516,7 +523,7 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
     cv::Point2f r_center;
     cv::Mat binary_roi;
     if (detect_r_tag_) {
-      std::tie(r_center, binary_roi) = MODE_YOLOX_TRT_->detectRTag(bgr_img, binary_thresh_, raw_r_center);
+      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, r_tag_roi_size_, raw_r_center);
     } else {
       r_center = raw_r_center;
     }
@@ -528,8 +535,10 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
         cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
-        binary_roi.copyTo(bgr_img(roi_rect));
-        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        if (tools::UIManager::isUIEnabled()) {
+          binary_roi.copyTo(bgr_img(roi_rect));
+          cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        }
       }
     }
 
@@ -605,7 +614,7 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
     cv::Point2f r_center;
     cv::Mat binary_roi;
     if (detect_r_tag_) {
-      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, raw_r_center);
+      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, r_tag_roi_size_, raw_r_center);
     } else {
       r_center = raw_r_center;
     }
@@ -617,8 +626,10 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
         cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
-        binary_roi.copyTo(bgr_img(roi_rect));
-        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        if (tools::UIManager::isUIEnabled()) {
+          binary_roi.copyTo(bgr_img(roi_rect));
+          cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        }
       }
     }
 
@@ -726,7 +737,7 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
     cv::Point2f r_center;
     cv::Mat binary_roi;
     if (detect_r_tag_ && !raw_r_centers.empty()) {
-      std::tie(r_center, binary_roi) = MODE_YOLOX_TRT_->detectRTag(bgr_img, binary_thresh_, raw_r_centers[0]);
+      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, r_tag_roi_size_, raw_r_centers[0]);
     } else {
       r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
     }
@@ -738,8 +749,10 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
         cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
-        binary_roi.copyTo(bgr_img(roi_rect));
-        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        if (tools::UIManager::isUIEnabled()) {
+          binary_roi.copyTo(bgr_img(roi_rect));
+          cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        }
       }
     }
 
@@ -805,7 +818,7 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
     cv::Point2f r_center;
     cv::Mat binary_roi;
     if (detect_r_tag_ && !raw_r_centers.empty()) {
-      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, raw_r_centers[0]);
+      std::tie(r_center, binary_roi) = detectRTag(bgr_img, binary_thresh_, r_tag_roi_size_, raw_r_centers[0]);
     } else {
       r_center = raw_r_centers.empty() ? cv::Point2f(0, 0) : raw_r_centers[0];
     }
@@ -817,8 +830,10 @@ std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Poin
         cv::Rect(bgr_img.cols - binary_roi.cols, bgr_img.rows - binary_roi.rows, binary_roi.cols, binary_roi.rows);
       if (roi_rect.x >= 0 && roi_rect.y >= 0 && roi_rect.br().x <= bgr_img.cols &&
           roi_rect.br().y <= bgr_img.rows) {
-        binary_roi.copyTo(bgr_img(roi_rect));
-        cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        if (tools::UIManager::isUIEnabled()) {
+          binary_roi.copyTo(bgr_img(roi_rect));
+          cv::rectangle(bgr_img, roi_rect, cv::Scalar(150, 150, 150), 2);
+        }
       }
     }
 

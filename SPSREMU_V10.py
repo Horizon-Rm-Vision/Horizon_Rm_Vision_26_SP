@@ -15,13 +15,13 @@
 - 只启用SENTRY_SR (SENTRY_SR_ONLY=2): 包含哨兵相关数据
     VisionToGimbal: 基础 + vx(4) + vy(4) + wz(4) + form(1) + gimbal(1) = 25字节
     GimbalToVision: 基础 + game_progress(1) + stage_remain_time(2) + current_hp(2) + ally_outpost_hp(2)
-                  + state(1) + energy_state(1) + bullets(2) = 23字节
+                  + state(1) + energy_state(1) + bullets(2) + judge(1) = 24字节
   扩展数据填0
 
 - 同时启用两者 (BOTH_ENABLED=3): 包含所有扩展数据
     VisionToGimbal: 基础 + pitch_vel(4) + yaw_vel(4) + vx(4) + vy(4) + wz(4) + form(1) + gimbal(1) = 33字节
     GimbalToVision: 基础 + pitch_vel(4) + yaw_vel(4) + game_progress(1) + stage_remain_time(2)
-                  + current_hp(2) + ally_outpost_hp(2) + state(1) + energy_state(1) + bullets(2) = 31字节
+                  + current_hp(2) + ally_outpost_hp(2) + state(1) + energy_state(1) + bullets(2) + judge(1) = 32字节
   扩展数据填0
 
 新的使用方法：
@@ -99,6 +99,7 @@ class GimbalToVision:
     state: int = 0
     energy_state: int = 0
     bullets: int = 0         # 子弹数量（uint16_t，与 gimbal.hpp 一致）
+    judge: int = 0           # 决策（uint8_t，与 gimbal.hpp 一致）
     tail: int = 0xDC
 
 # mode数值到名称的映射
@@ -197,8 +198,8 @@ class GimbalSimulator:
             base_size += 8  # pitch_vel(4) + yaw_vel(4)
 
         if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
-            base_size += 11  # game_progress(1) + stage_remain_time(2) + current_hp(2) + ally_outpost_hp(2)
-                            # + state(1) + energy_state(1) + bullets(2)
+            base_size += 12  # game_progress(1) + stage_remain_time(2) + current_hp(2) + ally_outpost_hp(2)
+                            # + state(1) + energy_state(1) + bullets(2) + judge(1)
 
         return base_size
 
@@ -305,9 +306,9 @@ class GimbalSimulator:
 
             if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
                 # game_progress(1) + stage_remain_time(2) + current_hp(2) + ally_outpost_hp(2)
-                # + state(1) + energy_state(1) + bullets(2)
-                data_list.extend([0, 0, 0, 0, 0, 0, 0])
-                format_str += 'BHHHBBH'
+                # + state(1) + energy_state(1) + bullets(2) + judge(1)
+                data_list.extend([0, 0, 0, 0, 0, 0, 0, 0])
+                format_str += 'BHHHBBHB'
 
             data_list.append(0xDC)  # tail
             format_str += 'B'

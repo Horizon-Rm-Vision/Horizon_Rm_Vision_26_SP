@@ -10,12 +10,12 @@
 
 namespace tools
 {
-Recorder::Recorder(double fps) : init_(false), fps_(fps), queue_(1), stop_thread_(false)
+Recorder::Recorder(double fps) : init_(false), fps_(fps), frame_count_(0), queue_(1), stop_thread_(false)
 {
   start_time_ = std::chrono::steady_clock::now();
   last_time_ = start_time_;
 
-  auto folder_path = "records";
+  auto folder_path = "../records";
   auto file_name = fmt::format("{:%Y-%m-%d_%H-%M-%S}", std::chrono::system_clock::now());
   text_path_ = fmt::format("{}/{}.txt", folder_path, file_name);
   video_path_ = fmt::format("{}/{}.avi", folder_path, file_name);
@@ -47,11 +47,12 @@ void Recorder::save_to_file()
     // 写入视频文件
     video_writer_.write(frame.img);
 
-    // 写入文本文件（输出顺序为wxyz）
+    // 写入文本文件（输出顺序为wxyz，追加frame_index）
     Eigen::Vector4d xyzw = frame.q.coeffs();
     auto since_begin = tools::delta_time(frame.timestamp, start_time_);
     text_writer_ << fmt::format(
-      "{} {} {} {} {}\n", since_begin, xyzw[3], xyzw[0], xyzw[1], xyzw[2]);
+      "{} {} {} {} {} {}\n", since_begin, xyzw[3], xyzw[0], xyzw[1], xyzw[2], frame_count_);
+    frame_count_++;
   }
 }
 

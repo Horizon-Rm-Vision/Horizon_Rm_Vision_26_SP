@@ -77,6 +77,7 @@ buff_tracker:
 #####-----R标签检测参数（移植自ROS版）-----#####
 detect_r_tag: true  # 是否使用传统视觉方法检测R标中心
 binary_thresh: 100  # 二值化阈值（用于R标检测）
+r_tag_roi_size: 200  # R标ROI窗口大小（像素，正方形边长）
 
 #####-----传统图像处理参数-----#####
 threshold: 100  # 二值化阈值
@@ -88,3 +89,8 @@ min_lightbar_length: 8  # 最小灯条长度
 show_debug: true  # 显示调试信息
 save_result: false  # 保存结果图像
 debug_level: 1  # 调试级别 (0:无, 1:基本, 2:详细)
+
+#####-----UI显示配置-----#####
+ui:
+  enabled: true  # 是否绘制UI
+  imshow: true   # 是否使用imshow显示图像

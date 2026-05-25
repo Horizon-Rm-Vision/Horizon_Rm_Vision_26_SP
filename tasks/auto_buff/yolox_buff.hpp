@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <opencv2/opencv.hpp>
 #include <openvino/openvino.hpp>
-#include <tuple>
 #include <vector>
 
 #include "tools/logger.hpp"
@@ -32,10 +31,6 @@ public:
   std::vector<Object> get_multicandidateboxes(cv::Mat & image);
 
   std::vector<Object> get_onecandidatebox(cv::Mat & image);
-
-  // R tag detection using traditional vision methods (ported from ROS)
-  std::tuple<cv::Point2f, cv::Mat> detectRTag(
-    const cv::Mat & img, int binary_thresh, const cv::Point2f & prior);
 
 private:
   // Letterbox preprocessing with padding

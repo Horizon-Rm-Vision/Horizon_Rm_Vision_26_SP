@@ -5,7 +5,7 @@
 #include <nlohmann/json.hpp>
 #include <opencv2/opencv.hpp>
 
-#include "tasks/auto_aim/aimer.hpp"
+#include "tasks/auto_aim/planner/planner.hpp"
 #include "tasks/auto_aim/solver.hpp"
 #include "tasks/auto_aim/tracker.hpp"
 #include "tasks/auto_aim/yolo.hpp"
@@ -40,11 +40,10 @@ int main(int argc, char * argv[])
   tools::Plotter plotter;
   tools::Exiter exiter;
 
-  // 初始化UIManager和WebStream (参考 auto_aim_debug_aimer)
   tools::UIManager ui_manager(config_path);
   tools::UIWebStream ui_web_stream(config_path);
   plotter.configureWebStreamFromConfig(config_path);
-  ui_manager.setProgramMode("AutoAim Replay");
+  ui_manager.setProgramMode("AutoAim MPC Replay");
 
   auto video_path = fmt::format("{}.avi", input_path);
   auto text_path = fmt::format("{}.txt", input_path);
@@ -54,14 +53,11 @@ int main(int argc, char * argv[])
   auto_aim::YOLO yolo(config_path);
   auto_aim::Solver solver(config_path);
   auto_aim::Tracker tracker(config_path, solver);
-  auto_aim::Aimer aimer(config_path);
+  auto_aim::Planner planner(config_path);
 
-  cv::Mat img, drawing;
+  cv::Mat img;
   auto t0 = std::chrono::steady_clock::now();
 
-  auto_aim::Target last_target;
-  io::Command last_command;
-  double last_t = -1;
   auto last_frame_time = std::chrono::steady_clock::now();
 
   video.set(cv::CAP_PROP_POS_FRAMES, start_index);
@@ -71,7 +67,6 @@ int main(int argc, char * argv[])
     text >> t >> w >> x >> y >> z >> frame_idx;
   }
 
-  // 使用 UIManager 的 FPS 计时
   auto last_ui_time = std::chrono::steady_clock::now();
 
   for (int frame_count = start_index; !exiter.exit(); frame_count++) {
@@ -87,7 +82,7 @@ int main(int argc, char * argv[])
 
     ui_web_stream.sendImage(img);
 
-    /// 自瞄核心逻辑
+    /// 自瞄核心逻辑（MPC）
 
     solver.set_R_gimbal2world({w, x, y, z});
 
@@ -97,22 +92,20 @@ int main(int argc, char * argv[])
     auto tracker_start = std::chrono::steady_clock::now();
     auto targets = tracker.track(armors, timestamp);
 
-    auto aimer_start = std::chrono::steady_clock::now();
-    auto command = aimer.aim(targets, timestamp, 27, false);
-
-    if (
-      !targets.empty() && aimer.debug_aim_point.valid &&
-      std::abs(command.yaw - last_command.yaw) * 57.3 < 2)
-      command.shoot = true;
-
-    if (command.control) last_command = command;
+    auto plan_start = std::chrono::steady_clock::now();
+    auto_aim::Plan plan = {false};
+    if (!targets.empty()) {
+      // 直接调用 plan(Target, bullet_speed)，避免 plan(optional<Target>)
+      // 内部使用 steady_clock::now() 导致回放时间错乱
+      plan = planner.plan(targets.front(), 27);
+    }
 
     auto finish = std::chrono::steady_clock::now();
     tools::logger()->info(
-      "[{}] yolo: {:.1f}ms, tracker: {:.1f}ms, aimer: {:.1f}ms", frame_count,
+      "[{}] yolo: {:.1f}ms, tracker: {:.1f}ms, planner: {:.1f}ms", frame_count,
       tools::delta_time(tracker_start, yolo_start) * 1e3,
-      tools::delta_time(aimer_start, tracker_start) * 1e3,
-      tools::delta_time(finish, aimer_start) * 1e3);
+      tools::delta_time(plan_start, tracker_start) * 1e3,
+      tools::delta_time(finish, plan_start) * 1e3);
 
     // UI FPS更新
     ui_manager.updateFPS();
@@ -137,6 +130,7 @@ int main(int argc, char * argv[])
 
     Eigen::Quaternion gimbal_q = {w, x, y, z};
     auto yaw = tools::eulers(gimbal_q.toRotationMatrix(), 2, 1, 0)[0];
+    auto pitch = tools::eulers(gimbal_q.toRotationMatrix(), 2, 1, 0)[1];
 
     // 绘图器数据收集
     nlohmann::json data;
@@ -153,36 +147,28 @@ int main(int argc, char * argv[])
     }
 
     data["gimbal_yaw"] = yaw * 57.3;
-    data["cmd_yaw"] = command.yaw * 57.3;
-    data["shoot"] = command.shoot;
+    data["plan_yaw"] = plan.yaw * 57.3;
+    data["plan_pitch"] = plan.pitch * 57.3;
+    data["fire"] = plan.fire;
 
     if (!targets.empty()) {
       auto target = targets.front();
 
-      if (last_t == -1) {
-        last_target = target;
-        last_t = t;
-        continue;
-      }
-
-      std::vector<Eigen::Vector4d> armor_xyza_list;
-
       // 当前帧target更新后
-      armor_xyza_list = target.armor_xyza_list();
+      std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
       for (const Eigen::Vector4d & xyza : armor_xyza_list) {
         auto image_points =
           solver.reproject_armor(xyza.head(3), xyza[3], target.armor_type, target.name);
         tools::draw_points(img, image_points, {0, 255, 0});
       }
 
-      // aimer瞄准位置
-      auto aim_point = aimer.debug_aim_point;
-      Eigen::Vector4d aim_xyza = aim_point.xyza;
+      // planner预测位置（红框）
+      Eigen::Vector4d aim_xyza = planner.debug_xyza;
       auto image_points =
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
-      if (aim_point.valid) tools::draw_points(img, image_points, {0, 0, 255});
+      tools::draw_points(img, image_points, {0, 0, 255});
 
-      // 观测器内部数据
+      // EKF内部数据
       Eigen::VectorXd x = target.ekf_x();
       data["x"] = x[0];
       data["vx"] = x[1];
@@ -209,13 +195,13 @@ int main(int argc, char * argv[])
       data["recent_nis_failures"] = target.ekf().data.at("recent_nis_failures");
     }
 
-    plotter.subplot("Yaw", {yaw * 180/M_PI, command.yaw * 180/M_PI},
-                    {"gimbal_yaw", "target_yaw"});
-    plotter.subplot("Pitch", {command.pitch * 180/M_PI},
-                    {"target_pitch"});
+    plotter.subplot("Yaw", {yaw * 180/M_PI, plan.yaw * 180/M_PI},
+                    {"gimbal_yaw", "plan_yaw"});
+    plotter.subplot("Pitch", {pitch * 180/M_PI, plan.pitch * 180/M_PI},
+                    {"gimbal_pitch", "plan_pitch"});
     plotter.draw();
 
-    // -------------- UI渲染 (参考 auto_aim_debug_aimer) --------------
+    // -------------- UI渲染 --------------
 
     ui_manager.initialize(img);
 
@@ -223,17 +209,19 @@ int main(int argc, char * argv[])
     bool has_target = !targets.empty();
     ui_manager.addLeftText("detect", fmt::format("Detect: {}", has_target ? "YES" : "NO"),
                           has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
-    ui_manager.addLeftText("fire", fmt::format("Fire: {}", command.shoot ? "YES" : "NO"),
-                          command.shoot ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+    ui_manager.addLeftText("fire", fmt::format("Fire: {}", plan.fire ? "YES" : "NO"),
+                          plan.fire ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
 
-    // 左侧面板：云台状态与cmd数据
+    // 左侧面板：云台姿态与规划指令
     Eigen::Vector3d ypr = tools::eulers(gimbal_q.toRotationMatrix(), 2, 1, 0);
     ui_manager.addLeftText("gimbal", fmt::format("Gimbal Y: {:.1f}  P: {:.1f}",
                             -ypr[0] * 57.3, ypr[1] * 57.3));
 
-    if (command.control) {
-      ui_manager.addLeftText("cmd", fmt::format("Cmd Y: {:.1f}  P: {:.1f}",
-                              -command.yaw * 57.3, -command.pitch * 57.3), cv::Scalar(0, 165, 255));
+    if (plan.control) {
+      ui_manager.addLeftText("plan_cmd", fmt::format("Plan Y: {:.1f}  P: {:.1f}",
+                                -plan.yaw * 57.3, -plan.pitch * 57.3), cv::Scalar(0, 165, 255));
+      ui_manager.addLeftText("plan_vel", fmt::format("Plan Vel Y: {:.1f}  P: {:.1f}",
+                                -plan.yaw_vel * 57.3, -plan.pitch_vel * 57.3), cv::Scalar(0, 165, 255));
     }
 
     // EKF目标状态

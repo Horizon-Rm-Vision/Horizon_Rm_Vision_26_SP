@@ -29,6 +29,7 @@ private:
   bool init_;
   std::atomic<bool> stop_thread_;
   double fps_;
+  int frame_count_;
   std::string text_path_;
   std::string video_path_;
   std::ofstream text_writer_;

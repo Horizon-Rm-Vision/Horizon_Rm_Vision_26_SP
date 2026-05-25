@@ -23,6 +23,10 @@ private:
   double first_tolerance_;
   double second_tolerance_;
   bool auto_fire_;
+
+  #ifdef HERO_OUTPOST_FILTER
+  bool outpost_top_plate_fire_disable_;
+  #endif
 };
 }  // namespace auto_aim
 

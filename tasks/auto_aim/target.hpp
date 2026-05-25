@@ -59,6 +59,10 @@ public:
 
   bool convergened();
 
+  #ifdef HERO_OUTPOST_FILTER
+  bool is_outpost_top_plate(int armor_id) const;
+  #endif
+
   bool isinit = false;
 
   bool checkinit();

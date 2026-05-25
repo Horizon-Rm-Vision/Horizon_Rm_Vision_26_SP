@@ -163,13 +163,9 @@ int main(int argc, char * argv[])
           if (blade.type == auto_buff::_unlight) continue;
           auto role = tracker.get_blade_role(blade.center, power_runes.value().r_center);
           if (role == auto_buff::BladeRole::FIRST) {
-            cv::putText(img, "first",
-                        blade.center + cv::Point2f(15, -10),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 0), 2);
+            tools::draw_text(img, "first", blade.center + cv::Point2f(15, -10), cv::Scalar(0, 255, 0));
           } else if (role == auto_buff::BladeRole::LAST) {
-            cv::putText(img, "last",
-                        blade.center + cv::Point2f(15, -10),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 165, 255), 2);
+            tools::draw_text(img, "last", blade.center + cv::Point2f(15, -10), cv::Scalar(0, 165, 255));
           }
         }
       }

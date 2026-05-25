@@ -34,6 +34,7 @@ add_compile_definitions(NOVA_OUTPOST_V2) # 新版前哨站识别方案2
 add_compile_definitions(NOVA_AIM_CENTER) # 新版锁中心模式
 #add_compile_definitions(BIG_BUFF_DUO_EKF) # 大符双线EKF模式,对大符的两块扇叶分别进行独立的EKF跟踪
 #add_compile_definitions(BIG_BUFF_FIRE_FIX) # 大符开火修正,待验证
+#add_compile_definitions(HERO_OUTPOST_FILTER) # 英雄前哨站特殊开火机制,只打下面两块,待测试
 
 if(BUILD_SENTRY)
 add_compile_definitions(SENTRY_SR) # 串口通信编译为哨兵导航联合通信版本
@@ -170,6 +171,8 @@ endif()
 ################## demo ##################
 add_executable(auto_aim_test tests/auto_aim_test.cpp)
 target_link_libraries(auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
+add_executable(auto_aim_test_mpc tests/auto_aim_test_mpc.cpp)
+target_link_libraries(auto_aim_test_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 if(BUILD_BUFF)
     add_executable(auto_buff_test tests/auto_buff_test.cpp)
     target_link_libraries(auto_buff_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff auto_aim tools io)

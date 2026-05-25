@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "tools/ui_manager.hpp"
+
 namespace auto_buff
 {
 YOLOX_BUFF_TRT::YOLOX_BUFF_TRT(const std::string & config)
@@ -296,20 +298,22 @@ std::vector<YOLOX_BUFF_TRT::Object> YOLOX_BUFF_TRT::get_multicandidateboxes(cv::
   }
 
   // Draw results
-  for (auto & obj : results) {
-    cv::rectangle(image, obj.rect, cv::Scalar(255, 255, 255), 1, 8);
-    const std::string label = "buff:" + std::to_string(obj.prob).substr(0, 4);
-    const cv::Size textSize =
-      cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
-    const cv::Rect textBox(obj.rect.tl().x, obj.rect.tl().y - 15, textSize.width,
-                           textSize.height + 5);
-    cv::rectangle(image, textBox, cv::Scalar(0, 255, 255), cv::FILLED);
-    cv::putText(image, label, cv::Point(obj.rect.tl().x, obj.rect.tl().y - 5),
-                cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
+  if (tools::UIManager::isUIEnabled()) {
+    for (auto & obj : results) {
+      cv::rectangle(image, obj.rect, cv::Scalar(255, 255, 255), 1, 8);
+      const std::string label = "buff:" + std::to_string(obj.prob).substr(0, 4);
+      const cv::Size textSize =
+        cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, nullptr);
+      const cv::Rect textBox(obj.rect.tl().x, obj.rect.tl().y - 15, textSize.width,
+                             textSize.height + 5);
+      cv::rectangle(image, textBox, cv::Scalar(0, 255, 255), cv::FILLED);
+      cv::putText(image, label, cv::Point(obj.rect.tl().x, obj.rect.tl().y - 5),
+                  cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
 
-    const int radius = 2;
-    for (int i = 0; i < 6; ++i) {
-      cv::circle(image, obj.kpt[i], radius, cv::Scalar(255, 0, 0), -1, cv::LINE_AA);
+      const int radius = 2;
+      for (int i = 0; i < 6; ++i) {
+        cv::circle(image, obj.kpt[i], radius, cv::Scalar(255, 0, 0), -1, cv::LINE_AA);
+      }
     }
   }
 
@@ -331,60 +335,6 @@ std::vector<YOLOX_BUFF_TRT::Object> YOLOX_BUFF_TRT::get_onecandidatebox(cv::Mat 
   std::sort(results.begin(), results.end(),
             [](const Object & a, const Object & b) { return a.prob > b.prob; });
   return {results.front()};
-}
-
-std::tuple<cv::Point2f, cv::Mat> YOLOX_BUFF_TRT::detectRTag(
-  const cv::Mat & img, int binary_thresh, const cv::Point2f & prior)
-{
-  // Check if prior is within image bounds
-  if (prior.x < 0 || prior.x > img.cols || prior.y < 0 || prior.y > img.rows) {
-    cv::Mat empty_roi = cv::Mat::zeros(cv::Size(200, 200), CV_8UC3);
-    return {prior, empty_roi};
-  }
-
-  // Create ROI around prior point (200x200 window)
-  cv::Rect roi = cv::Rect(prior.x - 100, prior.y - 100, 200, 200) &
-                 cv::Rect(0, 0, img.cols, img.rows);
-  cv::Point2f prior_in_roi = prior - cv::Point2f(roi.tl());
-
-  cv::Mat img_roi = img(roi);
-
-  // Gray -> Binary -> Dilate
-  cv::Mat gray_img;
-  cv::cvtColor(img_roi, gray_img, cv::COLOR_BGR2GRAY);
-  cv::Mat binary_img;
-  cv::threshold(gray_img, binary_img, binary_thresh, 255, cv::THRESH_BINARY);
-  cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-  cv::dilate(binary_img, binary_img, kernel);
-
-  // Find contours
-  std::vector<std::vector<cv::Point>> contours;
-  cv::findContours(binary_img, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-
-  // Find contour containing the prior point
-  auto it =
-    std::find_if(contours.begin(), contours.end(),
-                 [p = prior_in_roi](const std::vector<cv::Point> & contour) -> bool {
-                   return cv::boundingRect(contour).contains(p);
-                 });
-
-  // Convert to BGR for visualization
-  cv::cvtColor(binary_img, binary_img, cv::COLOR_GRAY2BGR);
-
-  if (it == contours.end()) {
-    return {prior, binary_img};
-  }
-
-  cv::drawContours(binary_img, contours, static_cast<int>(it - contours.begin()),
-                   cv::Scalar(0, 255, 0), 2);
-
-  // Compute center of the contour
-  cv::Point2f center(0, 0);
-  for (const auto & p : *it) center += cv::Point2f(p);
-  center /= static_cast<float>(it->size());
-  center += cv::Point2f(roi.tl());
-
-  return {center, binary_img};
 }
 
 }  // namespace auto_buff

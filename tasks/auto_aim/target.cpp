@@ -510,6 +510,27 @@ bool Target::convergened()
   return is_converged_;
 }
 #endif
+
+#ifdef HERO_OUTPOST_FILTER
+bool Target::is_outpost_top_plate(int armor_id) const
+{
+#ifdef NOVA_OUTPOST_V2
+  if (name != ArmorName::outpost || armor_num_ != OUTPOST_ARMOR_NUM) return false;
+  if (!is_h_converged_) return false;
+
+  double z0 = ekf_.x[4];
+  double z1 = ekf_.x[4] + ekf_.x[9];
+  double z2 = ekf_.x[4] + ekf_.x[10];
+  double z_id = (armor_id == 0) ? z0 : (armor_id == 1) ? z1 : z2;
+
+  return z_id > z0 && z_id > z1 && z_id > z2;
+#else
+  (void)armor_id;
+  return false;
+#endif
+}
+#endif
+
 #ifndef NOVA_OUTPOST_V2
 // 计算出装甲板中心的坐标（考虑长短轴）
 Eigen::Vector3d Target::h_armor_xyz(const Eigen::VectorXd & x, int id) const

@@ -93,6 +93,7 @@ outpost_q_h: 0.0006
 outpost_h_converged_variance: 0.05
 outpost_converged_pos_p_max: 0.5
 outpost_converged_vel_p_max: 10.0
+outpost_top_plate_fire_disable: false
 
 #####-----outpost 顶部装甲板过滤机制(仅用于无人机)-----#####
 #该机制用于前哨站顶部装甲板,过滤大于outpost_top_pitch的装甲板,保留小于outpost_front_pitch的装甲板
@@ -144,24 +145,25 @@ Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----gimbal参数-----#####
-com_port: /dev/pts/4
+com_port: auto
 
 # #####-----相机参数-----#####
-#camera_name: "mindvision"
-#exposure_ms: 3
-#gamma: 3 #已经废弃
-#vid_pid: "f622:d13a"
+camera_name: "mindvision"
+exposure_ms: 3
+gamma: 3 #已经废弃
+vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
 # vid_pid: "2bdf:0001"
 
-camera_name: "daheng"
-exposure_ms: 10
-gamma: 2.85
-vid_pid: "KE0200010097"
-camera_param_path: ../configs/camera_param/MD_HERO_UL_8MM.yaml
+# camera_name: "daheng"
+# exposure_ms: 10
+# gamma: 2.85
+# vid_pid: "KE0200010097"
+
+camera_param_path: ../configs/camera_param/MD_HERO_UC_12MM_V1.yaml
 
 #####-----BUFF神经网络参数-----#####
 model: ../assets/yolo11_buff_int8.xml  # YOLO11 buff检测模型路径
@@ -180,6 +182,7 @@ lose_max: 20  # 最大丢失帧数
 #####-----R标签检测参数（移植自ROS版）-----#####
 detect_r_tag: true  # 是否使用传统视觉方法检测R标中心
 binary_thresh: 100  # 二值化阈值（用于R标检测）
+r_tag_roi_size: 200  # R标ROI窗口大小（像素，正方形边长）
 
 #####-----buff tracker参数-----#####
 buff_tracker:
@@ -215,7 +218,7 @@ velocity_n: 30
 # #####-----UI显示配置-----#####
 ui:
   enabled: true
-  imshow: false
+  imshow: true
   web:
     enabled: true
     host: "192.168.1.49"

@@ -1,5 +1,8 @@
 #include "planner.hpp"
 
+#ifdef HERO_OUTPOST_FILTER
+#include <limits>
+#endif
 #include <vector>
 
 #include "tools/math_tools.hpp"
@@ -38,6 +41,10 @@ Planner::Planner(const std::string & config_path)
   aim_center_palstance_threshold_ = tools::read<double>(yaml, "aim_center_palstance_threshold");
   switch_trackmode_threshold_ = tools::read<double>(yaml, "switch_trackmode_threshold");
   aim_center_angle_tolerance_ = tools::read<double>(yaml, "aim_center_angle_tolerance") / 57.3;
+  #endif
+
+  #ifdef HERO_OUTPOST_FILTER
+  outpost_top_plate_fire_disable_ = yaml["outpost_top_plate_fire_disable"].as<bool>(false);
   #endif
 }
 
@@ -161,6 +168,24 @@ Plan Planner::plan(Target target, double bullet_speed)
     if (min_delta >= aim_center_angle_tolerance_) {
       plan.fire = false;
     }
+  }
+  #endif
+
+  #ifdef HERO_OUTPOST_FILTER
+  if (plan.fire && outpost_top_plate_fire_disable_ &&
+      target.name == ArmorName::outpost) {
+    auto aim_xyz = debug_xyza.head<3>();
+    auto armors = target.armor_xyza_list();
+    int closest_id = 0;
+    double min_dist = std::numeric_limits<double>::max();
+    for (int i = 0; i < static_cast<int>(armors.size()); i++) {
+      double dist = (armors[i].head<3>() - aim_xyz).squaredNorm();
+      if (dist < min_dist) {
+        min_dist = dist;
+        closest_id = i;
+      }
+    }
+    if (target.is_outpost_top_plate(closest_id)) plan.fire = false;
   }
   #endif
 
