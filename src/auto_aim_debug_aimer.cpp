@@ -288,7 +288,7 @@ int main(int argc, char * argv[])
     gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0);
     #endif
     #ifdef SENTRY_SR
-    gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z, form.data,gimbal_form_value);
+    gimbal.send(has_target, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z, form.data,gimbal_form_value,0);
     #endif
   }
 

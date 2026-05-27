@@ -96,6 +96,7 @@ int main(int argc, char * argv[])
       auto velocity = ros2.get_nav_velocity();
       auto form = ros2.subscribe_form();
       auto gimbal_form = ros2.get_gimbal_form();
+      auto buff = ros2.subscribe_buff();
       int8_t gimbal_form_value = gimbal_form ? gimbal_form->data : 0;
       #endif
       auto plan = planner.plan(target, gs.bullet_speed);
@@ -126,7 +127,7 @@ int main(int argc, char * argv[])
       #ifdef SENTRY_SR
       gimbal.send(
         plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
-        plan.pitch_acc,velocity->linear.x*velocity_n,velocity->linear.y*velocity_n,velocity->angular.z,form.data,gimbal_form_value);
+        plan.pitch_acc,velocity->linear.x*velocity_n,velocity->linear.y*velocity_n,velocity->angular.z,form.data,gimbal_form_value,buff.data);
       #endif
         
       auto fired = gs.bullet_count > last_bullet_count;
@@ -341,7 +342,7 @@ int main(int argc, char * argv[])
   gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
   #endif
   #ifdef SENTRY_SR
-  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   #endif
 
   return 0;

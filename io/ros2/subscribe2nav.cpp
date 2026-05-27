@@ -14,7 +14,8 @@ Subscribe2Nav::Subscribe2Nav()
   enemy_status_counter_(0),
   autoaim_target_counter_(0),
   gimbal_form_queue_(1),
-  form_queue_(1)
+  form_queue_(1),
+  buff_queue_(1)
 {
   enemy_status_subscription_ = this->create_subscription<sp_msgs::msg::EnemyStatusMsg>(
     "enemy_status", 10,
@@ -35,6 +36,10 @@ Subscribe2Nav::Subscribe2Nav()
   sentry_form_subscription_ = this->create_subscription<std_msgs::msg::Int8>(
     "form",10,
     std::bind(&Subscribe2Nav::sentry_form_callback,this,std::placeholders::_1));
+
+  buff_subscription_ = this->create_subscription<std_msgs::msg::Int8>(
+    "fu",10,
+    std::bind(&Subscribe2Nav::buff_callback,this,std::placeholders::_1));
 
   RCLCPP_INFO(this->get_logger(), "nav_subscriber node initialized.");
 }
@@ -102,6 +107,11 @@ void Subscribe2Nav::sentry_form_callback(const std_msgs::msg::Int8::SharedPtr ms
   form_queue_.push(*msg);
 }
 
+void Subscribe2Nav::buff_callback(const std_msgs::msg::Int8::SharedPtr msg){
+  buff_queue_.clear();
+  buff_queue_.push(*msg);
+}
+
 void Subscribe2Nav::start()
 {
   RCLCPP_INFO(this->get_logger(), "nav_subscriber node Starting to spin...");
@@ -165,6 +175,17 @@ std_msgs::msg::Int8 Subscribe2Nav::subscribe_form()
     return msg;
   }
   form_queue_.back(msg);
+  
+  return msg;
+}
+
+std_msgs::msg::Int8 Subscribe2Nav::subscribe_buff()
+{
+  std_msgs::msg::Int8 msg;
+  if(buff_queue_.empty()) {
+    return msg;
+  }
+  buff_queue_.back(msg);
   
   return msg;
 }

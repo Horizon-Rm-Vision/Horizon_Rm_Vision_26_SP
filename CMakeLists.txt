@@ -10,7 +10,7 @@ set(CMAKE_BUILD_TYPE Release)
 message(STATUS "--------------------CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}--------------------")
 
 # 编译模式选项：控制是否使用CUDA/TensorRT和OpenVINO
-option(USE_CUDA "Enable CUDA/TensorRT support" ON)
+option(USE_CUDA "Enable CUDA/TensorRT support" OFF)
 option(USE_OPENVINO "Enable OpenVINO support" ON)
 
 if(NOT USE_CUDA AND NOT USE_OPENVINO)
@@ -18,7 +18,7 @@ if(NOT USE_CUDA AND NOT USE_OPENVINO)
 endif()
 
 # 其他编译选项,默认不编译多余组件，可以改OFF为ON来启用或禁用，或者在cmake ..中添加-DBUILD_XXX=ON临时启用
-option(BUILD_SENTRY "Build sentry tools" OFF)
+option(BUILD_SENTRY "Build sentry tools" ON)
 option(BUILD_TEST "Build test tools" OFF)
 option(BUILD_CALIBRATION "Build calibration tools" OFF)
 option(BUILD_ALL "Build all components" OFF)
@@ -236,14 +236,22 @@ if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_
     # 编译 sentry 和 publish_test
     add_executable(auto_aim_debug_mpc src/auto_aim_debug_mpc.cpp)
     add_executable(auto_aim_debug_aimer src/auto_aim_debug_aimer.cpp)
-    add_executable(auto_vision_mpc src/auto_vision_mpc.cpp)
+    if(BUILD_BUFF)
+      add_executable(auto_buff_debug_mpc src/auto_buff_debug_mpc.cpp)
+      add_executable(auto_buff_debug_aimer src/auto_buff_debug_aimer.cpp)
+      add_executable(auto_vision_mpc src/auto_vision_mpc.cpp)
+    endif()
     add_executable(publish_test tests/publish_test.cpp)
     add_executable(subscribe_test tests/subscribe_test.cpp)
     add_executable(topic_loop_test tests/topic_loop_test.cpp)
 
     target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
     target_link_libraries(auto_aim_debug_aimer ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
-    target_link_libraries(auto_vision_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
+    if(BUILD_BUFF)
+      target_link_libraries(auto_buff_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff auto_aim tools io ${AUTO_BUFF_CERES})
+      target_link_libraries(auto_buff_debug_aimer ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff auto_aim tools io ${AUTO_BUFF_CERES})
+      target_link_libraries(auto_vision_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim ${AUTO_BUFF_LIBS} tools io)
+    endif()
     target_link_libraries(publish_test ${OpenCV_LIBS} fmt::fmt tools io auto_aim)
     target_link_libraries(subscribe_test ${OpenCV_LIBS} fmt::fmt tools io)
     target_link_libraries(topic_loop_test ${OpenCV_LIBS} fmt::fmt tools io)

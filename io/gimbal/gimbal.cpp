@@ -337,7 +337,7 @@ void Gimbal::send(
 // 自瞄向电控发送数据(哨兵模式，带导航通信内容)
 void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-  float pitch_acc,float vx, float vy, float wz,int form,int gimbal)
+  float pitch_acc,float vx, float vy, float wz,int form,int gimbal,int buff)
 {
   uint8_t mode;
   if (control) 
@@ -373,7 +373,7 @@ void Gimbal::send(
   tx_data_.wz = wz;
   tx_data_.form = form;
   tx_data_.gimbal = gimbal; //预留字段，暂时填0
-
+  tx_data_.buff = buff; //buff状态
   if (fd_ < 0) {
     tools::logger()->error("[Gimbal] Cannot send data - serial port not open");
     return;

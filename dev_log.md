@@ -272,6 +272,21 @@
   2.由于mpc机制的特殊性,recorder原有录制内容无法满足新回放模式运行,现已修改recorder以适配该新模式,保留对aimer的旧回放程序的支持,可行性待测试
 ## 
 
+#### Release Candidate 2 DEV1：
+
+- **功能更新:**
+  1.哨兵通信协议更新,支持通过导航发送给电控是否切换打符模式
+  2.auto_buff_debug_aimer和mpc支持哨兵模式
+  3.修复auto_vision_mpc切换打符模式后导航信息清零的问题
+  4.更新SPSREMU使其支持最新哨兵通信格式
+- **质量更新:**
+  1.集成了哨兵信8mm镜头内外参(HIK_SENTRY_UC_8MM.yaml)
+  2.集成了英雄新标定的内外参(MD_HERO_UC_12MM_V2.yaml)
+- **待测试:**
+  1.MPC模式的回放程序(auto_aim_test_mpc),可用性待测试
+  2.由于mpc机制的特殊性,recorder原有录制内容无法满足新回放模式运行,现已修改recorder以适配该新模式,保留对aimer的旧回放程序的支持,可行性待测试
+## 
+
 待开发任务：
 1.基地灯识别
 2.集成英雄自定义客户端图传编码端

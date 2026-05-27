@@ -23,6 +23,11 @@
 #include "tools/pose_buffer.hpp"
 #include <yaml-cpp/yaml.h>
 
+#ifdef SENTRY_SR
+#include "io/ros2/publish2nav.hpp"
+#include "io/ros2/ros2.hpp"
+#endif
+
 // 定义命令行参数
 const std::string keys =
   "{help h usage ? |                        | 输出命令行参数说明}"
@@ -40,6 +45,14 @@ int main(int argc, char * argv[])
   auto yaml_config = tools::load(config_path);
   bool enable_recorder = yaml_config["recorder"] ? yaml_config["recorder"].as<bool>() : false;
 
+  auto last_t = std::chrono::steady_clock::now();
+
+  #ifdef SENTRY_SR
+  auto yaml = YAML::LoadFile(config_path);
+  auto velocity_n = yaml["velocity_n"].as<int>();
+  io::ROS2 ros2;
+  #endif
+
   // 初始化绘图器、录制器、退出器
   tools::Plotter plotter;
   tools::Recorder recorder;
@@ -50,8 +63,6 @@ int main(int argc, char * argv[])
   tools::UIWebStream ui_web_stream(config_path);
   plotter.configureWebStreamFromConfig(config_path);
   ui_manager.setProgramMode("AutoBuff MPC");
-
-  auto last_t = std::chrono::steady_clock::now();
 
   // 初始化云台、相机
   io::Gimbal gimbal(config_path);
@@ -97,6 +108,13 @@ int main(int argc, char * argv[])
       }
     }
     auto gs = gimbal.state();
+    #ifdef SENTRY_SR
+    auto velocity = ros2.get_nav_velocity();
+    auto form = ros2.subscribe_form();
+    auto gimbal_form = ros2.get_gimbal_form();
+    auto buff = ros2.subscribe_buff();
+    int8_t gimbal_form_value = gimbal_form ? gimbal_form->data : 0;
+    #endif
     if (enable_recorder) recorder.record(img, q, t);
 
     // UI FPS更新
@@ -130,14 +148,23 @@ int main(int argc, char * argv[])
 
     auto target_copy = tracker.clone_target();
 
+    bool has_target = found && target_copy;
     auto plan = auto_aim::Plan{false, false, 0, 0, 0, 0, 0, 0, 0, 0};
-    if (found && target_copy) {
+    if (has_target) {
       plan = aimer.mpc_aim(*target_copy, t, gs, true);
     }
 
+    #ifndef SENTRY_SR
     gimbal.send(
       plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
       plan.pitch_acc);
+    #endif
+    #ifdef SENTRY_SR
+    gimbal.send(
+      plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
+      plan.pitch_acc, velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z,
+      form.data, gimbal_form_value, buff.data);
+    #endif
 
     // -------------- 调试绘制 --------------
 
@@ -239,6 +266,11 @@ int main(int argc, char * argv[])
 
     // -------------- UI渲染 --------------
 
+    #ifdef SENTRY_SR
+    // 发布导航的信息
+    ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, gs.ally_outpost_hp, gs.state, gs.energy_state, gs.bullets, gs.judge);
+    #endif
+
     ui_manager.initialize(img);
 
     // 左侧面板：模式标识
@@ -263,6 +295,17 @@ int main(int argc, char * argv[])
       ui_manager.addLeftText("plan_acc", fmt::format("Plan Acc Y:{:.2f}  P:{:.2f}",
                               plan.yaw_acc, plan.pitch_acc), cv::Scalar(0, 165, 255));
     }
+
+    #ifdef SENTRY_SR
+    // Sentry SR特有的导航相关数据
+    ui_manager.addLeftText("game_progress", fmt::format("Game Status: {} ", (int)gs.game_progress));
+    ui_manager.addLeftText("stage_remain_time", fmt::format("Blood: {} ", (int)gs.stage_remain_time));
+    ui_manager.addLeftText("current_hp", fmt::format("Bullet: {} ", (int)gs.current_hp));
+    ui_manager.addLeftText("ally_outpost_hp", fmt::format("Ally Outpost HP: {} ", (int)gs.ally_outpost_hp));
+    ui_manager.addLeftText("state", fmt::format("State: {} ", (int)gs.state));
+    ui_manager.addLeftText("energy_state", fmt::format("  Energy State: {} ", (int)gs.energy_state));
+    ui_manager.addLeftText("bullets", fmt::format("  Bullets: {} ", (int)gs.bullets));
+    #endif
 
     // 大符文姿态与距离
     if (selected.has_value()) {
@@ -306,6 +349,10 @@ int main(int argc, char * argv[])
       }
     }
 
+
+    #ifdef NOVA_Q
+    ui_manager.addLeftText("queue_size", fmt::format("Queue Size: {}", gimbal.q_size()));
+    #endif
 
     // 右侧面板：弹速,各种状态
     ui_manager.addRightText("bullet_speed", fmt::format("Bullet Speed: {:.1f}", gs.bullet_speed));

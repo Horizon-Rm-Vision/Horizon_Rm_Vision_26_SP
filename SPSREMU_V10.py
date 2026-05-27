@@ -13,13 +13,13 @@
   扩展数据填0
 
 - 只启用SENTRY_SR (SENTRY_SR_ONLY=2): 包含哨兵相关数据
-    VisionToGimbal: 基础 + vx(4) + vy(4) + wz(4) + form(1) + gimbal(1) = 25字节
+    VisionToGimbal: 基础 + vx(4) + vy(4) + wz(4) + form(1) + gimbal(1) + buff(1) = 26字节
     GimbalToVision: 基础 + game_progress(1) + stage_remain_time(2) + current_hp(2) + ally_outpost_hp(2)
                   + state(1) + energy_state(1) + bullets(2) + judge(1) = 24字节
   扩展数据填0
 
 - 同时启用两者 (BOTH_ENABLED=3): 包含所有扩展数据
-    VisionToGimbal: 基础 + pitch_vel(4) + yaw_vel(4) + vx(4) + vy(4) + wz(4) + form(1) + gimbal(1) = 33字节
+    VisionToGimbal: 基础 + pitch_vel(4) + yaw_vel(4) + vx(4) + vy(4) + wz(4) + form(1) + gimbal(1) + buff(1) = 34字节
     GimbalToVision: 基础 + pitch_vel(4) + yaw_vel(4) + game_progress(1) + stage_remain_time(2)
                   + current_hp(2) + ally_outpost_hp(2) + state(1) + energy_state(1) + bullets(2) + judge(1) = 32字节
   扩展数据填0
@@ -78,6 +78,7 @@ class VisionToGimbal:
     wz: float = 0.0
     form: int = 0
     gimbal: int = 0        # 云台编号，预留字段
+    buff: int = 0          # buff状态，与gimbal.hpp一致
     tail: int = 0xDC
 
 @dataclass
@@ -185,7 +186,7 @@ class GimbalSimulator:
             base_size += 8  # pitch_vel(4) + yaw_vel(4)
 
         if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
-            base_size += 14  # vx(4) + vy(4) + wz(4) + form(1) + gimbal(1)
+            base_size += 15  # vx(4) + vy(4) + wz(4) + form(1) + gimbal(1) + buff(1)
 
         return base_size
 
@@ -244,7 +245,7 @@ class GimbalSimulator:
                 format_str += 'ff'  # pitch_vel(4) + yaw_vel(4)
 
             if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
-                format_str += 'fffbb'  # vx(4) + vy(4) + wz(4) + form(1) + gimbal(1)
+                format_str += 'fffbbb'  # vx(4) + vy(4) + wz(4) + form(1) + gimbal(1) + buff(1)
 
             format_str += 'B'  # tail(1)
 
@@ -274,7 +275,8 @@ class GimbalSimulator:
                 packet.wz = unpacked[index + 2]
                 packet.form = unpacked[index + 3]
                 packet.gimbal = unpacked[index + 4]
-                index += 5
+                packet.buff = unpacked[index + 5]
+                index += 6
 
             packet.tail = unpacked[-1]
 
@@ -329,7 +331,7 @@ class GimbalSimulator:
             log_msg += f", PitchVel: {vision_data.pitch_vel:.3f}, YawVel: {vision_data.yaw_vel:.3f}"
 
         if self.comm_mode in [CommunicationMode.SENTRY_SR_ONLY, CommunicationMode.BOTH_ENABLED]:
-            log_msg += f", Vx: {vision_data.vx:.3f}, Vy: {vision_data.vy:.3f}, Wz: {vision_data.wz:.3f}, Form: {vision_data.form}, Gimbal: {vision_data.gimbal}"
+            log_msg += f", Vx: {vision_data.vx:.3f}, Vy: {vision_data.vy:.3f}, Wz: {vision_data.wz:.3f}, Form: {vision_data.form}, Gimbal: {vision_data.gimbal}, Buff: {vision_data.buff}"
 
         logger.info(log_msg)
 

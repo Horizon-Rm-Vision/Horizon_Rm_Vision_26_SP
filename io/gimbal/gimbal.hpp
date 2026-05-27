@@ -62,6 +62,7 @@ struct __attribute__((packed)) VisionToGimbal
   float wz;                   // 角速度
   int8_t form;                // 哨兵姿态
   int8_t gimbal;               // 云台编号，预留字段，暂时填0
+  int8_t buff;               // buff状态
   #endif
   uint8_t tail = 0xDC;        // 包尾 0xDC
 };
@@ -123,7 +124,7 @@ public:
   #ifdef SENTRY_SR
   void send(
     bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-    float pitch_acc, float vx, float vy, float wz,int form,int gimbal);
+    float pitch_acc, float vx, float vy, float wz,int form,int gimbal,int buff);
   #endif
 
   void send(io::VisionToGimbal VisionToGimbal);

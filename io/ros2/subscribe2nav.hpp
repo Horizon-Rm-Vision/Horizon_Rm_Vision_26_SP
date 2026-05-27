@@ -28,6 +28,7 @@ public:
   std::optional<geometry_msgs::msg::Twist> get_nav_velocity();
   std::optional<std_msgs::msg::Int8> get_gimbal_form();
   std_msgs::msg::Int8 subscribe_form();
+  std_msgs::msg::Int8 subscribe_buff();
 
 private:
   void enemy_status_callback(const sp_msgs::msg::EnemyStatusMsg::SharedPtr msg);
@@ -35,25 +36,31 @@ private:
   void nav_velocity_callback(const geometry_msgs::msg::Twist::SharedPtr msg);
   void sentry_form_callback(const std_msgs::msg::Int8::SharedPtr msg);
   void gimbal_form_callback(const std_msgs::msg::Int8::SharedPtr msg);
+  void buff_callback(const std_msgs::msg::Int8::SharedPtr msg);
   int enemy_status_counter_;
   int autoaim_target_counter_;
   int nav_velocity_counter_;
+  int buff_counter_;
+
 
   rclcpp::TimerBase::SharedPtr enemy_status_timer_;
   rclcpp::TimerBase::SharedPtr autoaim_target_timer_;
   rclcpp::TimerBase::SharedPtr nav_velocity_timer_;
+  rclcpp::TimerBase::SharedPtr buff_timer_;
 
   rclcpp::Subscription<sp_msgs::msg::EnemyStatusMsg>::SharedPtr enemy_status_subscription_;
   rclcpp::Subscription<sp_msgs::msg::AutoaimTargetMsg>::SharedPtr autoaim_target_subscription_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr nav_velocity_subscription_;
   rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr sentry_form_subscription_;
   rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr gimbal_form_subscription_;
+  rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr buff_subscription_;
 
   tools::ThreadSafeQueue<sp_msgs::msg::EnemyStatusMsg> enemy_statue_queue_;
   tools::ThreadSafeQueue<sp_msgs::msg::AutoaimTargetMsg> autoaim_target_queue_;
   tools::ThreadSafeQueue<geometry_msgs::msg::Twist> nav_velocity_queue_;
   tools::ThreadSafeQueue<std_msgs::msg::Int8> gimbal_form_queue_;
   tools::ThreadSafeQueue<std_msgs::msg::Int8> form_queue_; 
+  tools::ThreadSafeQueue<std_msgs::msg::Int8> buff_queue_;
 
 };
 }  // namespace io

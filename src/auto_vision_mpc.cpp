@@ -136,6 +136,7 @@ int main(int argc, char * argv[])
         auto form = ros2.subscribe_form();
         auto gimbal_form = ros2.get_gimbal_form();
         int8_t gimbal_form_value = gimbal_form ? gimbal_form->data : 0;
+        auto buff = ros2.subscribe_buff();
         #endif
         auto plan = planner.plan(target, gs.bullet_speed);
 
@@ -167,7 +168,7 @@ int main(int argc, char * argv[])
           plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
           plan.pitch_acc,
           velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z,
-          form.data, gimbal_form_value);
+          form.data, gimbal_form_value, buff.data);
         #endif
 
         auto fired = gs.bullet_count > last_bullet_count;
@@ -225,6 +226,16 @@ int main(int argc, char * argv[])
     auto gs = gimbal.state();
     if (enable_recorder) recorder.record(img, q, t);
 
+    #ifdef SENTRY_SR
+    auto velocity = ros2.get_nav_velocity();
+    auto form = ros2.subscribe_form();
+    auto gimbal_form = ros2.get_gimbal_form();
+    int8_t gimbal_form_value = gimbal_form ? gimbal_form->data : 0;
+    auto buff = ros2.subscribe_buff();
+    ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp,
+                        gs.ally_outpost_hp, gs.state, gs.energy_state, gs.bullets, gs.judge);
+    #endif
+
     // ================================================================
     //                         自瞄模式
     // ================================================================
@@ -273,11 +284,6 @@ int main(int argc, char * argv[])
         tools::draw_points(img, image_points, aim_color);
         #endif
       }
-
-      #ifdef SENTRY_SR
-      ros2.publish_status(gs.game_progress, gs.stage_remain_time, gs.current_hp, 
-                          gs.ally_outpost_hp, gs.state, gs.energy_state,gs.bullets,gs.judge);
-      #endif
 
       // ---- Plotter + UI (自瞄, 合并以消除重复 planner.plan() 调用) ----
       {
@@ -404,7 +410,8 @@ int main(int argc, char * argv[])
       #ifdef SENTRY_SR
       gimbal.send(
         plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
-        plan.pitch_acc, 0, 0, 0, 0, 0);
+        plan.pitch_acc, velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z,
+        form.data, gimbal_form_value, buff.data);
       #endif
 
       // ---- 图像绘制：打符 ----
@@ -551,7 +558,8 @@ int main(int argc, char * argv[])
       gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
       #endif
       #ifdef SENTRY_SR
-      gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      gimbal.send(false, false, 0, 0, 0, 0, 0, 0, velocity->linear.x*velocity_n, velocity->linear.y*velocity_n, velocity->angular.z,
+        form.data, gimbal_form_value, buff.data);
       #endif
 
       ui_manager.initialize(img);
@@ -582,7 +590,7 @@ int main(int argc, char * argv[])
   gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
   #endif
   #ifdef SENTRY_SR
-  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   #endif
 
   return 0;
