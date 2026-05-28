@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Autostart V2
+Comment=Start V2 script
+Exec=/home/horizon/Horizon_Rm_Vision_26_SP/autostart_V2.sh
+Icon=utilities-terminal
+Terminal=true
+Categories=Utility;

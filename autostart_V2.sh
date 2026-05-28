@@ -8,7 +8,10 @@ sec=2
 cnt=0
 name=horizon/Horizon_Rm_Vision_26_SP
 program_name=auto_aim_debug_mpc
+lock_file=/tmp/$program_name.lock
 cd /home/$name/build/
+
+trap 'rm -f "$lock_file"' EXIT INT TERM
 
 while [ 1 ]
 do
@@ -22,8 +25,12 @@ do
     else
         echo "启动 $name..."
         # 检查是否存在互斥锁
-        if [ ! -f /tmp/$program_name.lock ]; then
-            touch /tmp/$program_name.lock
+        if [ -f "$lock_file" ]; then
+            # 清理异常退出遗留的锁
+            rm -f "$lock_file"
+        fi
+        if [ ! -f "$lock_file" ]; then
+            touch "$lock_file"
             cd /home/$name/build/
             #手动查询串口设备代号命令：ls /dev/ttyS* -alt
             #英雄，哨兵和串口版步兵用ttyACM0
@@ -42,7 +49,7 @@ do
             source ./local_setup.sh
             taskset -c 10,11,16,17,18,19 ./$program_name
            
-            rm /tmp/$program_name.lock
+            rm -f "$lock_file"
             echo "$name 已启动!"
             ((cnt=cnt+1))
         else

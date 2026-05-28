@@ -21,6 +21,10 @@ public:
 
   std::string state() const;
 
+#ifdef PLANE_OUTPOST_TIMEFILTER
+  double outpost_filt_remaining_time() const;
+#endif
+
   std::list<Target> track(
     std::list<Armor> & armors, std::chrono::steady_clock::time_point t,
     bool use_enemy_color = true);
@@ -50,6 +54,15 @@ private:
   int outpost_correction_cancel_count_;
   int outpost_seen_streak_;
   int non_outpost_seen_streak_;
+
+#ifdef PLANE_OUTPOST_PRIOR
+  bool outpost_highest_priority_enable_;
+#endif
+
+#ifdef PLANE_OUTPOST_TIMEFILTER
+  double outpost_only_duration_;
+  std::chrono::steady_clock::time_point start_time_;
+#endif
 
   bool outpost_top_filter_enable_;
   double outpost_top_pitch_;

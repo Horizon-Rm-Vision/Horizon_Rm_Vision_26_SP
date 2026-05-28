@@ -93,7 +93,11 @@ outpost_q_h: 0.0006
 outpost_h_converged_variance: 0.05
 outpost_converged_pos_p_max: 0.5
 outpost_converged_vel_p_max: 10.0
-outpost_top_plate_fire_disable: false
+outpost_top_plate_fire_disable: false #启用时将禁止击打最高位前哨站装甲板(用于英雄)
+#飞机前哨站优先机制,启用宏并在yaml里启用后会将前哨站装甲板识别和追踪优先级设为最高 
+outpost_highest_priority_enable: true  # 前哨站优先级最高，高于其他所有装甲板
+#飞机前哨站定时过滤机制,启用宏并在yaml里设置时间后会在一定时间内在识别层过滤其他非前哨站装甲板
+outpost_only_duration: 270.0  # 启动后仅识别前哨站的时间窗口(秒)，0=关闭
 
 #####-----outpost 顶部装甲板过滤机制(仅用于无人机)-----#####
 #该机制用于前哨站顶部装甲板,过滤大于outpost_top_pitch的装甲板,保留小于outpost_front_pitch的装甲板

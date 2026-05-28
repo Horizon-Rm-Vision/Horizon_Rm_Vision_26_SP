@@ -263,8 +263,15 @@ int main(int argc, char * argv[])
     // 添加左侧UI元素
     ui_manager.addLeftText("detect", fmt::format("Detect: {}", has_target ? "YES" : "NO"), 
                           has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
-    ui_manager.addLeftText("fire", fmt::format("Fire: {}", plan.fire ? "YES" : "NO"), 
+    ui_manager.addLeftText("fire", fmt::format("Fire: {}", plan.fire ? "YES" : "NO"),
                           plan.fire ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+    #ifdef PLANE_OUTPOST_TIMEFILTER
+    {
+      double remaining = tracker.outpost_filt_remaining_time();
+      cv::Scalar filt_color = remaining > 0.0 ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 255, 0);
+      ui_manager.addLeftText("outpost_filt_time", fmt::format("Outpost Filt Time: {:.1f}s", remaining), filt_color);
+    }
+    #endif
     ui_manager.addLeftText("gimbal_status", fmt::format("Gimbal Yaw: {:.2f}  Pitch: {:.2f}", -gs.yaw * 180.0 / M_PI, -gs.pitch * 180.0 / M_PI));
     ui_manager.addLeftText("gimbal_vel", fmt::format("Gimbal Vel Y: {:.2f}  P: {:.2f}", -gs.yaw_vel * 180.0 / M_PI, -gs.pitch_vel * 180.0 / M_PI));
     ui_manager.addLeftText("plan_status", fmt::format("Plan Yaw: {:.2f}  Pitch: {:.2f}", -plan.yaw * 180.0 / M_PI, -plan.pitch * 180.0 / M_PI), cv::Scalar(0, 165, 255));

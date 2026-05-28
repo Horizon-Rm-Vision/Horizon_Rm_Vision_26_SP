@@ -35,6 +35,8 @@ add_compile_definitions(NOVA_AIM_CENTER) # 新版锁中心模式
 #add_compile_definitions(BIG_BUFF_DUO_EKF) # 大符双线EKF模式,对大符的两块扇叶分别进行独立的EKF跟踪
 #add_compile_definitions(BIG_BUFF_FIRE_FIX) # 大符开火修正,待验证
 #add_compile_definitions(HERO_OUTPOST_FILTER) # 英雄前哨站特殊开火机制,只打下面两块,待测试
+#add_compile_definitions(PLANE_OUTPOST_PRIOR) #飞机前哨站优先机制,启用并在yaml里启用后会将前哨站装甲板识别和追踪优先级设为最高 
+#add_compile_definitions(PLANE_OUTPOST_TIMEFILTER) #飞机前哨站定时过滤机制,启用并在yaml里启用后会在一定时间内在识别层过滤其他非前哨站装甲板 
 
 if(BUILD_SENTRY)
 add_compile_definitions(SENTRY_SR) # 串口通信编译为哨兵导航联合通信版本

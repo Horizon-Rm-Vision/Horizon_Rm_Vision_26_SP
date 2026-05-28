@@ -225,6 +225,13 @@ int main(int argc, char * argv[])
                           has_target ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
     ui_manager.addLeftText("fire", fmt::format("Fire: {}", command.shoot ? "YES" : "NO"),
                           command.shoot ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0));
+    #ifdef PLANE_OUTPOST_TIMEFILTER
+    {
+      double remaining = tracker.outpost_filt_remaining_time();
+      cv::Scalar filt_color = remaining > 0.0 ? cv::Scalar(0, 255, 255) : cv::Scalar(0, 255, 0);
+      ui_manager.addLeftText("outpost_filt_time", fmt::format("Outpost Filt Time: {:.1f}s", remaining), filt_color);
+    }
+    #endif
 
     // 左侧面板：云台状态与cmd数据
     Eigen::Vector3d ypr = tools::eulers(gimbal_q.toRotationMatrix(), 2, 1, 0);

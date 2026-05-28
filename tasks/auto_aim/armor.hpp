@@ -39,6 +39,7 @@ enum ArmorName
 const std::vector<std::string> ARMOR_NAMES = {"one",    "two",     "three", "four",     "five",
                                               "sentry", "outpost", "base",  "not_armor"};
 
+#ifndef PLANE_OUTPOST_PRIOR
 enum ArmorPriority
 {
   first = 1,
@@ -47,6 +48,20 @@ enum ArmorPriority
   forth,
   fifth
 };
+#endif
+
+
+#ifdef PLANE_OUTPOST_PRIOR
+enum ArmorPriority
+{
+  highest = 0,
+  first = 1,
+  second,
+  third,
+  forth,
+  fifth
+};
+#endif
 
 // clang-format off
 const std::vector<std::tuple<Color, ArmorName, ArmorType>> armor_properties = {

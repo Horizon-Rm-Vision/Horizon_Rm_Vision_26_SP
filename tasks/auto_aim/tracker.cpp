@@ -79,6 +79,19 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
     yaml["outpost_correction_cancel_count"].as<int>() :
     outpost_correction_cancel_count_;
 
+#ifdef PLANE_OUTPOST_PRIOR
+  outpost_highest_priority_enable_ =
+    yaml["outpost_highest_priority_enable"]
+      ? yaml["outpost_highest_priority_enable"].as<bool>()
+      : false;
+#endif
+
+#ifdef PLANE_OUTPOST_TIMEFILTER
+  outpost_only_duration_ =
+    yaml["outpost_only_duration"] ? yaml["outpost_only_duration"].as<double>() : 0.0;
+  start_time_ = std::chrono::steady_clock::now();
+#endif
+
   outpost_top_filter_enable_ =
     yaml["outpost_top_filter_enable"] ? yaml["outpost_top_filter_enable"].as<bool>() : false;
   outpost_top_pitch_ =
@@ -152,6 +165,18 @@ std::list<Target> Tracker::track(
   // 过滤掉非我方装甲板
   armors.remove_if([&](const auto_aim::Armor & a) { return a.color != enemy_color_; });
 
+  #ifdef PLANE_OUTPOST_TIMEFILTER
+  // 启动后仅识别前哨站的时间窗口
+  if (outpost_only_duration_ > 0.0) {
+    auto elapsed =
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time_).count();
+    if (elapsed < outpost_only_duration_) {
+      armors.remove_if(
+        [&](const auto_aim::Armor & a) { return a.name != ArmorName::outpost; });
+    }
+  }
+  #endif
+
   apply_outpost_correction(armors);
 
   // 过滤前哨站顶部装甲板
@@ -171,6 +196,15 @@ std::list<Target> Tracker::track(
     return distance_1 < distance_2;
   });
 
+  #ifdef PLANE_OUTPOST_PRIOR
+  // 前哨站优先级最高：高于所有其他装甲板
+  if (outpost_highest_priority_enable_) {
+    for (auto & armor : armors) {
+      if (armor.name == ArmorName::outpost) armor.priority = ArmorPriority::highest;
+    }
+  }
+  #endif
+
   // 按优先级排序，优先级最高在首位(优先级越高数字越小，1的优先级最高)
   armors.sort(
     [](const auto_aim::Armor & a, const auto_aim::Armor & b) { return a.priority < b.priority; });
@@ -179,6 +213,16 @@ std::list<Target> Tracker::track(
   if (state_ == "lost") {
     found = set_target(armors, t);
   }
+
+  #ifdef PLANE_OUTPOST_PRIOR
+  // 当前画面中出现优先级更高的装甲板，切换目标
+  else if (
+    state_ == "tracking" && !armors.empty() && armors.front().priority < target_.priority) {
+    found = set_target(armors, t);
+    tools::logger()->debug(
+      "[Tracker] switch target to {}", ARMOR_NAMES[armors.front().name]);
+  }
+  #endif
 
   else {
     found = update_target(armors, t);
@@ -233,6 +277,18 @@ std::tuple<omniperception::DetectionResult, std::list<Target>> Tracker::track(
     state_ = "lost";
   }
 
+  #ifdef PLANE_OUTPOST_TIMEFILTER
+  // 启动后仅识别前哨站的时间窗口
+  if (outpost_only_duration_ > 0.0) {
+    auto elapsed =
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time_).count();
+    if (elapsed < outpost_only_duration_) {
+      armors.remove_if(
+        [&](const auto_aim::Armor & a) { return a.name != ArmorName::outpost; });
+    }
+  }
+  #endif
+
   apply_outpost_correction(armors);
 
   // 优先选择靠近图像中心的装甲板
@@ -242,6 +298,15 @@ std::tuple<omniperception::DetectionResult, std::list<Target>> Tracker::track(
     auto distance_2 = cv::norm(b.center - img_center);
     return distance_1 < distance_2;
   });
+
+  #ifdef PLANE_OUTPOST_PRIOR
+  // 前哨站优先级最高：高于所有其他装甲板
+  if (outpost_highest_priority_enable_) {
+    for (auto & armor : armors) {
+      if (armor.name == ArmorName::outpost) armor.priority = ArmorPriority::highest;
+    }
+  }
+  #endif
 
   // 按优先级排序，优先级最高在首位(优先级越高数字越小，1的优先级最高)
   armors.sort([](const Armor & a, const Armor & b) { return a.priority < b.priority; });
@@ -443,5 +508,16 @@ bool Tracker::update_target(std::list<Armor> & armors, std::chrono::steady_clock
 
   return true;
 }
+
+#ifdef PLANE_OUTPOST_TIMEFILTER
+double Tracker::outpost_filt_remaining_time() const
+{
+  if (outpost_only_duration_ <= 0.0) return 0.0;
+  auto elapsed =
+    std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time_).count();
+  auto remaining = outpost_only_duration_ - elapsed;
+  return remaining > 0.0 ? remaining : 0.0;
+}
+#endif
 
 }  // namespace auto_aim
